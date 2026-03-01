@@ -7,7 +7,7 @@ var recipes: Dictionary = {
 		"name": "补血丹",
 		"recipe_name": "补血丹丹方",
 		"success_value": 50,
-		"base_time": 5.0,
+		"base_time": 3.0,
 		"materials": {
 			"mat_herb": 2
 		},
@@ -20,9 +20,9 @@ var recipes: Dictionary = {
 		"name": "补气丹",
 		"recipe_name": "补气丹丹方",
 		"success_value": 40,
-		"base_time": 5.0,
+		"base_time": 10.0,
 		"materials": {
-			"mat_herb": 5
+			"mat_herb": 10
 		},
 		"spirit_energy": 1,
 		"product": "spirit_pill",
@@ -33,7 +33,7 @@ var recipes: Dictionary = {
 		"name": "筑基丹",
 		"recipe_name": "筑基丹丹方",
 		"success_value": 30,
-		"base_time": 10.0,
+		"base_time": 30.0,
 		"materials": {
 			"foundation_herb": 3,
 			"mat_herb": 10
@@ -47,7 +47,7 @@ var recipes: Dictionary = {
 		"name": "金丹丹",
 		"recipe_name": "金丹丹丹方",
 		"success_value": 20,
-		"base_time": 15.0,
+		"base_time": 40.0,
 		"materials": {
 			"foundation_herb": 3,
 			"foundation_pill": 3,

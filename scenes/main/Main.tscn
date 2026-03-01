@@ -92,23 +92,6 @@ corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_disabled"]
-bg_color = Color(0.6, 0.58, 0.55, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.5, 0.48, 0.45, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-border_color = Color(0.7, 0.68, 0.65, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_detail"]
 bg_color = Color(0.9, 0.88, 0.85, 1)
 border_width_left = 1
@@ -121,15 +104,27 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_log"]
-bg_color = Color(0.85, 0.8, 0.75, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_alchemy_panel"]
+bg_color = Color(0.85, 0.82, 0.78, 0.75)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_alchemy_panel"]
-bg_color = Color(0.85, 0.82, 0.78, 0.75)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_disabled"]
+bg_color = Color(0.6, 0.58, 0.55, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.7, 0.68, 0.65, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_log"]
+bg_color = Color(0.85, 0.8, 0.75, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
@@ -167,9 +162,9 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="TopSpacer" type="Control" parent="VBoxContainer" unique_id=992490503]
+custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 size_flags_vertical = 0
-custom_minimum_size = Vector2(0, 20)
 
 [node name="TopBar" type="Control" parent="VBoxContainer" unique_id=992490502]
 custom_minimum_size = Vector2(0, 80)
@@ -249,14 +244,14 @@ alignment = 1
 
 [node name="SpiritStoneIcon" type="Label" parent="VBoxContainer/TopBar/TopBarContent/SpiritStoneContainer" unique_id=175024947]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.952941, 0.611765, 0.0705882, 1)
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 28
 text = "💎"
 horizontal_alignment = 1
 
 [node name="SpiritStoneLabel" type="Label" parent="VBoxContainer/TopBar/TopBarContent/SpiritStoneContainer" unique_id=172021799]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.952941, 0.611765, 0.0705882, 1)
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 22
 text = "0"
 horizontal_alignment = 1
@@ -295,16 +290,6 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
 text = "修炼"
-
-[node name="MeridianTab" type="Button" parent="VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar" unique_id=857891156]
-custom_minimum_size = Vector2(120, 50)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
-theme_override_font_sizes/font_size = 18
-theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
-theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
-text = "经脉"
 
 [node name="SpellTab" type="Button" parent="VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar" unique_id=857891157]
 custom_minimum_size = Vector2(120, 50)
@@ -556,19 +541,6 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
 text = "突破"
-
-[node name="MeridianPanel" type="Control" parent="VBoxContainer/ContentPanel/NeishiPanel" unique_id=828400659]
-visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 60.0
-offset_right = -10.0
-offset_bottom = -10.0
-grow_horizontal = 2
-grow_vertical = 2
 
 [node name="SpellPanel" type="Control" parent="VBoxContainer/ContentPanel/NeishiPanel" unique_id=828400660]
 visible = false
@@ -1162,10 +1134,6 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_alchemy_panel")
 
 [node name="RecipeListVBox" type="VBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/RecipeListPanel" unique_id=1816358075]
 layout_mode = 2
-offset_left = 5.0
-offset_top = 5.0
-offset_right = -5.0
-offset_bottom = -5.0
 
 [node name="RecipeListLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/RecipeListPanel/RecipeListVBox" unique_id=1816358076]
 layout_mode = 2
@@ -1191,10 +1159,6 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_alchemy_panel")
 
 [node name="CraftVBox" type="VBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel" unique_id=1816358080]
 layout_mode = 2
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
 alignment = 1
 
 [node name="RecipeNameLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358081]
@@ -1265,10 +1229,9 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 16
 text = "Max"
 
-[node name="CraftCountLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358102]
+[node name="CraftCountLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1823910151]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
-theme_override_constants/top_margin = 16
 theme_override_font_sizes/font_size = 24
 text = "0/0"
 horizontal_alignment = 1
@@ -1277,11 +1240,9 @@ horizontal_alignment = 1
 custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
 size_flags_horizontal = 3
-max_value = 100.0
-value = 0.0
 show_percentage = false
 
-[node name="ButtonHBox" type="HBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358103]
+[node name="ButtonHBox" type="HBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1233295825]
 layout_mode = 2
 alignment = 1
 
@@ -1297,7 +1258,7 @@ theme_override_styles/disabled = SubResource("StyleBoxFlat_button_disabled")
 disabled = true
 text = "开始炼制"
 
-[node name="StopButton" type="Button" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/ButtonHBox" unique_id=1816358104]
+[node name="StopButton" type="Button" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/ButtonHBox" unique_id=1406787781]
 custom_minimum_size = Vector2(120, 45)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
@@ -1316,10 +1277,6 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_alchemy_panel")
 
 [node name="BottomVBox" type="VBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/BottomPanel" unique_id=1816358097]
 layout_mode = 2
-offset_left = 10.0
-offset_top = 5.0
-offset_right = -10.0
-offset_bottom = -5.0
 
 [node name="BonusTitleLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/BottomPanel/BottomVBox" unique_id=1816358098]
 layout_mode = 2
@@ -1366,11 +1323,6 @@ scroll_following = true
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 alignment = 1
-
-[node name="BottomSpacer" type="Control" parent="VBoxContainer" unique_id=1586396814]
-layout_mode = 2
-size_flags_vertical = 0
-custom_minimum_size = Vector2(0, 20)
 
 [node name="NeishiButton" type="Button" parent="VBoxContainer/TabBar" unique_id=857891154]
 custom_minimum_size = Vector2(120, 50)
@@ -1421,3 +1373,8 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
 text = "设置"
+
+[node name="BottomSpacer" type="Control" parent="VBoxContainer" unique_id=1586396814]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+size_flags_vertical = 0

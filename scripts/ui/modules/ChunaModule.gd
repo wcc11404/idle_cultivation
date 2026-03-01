@@ -132,6 +132,11 @@ func setup_inventory_grid():
 	if not inventory_grid:
 		return
 	
+	# 禁用并隐藏横向滚动条
+	var scroll_container = inventory_grid.get_parent() if inventory_grid.get_parent() is ScrollContainer else null
+	if scroll_container:
+		scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	
 	# 清空现有格子
 	while inventory_grid.get_child_count() > 0:
 		var child = inventory_grid.get_child(0)

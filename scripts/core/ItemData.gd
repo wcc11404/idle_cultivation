@@ -116,11 +116,11 @@ var item_data: Dictionary = {
 		"type": 3,
 		"quality": 1,
 		"max_stack": 99,
-		"description": "普通丹药，可补充50点灵气",
+		"description": "普通丹药，可补充20点灵气",
 		"icon": "res://assets/items/spirit_pill.png",
 		"effect": {
 			"type": "add_spirit_energy",
-			"amount": 50
+			"amount": 20
 		}
 	},
 	"spell_basic_breathing": {

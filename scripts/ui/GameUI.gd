@@ -102,11 +102,9 @@ const REALM_FRAME_TEXTURES = {
 
 # 内室子Tab
 @onready var cultivation_tab: Button = $VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar/CultivationTab
-@onready var meridian_tab: Button = $VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar/MeridianTab
 @onready var spell_tab: Button = $VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar/SpellTab
 
 @onready var cultivation_panel: Control = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer
-@onready var meridian_panel: Control = $VBoxContainer/ContentPanel/NeishiPanel/MeridianPanel
 @onready var spell_panel: Control = $VBoxContainer/ContentPanel/NeishiPanel/SpellPanel
 
 @onready var save_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SaveButton
@@ -296,8 +294,6 @@ func setup_button_connections():
 	# 内室子Tab连接（NeishiModule）
 	if cultivation_tab and neishi_module:
 		cultivation_tab.pressed.connect(neishi_module.on_cultivation_tab_pressed)
-	if meridian_tab and neishi_module:
-		meridian_tab.pressed.connect(neishi_module.on_meridian_tab_pressed)
 	if spell_tab and neishi_module:
 		spell_tab.pressed.connect(neishi_module.on_spell_tab_pressed)
 	
@@ -339,6 +335,7 @@ func setup_alchemy_module():
 	alchemy_module.count_10_button = count_10_button
 	alchemy_module.count_100_button = count_100_button
 	alchemy_module.count_max_button = count_max_button
+	alchemy_module.alchemy_back_button = alchemy_back_button
 	
 	# 初始化炼丹模块（在设置UI节点引用之后）
 	alchemy_module.initialize(self, player, alchemy_system, recipe_data, item_data_ref)
@@ -357,7 +354,7 @@ func setup_alchemy_module():
 		count_max_button.pressed.connect(_on_craft_count_max)
 	
 	# 连接信号
-	alchemy_module.log_message.connect(_on_module_log)
+	alchemy_module.log_message.connect(_on_alchemy_log)
 	alchemy_module.back_to_dongfu_requested.connect(_on_back_to_dongfu_requested)
 	
 	# 连接返回按钮
@@ -481,10 +478,8 @@ func setup_neishi_module():
 	# 设置UI节点引用
 	neishi_module.neishi_panel = neishi_panel
 	neishi_module.cultivation_panel = cultivation_panel
-	neishi_module.meridian_panel = meridian_panel
 	neishi_module.spell_panel = spell_panel
 	neishi_module.cultivation_tab = cultivation_tab
-	neishi_module.meridian_tab = meridian_tab
 	neishi_module.spell_tab = spell_tab
 	
 	# 初始化模块
@@ -501,6 +496,11 @@ func _on_module_log(message: String):
 	"""统一处理各模块的日志消息"""
 	if log_manager:
 		log_manager.add_system_log(message)
+
+func _on_alchemy_log(message: String):
+	"""处理炼丹模块的日志消息"""
+	if log_manager:
+		log_manager.add_alchemy_log(message)
 
 func setup_lianli_module():
 	# 创建历练模块
@@ -770,6 +770,11 @@ func show_lianli_tab():
 	tab_lianli.disabled = true
 	tab_settings.disabled = false
 
+	# 更新历练区域按钮显示（每日次数、无尽塔层数等）
+	update_lianli_area_buttons_display()
+	if endless_tower_button and lianli_module:
+		lianli_module.update_endless_tower_button_text(endless_tower_button)
+
 	# 检查是否处于历练中（战斗中或等待中）
 	if lianli_module:
 		if lianli_system and (lianli_system.is_in_battle or lianli_system.is_waiting or lianli_system.is_in_lianli):
@@ -877,7 +882,15 @@ func _init_lianli_area_buttons():
 		if i < lianli_area_ids.size():
 			var area_id = lianli_area_ids[i]
 			var area_name = lianli_area_data.get_area_name(area_id) if lianli_area_data else area_id
-			button.text = area_name
+			
+			# 特殊区域显示剩余次数
+			if lianli_area_data and lianli_area_data.is_special_area(area_id) and player:
+				var remaining = player.get_daily_dungeon_count(area_id)
+				var max_count = PlayerData.DAILY_DUNGEON_MAX_COUNT
+				button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
+			else:
+				button.text = area_name
+			
 			button.visible = true
 			# 断开之前的连接（避免重复连接）
 			var connections = button.get_signal_connection_list("pressed")
@@ -888,6 +901,25 @@ func _init_lianli_area_buttons():
 				button.pressed.connect(lianli_module.on_lianli_area_pressed.bind(area_id))
 		else:
 			button.visible = false
+
+# 更新历练区域按钮显示（用于刷新每日次数等）
+func update_lianli_area_buttons_display():
+	if not lianli_area_data or not player:
+		return
+	
+	for i in range(lianli_area_buttons.size()):
+		if i < lianli_area_ids.size():
+			var button = lianli_area_buttons[i]
+			var area_id = lianli_area_ids[i]
+			var area_name = lianli_area_data.get_area_name(area_id)
+			
+			# 特殊区域显示剩余次数
+			if lianli_area_data.is_special_area(area_id):
+				var remaining = player.get_daily_dungeon_count(area_id)
+				var max_count = PlayerData.DAILY_DUNGEON_MAX_COUNT
+				button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
+			else:
+				button.text = area_name
 
 # ==================== 无尽塔功能 ====================
 
@@ -910,6 +942,7 @@ func _on_craft_count_changed(count: int):
 func _on_craft_count_max():
 	if alchemy_module:
 		var max_count = alchemy_module.get_max_craft_count()
+		max_count = maxi(max_count, 1)  # 至少设置1个
 		alchemy_module.set_craft_count(max_count)
 
 func update_ui():

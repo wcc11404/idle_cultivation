@@ -75,7 +75,9 @@ func has_furnace() -> bool:
 func get_alchemy_bonus() -> Dictionary:
 	var bonus = {
 		"success_bonus": 0,
-		"speed_bonus": 0.0
+		"speed_rate": 0.0,
+		"level": 0,
+		"obtained": false
 	}
 	
 	if not spell_system:
@@ -86,12 +88,15 @@ func get_alchemy_bonus() -> Dictionary:
 	if spell_info.is_empty() or not spell_info.obtained:
 		return bonus
 	
+	bonus.obtained = true
 	var level = spell_info.level
+	bonus.level = level
+	
 	if level > 0:
 		var level_data = spell_system.spell_data.get_spell_level_data("alchemy", level)
 		var effect = level_data.get("effect", {})
 		bonus.success_bonus = effect.get("success_bonus", 0)
-		bonus.speed_bonus = effect.get("speed_bonus", 0.0)
+		bonus.speed_rate = effect.get("speed_rate", 0.0)
 	
 	return bonus
 
@@ -99,15 +104,17 @@ func get_alchemy_bonus() -> Dictionary:
 func get_furnace_bonus() -> Dictionary:
 	var bonus = {
 		"success_bonus": 0,
-		"speed_bonus": 0.0
+		"speed_rate": 0.0,
+		"has_furnace": false
 	}
 	
 	if not has_furnace():
 		return bonus
 	
+	bonus.has_furnace = true
 	# 初级丹炉固定加成
 	bonus.success_bonus = 10
-	bonus.speed_bonus = 0.1
+	bonus.speed_rate = 0.1
 	
 	return bonus
 
@@ -134,7 +141,7 @@ func calculate_craft_time(recipe_id: String) -> float:
 	var alchemy_bonus = get_alchemy_bonus()
 	var furnace_bonus = get_furnace_bonus()
 	
-	var final_speed = 1.0 + alchemy_bonus.speed_bonus + furnace_bonus.speed_bonus
+	var final_speed = 1.0 + alchemy_bonus.speed_rate + furnace_bonus.speed_rate
 	
 	return base_time / final_speed
 
@@ -205,7 +212,7 @@ func start_crafting(recipe_id: String, count: int) -> Dictionary:
 	current_craft_progress = 0.0
 	
 	crafting_started.emit(recipe_id, count)
-	log_message.emit("开始炼制 " + recipe_data.get_recipe_name(recipe_id) + " ×" + str(count))
+	log_message.emit("开炉炼丹，开始炼制 [" + recipe_data.get_recipe_name(recipe_id) + "]")
 	
 	# 执行炼制（立即完成，实际游戏中可以加入延时）
 	_perform_crafting()
@@ -247,12 +254,6 @@ func _perform_crafting():
 	if spell_system:
 		for i in range(current_craft_count):
 			spell_system.add_spell_use_count("alchemy")
-	
-	# 发送日志
-	var recipe_name = recipe_data.get_recipe_name(current_craft_recipe)
-	log_message.emit("炼制完成！获得 " + recipe_name + " ×" + str(success_count))
-	if fail_count > 0:
-		log_message.emit("炼制失败 " + str(fail_count) + " 次，返还一半材料")
 	
 	# 结束炼制
 	is_crafting = false

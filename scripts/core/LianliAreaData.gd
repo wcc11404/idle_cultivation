@@ -121,7 +121,7 @@ const SPECIAL_AREAS = {
 			}
 		],
 		"special_drops": {
-			"foundation_pill": 1,
+			"foundation_herb": 10,
 			"spirit_stone": 20
 		}
 	}

@@ -116,6 +116,13 @@ func start_lianli_in_area(area_id: String):
 		log_message.emit("气血值不足，无法进入历练区域！请先修炼恢复气血值。")
 		return
 	
+	# 检查特殊区域每日次数限制（只检查，不消耗）
+	if lianli_area_data and lianli_area_data.is_special_area(area_id):
+		var remaining = player.get_daily_dungeon_count(area_id)
+		if remaining <= 0:
+			log_message.emit("今日进入次数已用完，请明天凌晨4点后再来")
+			return
+	
 	# 如果正在修炼，先停止修炼
 	if player.get_is_cultivating():
 		_stop_cultivation()
@@ -337,22 +344,15 @@ func _update_button_container():
 		return
 	
 	var is_tower = lianli_system.is_in_endless_tower()
-	var is_special = not is_tower and lianli_area_data and lianli_area_data.is_special_area(current_lianli_area_id)
 	
 	# 连续战斗复选框
 	if continuous_checkbox:
-		if is_special:
-			continuous_checkbox.visible = false
-		else:
-			continuous_checkbox.visible = true
+		continuous_checkbox.visible = true
 	
 	# 继续战斗按钮
 	if continue_button:
-		if is_special:
-			continue_button.visible = false
-		else:
-			continue_button.visible = true
-			continue_button.disabled = true
+		continue_button.visible = true
+		continue_button.disabled = true
 
 # 设置连续战斗默认值
 func _set_continuous_default():
@@ -360,9 +360,8 @@ func _set_continuous_default():
 		return
 	
 	var is_tower = lianli_system.is_in_endless_tower()
-	var is_special = lianli_area_data and lianli_area_data.is_special_area(current_lianli_area_id)
 	
-	if continuous_checkbox and not is_special:
+	if continuous_checkbox:
 		if is_tower:
 			continuous_checkbox.button_pressed = false
 		else:

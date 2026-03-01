@@ -214,26 +214,26 @@ const SPELLS = {
 		"id": "alchemy",
 		"name": "炼丹术",
 		"type": SpellType.MISC,
-		"description": "提升炼丹成功率和速度的杂学术法，通过炼制丹药提升熟练度",
+		"description": "炼丹专精术法，成功值+{success_bonus}，炼丹速度+{speed_rate}%",
 		"max_level": 3,
 		"levels": {
 			1: {
 				"spirit_cost": 50,
 				"use_count_required": 10,
 				"attribute_bonus": {"max_spirit": 1.02},
-				"effect": {"type": "alchemy", "success_bonus": 10, "speed_bonus": 0.1}
+				"effect": {"type": "alchemy", "success_bonus": 10, "speed_rate": 0.1}
 			},
 			2: {
 				"spirit_cost": 200,
 				"use_count_required": 30,
 				"attribute_bonus": {"max_spirit": 1.04},
-				"effect": {"type": "alchemy", "success_bonus": 20, "speed_bonus": 0.2}
+				"effect": {"type": "alchemy", "success_bonus": 20, "speed_rate": 0.2}
 			},
 			3: {
 				"spirit_cost": 500,
 				"use_count_required": 60,
 				"attribute_bonus": {"max_spirit": 1.06},
-				"effect": {"type": "alchemy", "success_bonus": 30, "speed_bonus": 0.3}
+				"effect": {"type": "alchemy", "success_bonus": 30, "speed_rate": 0.3}
 			}
 		}
 	}

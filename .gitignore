@@ -46,3 +46,6 @@ Library/
 
 # OS specific
 Thumbs.db
+
+# Godot user data directory
+.local/

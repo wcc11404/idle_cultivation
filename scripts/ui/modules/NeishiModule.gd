@@ -18,12 +18,10 @@ var spell_module: SpellModule = null
 # UI节点引用（由GameUI设置）
 var neishi_panel: Control = null
 var cultivation_panel: Control = null
-var meridian_panel: Control = null
 var spell_panel: Control = null
 
 # 子Tab按钮
 var cultivation_tab: Button = null
-var meridian_tab: Button = null
 var spell_tab: Button = null
 
 # 当前活动面板
@@ -62,14 +60,11 @@ func hide_tab():
 	if neishi_panel:
 		neishi_panel.visible = false
 
-# 显示子面板（修炼/经脉/术法）
+# 显示子面板（修炼/术法）
 func show_cultivation_panel():
 	_show_sub_panel(cultivation_panel)
 	if cultivation_module:
 		cultivation_module.show_panel()
-
-func show_meridian_panel():
-	_show_sub_panel(meridian_panel)
 
 func show_spell_panel():
 	_show_sub_panel(spell_panel)
@@ -81,8 +76,6 @@ func _show_sub_panel(active_panel: Control):
 	# 隐藏所有子面板
 	if cultivation_panel:
 		cultivation_panel.visible = false
-	if meridian_panel:
-		meridian_panel.visible = false
 	if spell_panel:
 		spell_panel.visible = false
 	
@@ -114,8 +107,6 @@ func _show_sub_panel(active_panel: Control):
 func _get_panel_name(panel: Control) -> String:
 	if panel == cultivation_panel:
 		return "cultivation"
-	elif panel == meridian_panel:
-		return "meridian"
 	elif panel == spell_panel:
 		return "spell"
 	return ""
@@ -124,17 +115,12 @@ func _get_panel_name(panel: Control) -> String:
 func _update_tab_buttons(active_panel: Control):
 	if cultivation_tab:
 		cultivation_tab.disabled = (active_panel == cultivation_panel)
-	if meridian_tab:
-		meridian_tab.disabled = (active_panel == meridian_panel)
 	if spell_tab:
 		spell_tab.disabled = (active_panel == spell_panel)
 
 # Tab按钮按下处理
 func on_cultivation_tab_pressed():
 	show_cultivation_panel()
-
-func on_meridian_tab_pressed():
-	show_meridian_panel()
 
 func on_spell_tab_pressed():
 	show_spell_panel()

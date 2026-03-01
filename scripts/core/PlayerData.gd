@@ -30,6 +30,12 @@ var has_alchemy_furnace: bool = false  # 是否拥有丹炉
 # 战斗临时Buff（由LianliSystem管理）
 var combat_buffs: Dictionary = {}
 
+# 每日副本数据
+var daily_dungeon_data: Dictionary = {}
+
+const DAILY_DUNGEON_MAX_COUNT: int = 3
+const DAILY_RESET_HOUR: int = 4
+
 func _ready():
 	add_to_group("player")
 	apply_realm_stats()
@@ -189,6 +195,9 @@ func consume_spirit(amount: float) -> bool:
 ## 增加灵气
 func add_spirit(amount: float) -> float:
 	var max_spirit = get_final_max_spirit_energy()
+	# 如果当前灵气已经超过上限，直接返回，不丢失灵气
+	if spirit_energy >= max_spirit:
+		return spirit_energy
 	spirit_energy = min(max_spirit, spirit_energy + amount)
 	return spirit_energy
 
@@ -310,9 +319,6 @@ func attempt_breakthrough() -> Dictionary:
 	return {"success": false, "reason": "突破类型错误", "stone_cost": stone_cost, "energy_cost": energy_cost, "materials": materials}
 
 func get_save_data() -> Dictionary:
-	# 只保存核心数据，可计算属性在加载时通过 apply_realm_stats() 重新计算
-	# 注意：spirit_stone 由 Inventory 系统单独管理
-	# 使用 format_for_save 格式化数值，保留4位小数
 	return {
 		"realm": realm,
 		"realm_level": realm_level,
@@ -320,7 +326,8 @@ func get_save_data() -> Dictionary:
 		"spirit_energy": AttributeCalculator.format_for_save(spirit_energy),
 		"tower_highest_floor": tower_highest_floor,
 		"learned_recipes": learned_recipes,
-		"has_alchemy_furnace": has_alchemy_furnace
+		"has_alchemy_furnace": has_alchemy_furnace,
+		"daily_dungeon_data": daily_dungeon_data.duplicate()
 	}
 
 func apply_save_data(data: Dictionary):
@@ -338,6 +345,55 @@ func apply_save_data(data: Dictionary):
 		learned_recipes = data["learned_recipes"]
 	if data.has("has_alchemy_furnace"):
 		has_alchemy_furnace = data["has_alchemy_furnace"]
+	if data.has("daily_dungeon_data"):
+		daily_dungeon_data = data["daily_dungeon_data"].duplicate()
+	
+	check_and_reset_daily_dungeons()
 
 	# 重新计算可计算属性
 	apply_realm_stats()
+
+# ==================== 每日副本功能 ====================
+
+func get_daily_dungeon_count(dungeon_id: String) -> int:
+	_ensure_daily_dungeon_data(dungeon_id)
+	return daily_dungeon_data[dungeon_id]["enter_count"]
+
+func use_daily_dungeon_count(dungeon_id: String) -> bool:
+	_ensure_daily_dungeon_data(dungeon_id)
+	if daily_dungeon_data[dungeon_id]["enter_count"] <= 0:
+		return false
+	daily_dungeon_data[dungeon_id]["enter_count"] -= 1
+	return true
+
+func _ensure_daily_dungeon_data(dungeon_id: String):
+	if not daily_dungeon_data.has(dungeon_id):
+		daily_dungeon_data[dungeon_id] = {
+			"enter_count": DAILY_DUNGEON_MAX_COUNT,
+			"last_reset_date": _get_today_string()
+		}
+
+func check_and_reset_daily_dungeons():
+	var today = _get_today_string()
+	var now = Time.get_datetime_dict_from_system()
+	var current_hour = now.hour
+	
+	for dungeon_id in daily_dungeon_data.keys():
+		var last_reset = daily_dungeon_data[dungeon_id].get("last_reset_date", "")
+		var need_reset = false
+		
+		if last_reset == "":
+			need_reset = true
+		elif last_reset != today:
+			if current_hour >= DAILY_RESET_HOUR:
+				need_reset = true
+			else:
+				need_reset = true
+		
+		if need_reset:
+			daily_dungeon_data[dungeon_id]["enter_count"] = DAILY_DUNGEON_MAX_COUNT
+			daily_dungeon_data[dungeon_id]["last_reset_date"] = today
+
+func _get_today_string() -> String:
+	var datetime = Time.get_datetime_dict_from_system()
+	return "%04d-%02d-%02d" % [datetime.year, datetime.month, datetime.day]

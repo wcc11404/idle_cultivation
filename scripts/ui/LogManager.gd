@@ -4,7 +4,8 @@ signal log_added(message: String)
 
 enum LogType {
 	SYSTEM,    # 系统消息
-	BATTLE     # 战斗消息
+	BATTLE,    # 战斗消息
+	ALCHEMY    # 炼丹消息
 }
 
 var log_messages: Array = []
@@ -26,6 +27,10 @@ func add_system_log(message: String):
 # 添加战斗消息
 func add_battle_log(message: String):
 	_add_log_internal(message, LogType.BATTLE)
+
+# 添加炼丹消息
+func add_alchemy_log(message: String):
+	_add_log_internal(message, LogType.ALCHEMY)
 
 func _add_log_internal(message: String, log_type: LogType):
 	var timestamp = _get_timestamp()
@@ -59,6 +64,8 @@ func _get_type_tag(log_type: LogType) -> String:
 			return "[系统]"
 		LogType.BATTLE:
 			return "[战斗]"
+		LogType.ALCHEMY:
+			return "[炼丹]"
 		_:
 			return "[系统]"
 

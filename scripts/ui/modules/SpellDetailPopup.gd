@@ -349,6 +349,7 @@ func _get_attribute_name(attr: String) -> String:
 		"health": return "气血值"
 		"spirit_gain": return "灵气获取"
 		"speed": return "速度"
+		"max_spirit": return "最大灵气"
 		_: return attr
 
 func _format_spell_number(value: float) -> String:
@@ -380,6 +381,12 @@ func _format_effect_description(description: String, effect: Dictionary) -> Stri
 					formatted_value = str(int(round(percent_value))) + "%"
 				else:
 					formatted_value = "%.1f" % percent_value + "%"
+			elif key == "speed_rate":
+				var percent_value = value * 100.0
+				if is_equal_approx(percent_value, round(percent_value)):
+					formatted_value = str(int(round(percent_value)))
+				else:
+					formatted_value = "%.1f" % percent_value
 			elif key.find("value") != -1:
 				formatted_value = _format_spell_number(value)
 			elif key == "efficiency":

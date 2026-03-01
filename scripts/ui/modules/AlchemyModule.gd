@@ -50,6 +50,7 @@ var furnace_info_label: Label = null
 var craft_count_label: Label = null
 var count_1_button: Button = null
 var count_10_button: Button = null
+var alchemy_back_button: Button = null
 var count_100_button: Button = null
 var count_max_button: Button = null
 
@@ -132,7 +133,26 @@ func _style_info_labels():
 func _style_materials_section():
 	if not materials_container:
 		return
+	
+	# 设置materials_container的边距
+	var margin = MarginContainer.new()
+	margin.name = "MaterialsMargin"
+	margin.add_theme_constant_override("margin_left", 16)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	
 	var parent = materials_container.get_parent()
+	if parent and not parent.get_node_or_null("MaterialsMargin"):
+		var idx = materials_container.get_index()
+		parent.remove_child(materials_container)
+		margin.add_child(materials_container)
+		parent.add_child(margin)
+		parent.move_child(margin, idx)
+	
+	parent = materials_container.get_parent()
+	if parent and parent.name == "MaterialsMargin":
+		parent = parent.get_parent()
 	if not parent:
 		return
 	
@@ -330,6 +350,12 @@ func _setup_back_button():
 	if not alchemy_room_panel:
 		return
 	
+	# 如果场景中已有返回按钮，直接应用样式
+	if alchemy_back_button:
+		_apply_count_button_style(alchemy_back_button, false)
+		return
+	
+	# 否则动态创建返回按钮
 	var title_bar = alchemy_room_panel.get_node_or_null("VBoxContainer/TitleBar")
 	if title_bar:
 		return
@@ -576,24 +602,61 @@ func _rebuild_material_labels(materials: Dictionary):
 		child.free()
 	_material_labels.clear()
 	
+	# 创建两列布局
+	var hbox = HBoxContainer.new()
+	hbox.name = "MaterialsHBox"
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	materials_container.add_child(hbox)
+	
+	var col1 = VBoxContainer.new()
+	col1.name = "Column1"
+	col1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col1.custom_minimum_size = Vector2(0, 90)
+	hbox.add_child(col1)
+	
+	var col2 = VBoxContainer.new()
+	col2.name = "Column2"
+	col2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col2.custom_minimum_size = Vector2(0, 90)
+	hbox.add_child(col2)
+	
+	# 收集所有材料项（包括灵气）
+	var all_items = []
 	for material_id in materials:
-		_create_material_label(material_id, materials[material_id])
+		all_items.append({"type": "material", "id": material_id, "required": materials[material_id]})
 	
-	_add_spirit_energy_label()
+	var spirit_required = recipe_data.get_recipe_spirit_energy(selected_recipe)
+	if spirit_required > 0:
+		all_items.append({"type": "spirit", "id": "spirit_energy", "required": spirit_required})
+	
+	# 分配到两列，每列最多3个
+	for i in range(all_items.size()):
+		var item = all_items[i]
+		var target_col = col1 if i < 3 else col2
+		_create_material_item(target_col, item)
 
-func _create_material_label(material_id: String, required_per: int):
-	var total_required = required_per * selected_count
-	var has = alchemy_system.inventory.get_item_count(material_id)
-	var item_name = item_data.get_item_name(material_id) if item_data else material_id
-	
+func _create_material_item(parent: VBoxContainer, item: Dictionary):
 	var label = Label.new()
-	label.text = "    %s: %d/%d" % [item_name, has, total_required]
+	
+	if item.type == "spirit":
+		label.name = "SpiritEnergyLabel"
+		var total_spirit = item.required * selected_count
+		var has_spirit = int(player.spirit_energy) if player else 0
+		label.text = "灵气: %d/%d" % [has_spirit, total_spirit]
+		label.add_theme_color_override("font_color", COLOR_TEXT_RED if has_spirit < total_spirit else COLOR_TEXT_DARK)
+		_material_labels["spirit_energy"] = label
+	else:
+		var material_id = item.id
+		var total_required = item.required * selected_count
+		var has = alchemy_system.inventory.get_item_count(material_id)
+		var item_name = item_data.get_item_name(material_id) if item_data else material_id
+		label.text = "%s: %d/%d" % [item_name, has, total_required]
+		label.add_theme_color_override("font_color", COLOR_TEXT_RED if has < total_required else COLOR_TEXT_DARK)
+		_material_labels[material_id] = label
+	
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	label.add_theme_font_size_override("font_size", FONT_SIZE_NORMAL)
-	label.add_theme_color_override("font_color", COLOR_TEXT_RED if has < total_required else COLOR_TEXT_DARK)
-	
-	materials_container.add_child(label)
-	_material_labels[material_id] = label
+	parent.add_child(label)
 
 func _update_material_labels_text():
 	for material_id in _material_labels:
@@ -601,50 +664,19 @@ func _update_material_labels_text():
 		if not is_instance_valid(label):
 			continue
 		
-		var required_per = _cached_recipe_materials.get(material_id, 0)
-		var total_required = required_per * selected_count
-		var has = alchemy_system.inventory.get_item_count(material_id)
-		var item_name = item_data.get_item_name(material_id) if item_data else material_id
-		
-		label.text = "    %s: %d/%d" % [item_name, has, total_required]
-		label.add_theme_color_override("font_color", COLOR_TEXT_RED if has < total_required else COLOR_TEXT_DARK)
-	
-	_update_spirit_energy_label()
-
-func _add_spirit_energy_label():
-	if not materials_container or not selected_recipe or not recipe_data:
-		return
-	
-	var spirit_required = recipe_data.get_recipe_spirit_energy(selected_recipe)
-	if spirit_required <= 0:
-		return
-	
-	var total_spirit = spirit_required * selected_count
-	var has_spirit = int(player.spirit_energy) if player else 0
-	
-	var label = Label.new()
-	label.name = "SpiritEnergyLabel"
-	label.text = "    灵气: %d/%d" % [has_spirit, total_spirit]
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	label.add_theme_font_size_override("font_size", FONT_SIZE_NORMAL)
-	label.add_theme_color_override("font_color", COLOR_TEXT_RED if has_spirit < total_spirit else COLOR_TEXT_DARK)
-	
-	materials_container.add_child(label)
-
-func _update_spirit_energy_label():
-	if not materials_container:
-		return
-	
-	var label = materials_container.get_node_or_null("SpiritEnergyLabel")
-	if not label:
-		return
-	
-	var spirit_required = recipe_data.get_recipe_spirit_energy(selected_recipe) if recipe_data else 0
-	var total_spirit = spirit_required * selected_count
-	var has_spirit = int(player.spirit_energy) if player else 0
-	
-	label.text = "    灵气: %d/%d" % [has_spirit, total_spirit]
-	label.add_theme_color_override("font_color", COLOR_TEXT_RED if has_spirit < total_spirit else COLOR_TEXT_DARK)
+		if material_id == "spirit_energy":
+			var spirit_required = recipe_data.get_recipe_spirit_energy(selected_recipe) if recipe_data else 0
+			var total_spirit = spirit_required * selected_count
+			var has_spirit = int(player.spirit_energy) if player else 0
+			label.text = "灵气: %d/%d" % [has_spirit, total_spirit]
+			label.add_theme_color_override("font_color", COLOR_TEXT_RED if has_spirit < total_spirit else COLOR_TEXT_DARK)
+		else:
+			var required_per = _cached_recipe_materials.get(material_id, 0)
+			var total_required = required_per * selected_count
+			var has = alchemy_system.inventory.get_item_count(material_id)
+			var item_name = item_data.get_item_name(material_id) if item_data else material_id
+			label.text = "%s: %d/%d" % [item_name, has, total_required]
+			label.add_theme_color_override("font_color", COLOR_TEXT_RED if has < total_required else COLOR_TEXT_DARK)
 
 func _update_craft_count_label():
 	if craft_count_label:
@@ -659,12 +691,12 @@ func _update_alchemy_info():
 	var furnace_bonus = alchemy_system.get_furnace_bonus()
 	
 	if alchemy_info_label:
-		var alchemy_level = alchemy_bonus.get("level", 0)
-		if alchemy_level > 0:
+		if alchemy_bonus.get("obtained", false):
+			var alchemy_level = alchemy_bonus.get("level", 0)
 			alchemy_info_label.text = "炼丹术: LV.%d (+%d成功值, +%.0f%%速度)" % [
 				alchemy_level,
-				alchemy_bonus.get("success", 0),
-				alchemy_bonus.get("speed", 0.0) * 100
+				alchemy_bonus.get("success_bonus", 0),
+				alchemy_bonus.get("speed_rate", 0.0) * 100
 			]
 		else:
 			alchemy_info_label.text = "炼丹术: 未学习"
@@ -672,8 +704,8 @@ func _update_alchemy_info():
 	if furnace_info_label:
 		if furnace_bonus.get("has_furnace", false):
 			furnace_info_label.text = "丹炉: 初级丹炉 (+%d成功值, +%.0f%%速度)" % [
-				furnace_bonus.get("success", 0),
-				furnace_bonus.get("speed", 0.0) * 100
+				furnace_bonus.get("success_bonus", 0),
+				furnace_bonus.get("speed_rate", 0.0) * 100
 			]
 		else:
 			furnace_info_label.text = "丹炉: 无"
@@ -685,13 +717,13 @@ func _on_craft_pressed():
 	
 	var materials_check = alchemy_system.check_materials(selected_recipe, selected_count)
 	if not materials_check.enough:
-		log_message.emit("材料不足，无法开始炼制")
+		log_message.emit("灵材不足，无法开炉炼丹")
 		return
 	
 	var spirit_required = recipe_data.get_recipe_spirit_energy(selected_recipe) if recipe_data else 0
 	var total_spirit = spirit_required * selected_count
 	if player and player.spirit_energy < total_spirit:
-		log_message.emit("灵气不足，无法开始炼制")
+		log_message.emit("灵气不济，无法催动丹火")
 		return
 	
 	if game_ui and game_ui.has_method("stop_other_activities"):
@@ -757,7 +789,7 @@ func _craft_next_pill():
 		return
 	
 	if not _check_single_craft_materials():
-		log_message.emit("材料不足，停止炼制")
+		log_message.emit("灵材耗尽，炼丹中断")
 		_finish_crafting()
 		return
 	
@@ -794,16 +826,20 @@ func _complete_single_pill():
 	var roll = randf() * 100.0
 	var recipe_name = recipe_data.get_recipe_name(selected_recipe) if recipe_data else "丹药"
 	
+	# 不管成功失败，都增加炼丹术使用次数
+	if alchemy_system and alchemy_system.spell_system:
+		alchemy_system.spell_system.add_spell_use_count("alchemy")
+	
 	if roll <= success_rate:
 		craft_success_count += 1
 		var product = recipe_data.get_recipe_product(selected_recipe)
 		var product_count = recipe_data.get_recipe_product_count(selected_recipe)
 		alchemy_system.inventory.add_item(product, product_count)
-		log_message.emit("炼制%s成功" % recipe_name)
+		log_message.emit("丹香四溢，[%s]炼制成功" % recipe_name)
 	else:
 		craft_fail_count += 1
 		_return_materials_for_failed(1)
-		log_message.emit("炼制%s失败，返还一半材料" % recipe_name)
+		log_message.emit("火候失控，[%s]炼制失败，药渣可回收部分材料" % recipe_name)
 	
 	_update_craft_count_label()
 	_update_materials_display()
@@ -836,11 +872,15 @@ func _stop_crafting() -> Dictionary:
 			alchemy_system.inventory.add_item(material_id, return_amount)
 	
 	var spirit_required = recipe_data.get_recipe_spirit_energy(selected_recipe) if recipe_data else 0
+	# TODO: 注意：这里使用add_spirit是有意为之，不是bug
+	# 如果当前灵气超过上限，add_spirit会将灵气限制在上限内
+	# 这是设计上的权衡：允许玩家通过反复开始/停止炼制来积累超过上限的灵气会破坏游戏平衡
+	# 如需修改此行为，需要同时考虑游戏经济系统的整体影响
 	if spirit_required > 0 and player:
 		player.add_spirit(spirit_required)
 	
-	if remaining_count > 0:
-		log_message.emit("停止炼制，返还当前丹药的材料")
+	# 停止炼丹提示：收丹停火，返还材料，成功X枚，废丹X枚
+	log_message.emit("收丹停火，返还材料，成功%d枚，废丹%d枚" % [craft_success_count, craft_fail_count])
 	
 	if craft_button:
 		craft_button.disabled = false
@@ -849,6 +889,10 @@ func _stop_crafting() -> Dictionary:
 		stop_button.disabled = true
 	if craft_progress_bar:
 		craft_progress_bar.value = 0
+	
+	# 重置计数并更新显示
+	current_craft_index = 0
+	_update_craft_count_label()
 	
 	crafting_stopped.emit(completed_count, remaining_count)
 	
@@ -873,7 +917,7 @@ func _finish_crafting():
 	
 	var recipe_name = recipe_data.get_recipe_name(selected_recipe) if recipe_data else "丹药"
 	if craft_success_count > 0 or craft_fail_count > 0:
-		log_message.emit("炼制完成：成功%d次，失败%d次" % [craft_success_count, craft_fail_count])
+		log_message.emit("此次炼丹结束，成丹%d枚，废丹%d枚" % [craft_success_count, craft_fail_count])
 	
 	current_craft_index = 0
 	total_craft_count = 0
@@ -909,9 +953,17 @@ func get_max_craft_count() -> int:
 	var materials = recipe_data.get_recipe_materials(selected_recipe)
 	var max_count = 9999
 	
+	# 计算材料能支持的最大数量
 	for material_id in materials:
 		var has_count = alchemy_system.inventory.get_item_count(material_id)
 		var possible_count = int(has_count / materials[material_id])
 		max_count = mini(max_count, possible_count)
+	
+	# 计算灵气能支持的最大数量
+	if player and recipe_data:
+		var spirit_required = recipe_data.get_recipe_spirit_energy(selected_recipe)
+		if spirit_required > 0:
+			var max_by_spirit = int(player.spirit_energy / spirit_required)
+			max_count = mini(max_count, max_by_spirit)
 	
 	return max_count

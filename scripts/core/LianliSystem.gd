@@ -345,6 +345,14 @@ func _process(delta: float):
 				current_tower_floor += 1
 				_start_tower_battle()
 			else:
+				# 特殊区域：检查剩余次数
+				if lianli_area_data and lianli_area_data.is_special_area(current_area_id):
+					if player.get_daily_dungeon_count(current_area_id) <= 0:
+						# 次数用完，结束历练
+						is_in_lianli = false
+						log_message.emit("今日次数已用完，历练结束")
+						end_lianli()
+						return
 				# 普通区域：开始下一场战斗
 				start_next_battle()
 		return
@@ -552,13 +560,25 @@ func _handle_battle_victory():
 		_handle_tower_victory()
 		return
 	
-	# 检查是否是单BOSS区域，如果是则直接结束历练
+	# 特殊区域：战斗胜利后消耗每日次数
+	if lianli_area_data and lianli_area_data.is_special_area(current_area_id):
+		player.use_daily_dungeon_count(current_area_id)
+	
+	# 检查是否是单BOSS区域
 	if lianli_area_data and lianli_area_data.is_single_boss_area(current_area_id):
 		is_in_battle = false
-		is_in_lianli = false
-		log_message.emit("通关成功！")
-		end_lianli()
-		return
+		# 检查连续战斗 + 剩余次数
+		if continuous_lianli and player.get_daily_dungeon_count(current_area_id) > 0:
+			# 启动等待计时器，准备下一场战斗
+			is_waiting = true
+			wait_timer = 0.0
+			current_wait_interval = get_wait_interval()
+			return
+		else:
+			is_in_lianli = false
+			log_message.emit("通关成功！")
+			end_lianli()
+			return
 	
 	# 启动等待计时器（连续历练模式）
 	if continuous_lianli and is_in_lianli:

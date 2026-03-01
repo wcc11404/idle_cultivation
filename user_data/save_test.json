@@ -13,62 +13,12 @@
 				"id": "starter_pack"
 			},
 			{
-				"count": 0,
-				"empty": true,
-				"id": ""
-			},
-			{
-				"count": 9999863,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
-				"count": 9999999,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
-				"count": 9999999,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
-				"count": 9999999,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
-				"count": 9999999,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
-				"count": 9999999,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
-				"count": 9999999,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
-				"count": 9999999,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
-				"count": 9999999,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
-				"count": 9999999,
-				"empty": false,
-				"id": "spirit_stone"
-			},
-			{
 				"count": 10,
+				"empty": false,
+				"id": "foundation_herb"
+			},
+			{
+				"count": 99999884,
 				"empty": false,
 				"id": "spirit_stone"
 			},
@@ -128,24 +78,74 @@
 				"id": "tribulation_pill"
 			},
 			{
-				"count": 0,
-				"empty": true,
-				"id": ""
+				"count": 1,
+				"empty": false,
+				"id": "spell_basic_breathing"
 			},
 			{
-				"count": 0,
-				"empty": true,
-				"id": ""
+				"count": 1,
+				"empty": false,
+				"id": "spell_basic_boxing_techniques"
 			},
 			{
-				"count": 0,
-				"empty": true,
-				"id": ""
+				"count": 1,
+				"empty": false,
+				"id": "spell_thunder_strike"
 			},
 			{
-				"count": 0,
-				"empty": true,
-				"id": ""
+				"count": 1,
+				"empty": false,
+				"id": "spell_basic_defense"
+			},
+			{
+				"count": 1,
+				"empty": false,
+				"id": "spell_basic_steps"
+			},
+			{
+				"count": 1,
+				"empty": false,
+				"id": "spell_basic_health"
+			},
+			{
+				"count": 1,
+				"empty": false,
+				"id": "spell_alchemy"
+			},
+			{
+				"count": 1,
+				"empty": false,
+				"id": "alchemy_furnace"
+			},
+			{
+				"count": 1,
+				"empty": false,
+				"id": "recipe_health_pill"
+			},
+			{
+				"count": 1,
+				"empty": false,
+				"id": "recipe_spirit_pill"
+			},
+			{
+				"count": 1,
+				"empty": false,
+				"id": "recipe_foundation_pill"
+			},
+			{
+				"count": 1,
+				"empty": false,
+				"id": "recipe_golden_core_pill"
+			},
+			{
+				"count": 9999,
+				"empty": false,
+				"id": "mat_herb"
+			},
+			{
+				"count": 99,
+				"empty": false,
+				"id": "foundation_herb"
 			},
 			{
 				"count": 0,
@@ -1011,7 +1011,7 @@
 	},
 	"player": {
 		"has_alchemy_furnace": false,
-		"health": "250",
+		"health": "220",
 		"learned_recipes": [],
 		"realm": "筑基期",
 		"realm_level": 1,
@@ -1020,58 +1020,15 @@
 	},
 	"spell_system": {
 		"equipped_spells": {
-			"0": [
-				"basic_breathing"
-			],
-			"1": [
-				"basic_boxing_techniques",
-				"thunder_strike"
-			],
-			"2": [
-				"basic_defense",
-				"basic_health"
-			],
+			"0": [],
+			"1": [],
+			"2": [],
 			"3": []
 		},
 		"player_spells": {
-			"basic_boxing_techniques": {
-				"charged_spirit": 0,
-				"level": 1,
-				"obtained": true,
-				"use_count": 0
-			},
-			"basic_breathing": {
-				"charged_spirit": 0,
-				"level": 1,
-				"obtained": true,
-				"use_count": 0
-			},
-			"basic_defense": {
-				"charged_spirit": 0,
-				"level": 1,
-				"obtained": true,
-				"use_count": 0
-			},
-			"basic_health": {
-				"charged_spirit": 0,
-				"level": 1,
-				"obtained": true,
-				"use_count": 0
-			},
-			"basic_steps": {
-				"charged_spirit": 0,
-				"level": 1,
-				"obtained": true,
-				"use_count": 0
-			},
-			"thunder_strike": {
-				"charged_spirit": 0,
-				"level": 1,
-				"obtained": true,
-				"use_count": 0
-			}
+
 		}
 	},
-	"timestamp": 1771935446.28964,
+	"timestamp": 1772364114.033,
 	"version": "1.3"
 }
