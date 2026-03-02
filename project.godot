@@ -14,7 +14,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="hello_world"
+config/name="idle_cultivation"
 config/description="2D修仙题材自动挂机游戏"
 config/version="0.1"
 run/main_scene="res://scenes/main/Main.tscn"
