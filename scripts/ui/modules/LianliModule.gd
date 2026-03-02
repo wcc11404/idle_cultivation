@@ -94,6 +94,9 @@ func show_lianli_select_panel():
 		lianli_scene_panel.visible = false
 	if lianli_select_panel:
 		lianli_select_panel.visible = true
+	# 更新历练区域按钮显示（刷新特殊区域剩余次数）
+	if game_ui:
+		game_ui.update_lianli_area_buttons_display()
 
 # ==================== 历练区域功能 ====================
 
@@ -222,9 +225,8 @@ func on_continue_pressed():
 
 # 连续战斗复选框切换
 func on_continuous_toggled(enabled: bool):
-	# 连续战斗勾选只是一个状态，不直接控制逻辑
-	# 逻辑在战斗结束时根据此状态决定
-	pass
+	if lianli_system:
+		lianli_system.set_continuous_lianli(enabled)
 
 # 检查是否勾选了连续战斗
 func is_continuous_checked() -> bool:
@@ -366,6 +368,8 @@ func _set_continuous_default():
 			continuous_checkbox.button_pressed = false
 		else:
 			continuous_checkbox.button_pressed = true
+		# 同步到LianliSystem
+		lianli_system.set_continuous_lianli(continuous_checkbox.button_pressed)
 
 # ==================== 信号处理函数 ====================
 
