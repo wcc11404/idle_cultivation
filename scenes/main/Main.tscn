@@ -302,10 +302,11 @@ theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
 text = "术法"
 
 [node name="HSeparator" type="HSeparator" parent="VBoxContainer/ContentPanel/NeishiPanel" unique_id=1793208028]
-layout_mode = 0
+layout_mode = 1
+anchor_right = 1.0
 offset_top = 55.0
-offset_right = 680.0
 offset_bottom = 59.0
+grow_horizontal = 2
 scale = Vector2(1, 3)
 
 [node name="CultivationContainer" type="Control" parent="VBoxContainer/ContentPanel/NeishiPanel" unique_id=828400658]

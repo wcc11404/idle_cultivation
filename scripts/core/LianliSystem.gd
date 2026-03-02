@@ -43,7 +43,6 @@ var current_enemy: Dictionary = {}
 # 无尽塔状态
 var is_in_tower: bool = false  # 是否处于无尽塔中
 var current_tower_floor: int = 0  # 当前无尽塔层数
-var tower_continuous: bool = false  # 无尽塔连续战斗模式
 var endless_tower_data: Node = null  # 无尽塔数据引用
 
 # 连续历练设置
@@ -176,10 +175,6 @@ func _start_tower_battle() -> bool:
 	
 	return start_battle(enemy_data_dict)
 
-# 设置无尽塔连续战斗模式
-func set_tower_continuous(enabled: bool):
-	tower_continuous = enabled
-
 # 获取当前无尽塔层数
 func get_current_tower_floor() -> int:
 	return current_tower_floor
@@ -262,8 +257,9 @@ func end_lianli():
 	is_in_lianli = false
 	is_in_battle = false
 	is_waiting = false
+	is_in_tower = false
+	current_tower_floor = 0
 	current_enemy = {}
-	continuous_lianli = false
 	tick_accumulator = 0.0
 	# 恢复气血buff带来的加成
 	_restore_health_after_combat()
@@ -566,7 +562,6 @@ func _handle_battle_victory():
 	
 	# 检查是否是单BOSS区域
 	if lianli_area_data and lianli_area_data.is_single_boss_area(current_area_id):
-		is_in_battle = false
 		# 检查连续战斗 + 剩余次数
 		if continuous_lianli and player.get_daily_dungeon_count(current_area_id) > 0:
 			# 启动等待计时器，准备下一场战斗
@@ -585,19 +580,21 @@ func _handle_battle_victory():
 		is_waiting = true
 		wait_timer = 0.0
 		current_wait_interval = get_wait_interval()
+	else:
+		# 非连续战斗模式，结束历练
+		is_in_lianli = false
+		end_lianli()
 
 func _handle_battle_defeat():
-	is_in_battle = false
+	# 恢复气血buff
+	_restore_health_after_combat()
 	
 	# 检查是否是无尽塔
 	if is_in_tower:
-		_handle_tower_defeat()
-		return
+		log_message.emit("无尽塔挑战结束，最高到达第" + str(current_tower_floor) + "层")
+	else:
+		log_message.emit("气血不足，历练结束")
 	
-	is_in_lianli = false
-	# 恢复气血buff
-	_restore_health_after_combat()
-	log_message.emit("气血不足，历练结束")
 	battle_ended.emit(false, [], current_enemy.get("name", ""))
 	end_lianli()
 
@@ -628,18 +625,16 @@ func _handle_tower_victory():
 	
 	# 战斗结束，发出信号让UI决定是否连续战斗
 	is_in_battle = false
+	
+	# 检查是否需要退出历练
+	if not continuous_lianli:
+		is_in_lianli = false
+		is_in_tower = false
+		log_message.emit("挑战结束，最高到达第" + str(current_tower_floor) + "层")
+		end_lianli()
+		return
+	
 	battle_ended.emit(true, [], current_enemy.get("name", ""))
-
-# 处理无尽塔战斗失败
-func _handle_tower_defeat():
-	is_in_battle = false
-	is_in_lianli = false
-	is_in_tower = false
-	# 恢复气血buff
-	_restore_health_after_combat()
-	log_message.emit("无尽塔挑战结束，最高到达第" + str(current_tower_floor) + "层")
-	battle_ended.emit(false, [], current_enemy.get("name", ""))
-	end_lianli()
 
 # 继续无尽塔下一层（玩家手动点击）
 func continue_tower_next_floor() -> bool:
@@ -676,10 +671,6 @@ func get_current_enemy_drops() -> Dictionary:
 # 退出无尽塔
 func exit_tower():
 	if is_in_tower:
-		is_in_tower = false
-		is_in_lianli = false
-		is_in_battle = false
-		is_waiting = false
 		log_message.emit("退出无尽塔，最高到达第" + str(current_tower_floor) + "层")
 		end_lianli()
 

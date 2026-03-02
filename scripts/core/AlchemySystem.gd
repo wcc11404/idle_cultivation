@@ -5,8 +5,11 @@ class_name AlchemySystem extends Node
 # 信号
 signal recipe_learned(recipe_id: String)
 signal crafting_started(recipe_id: String, count: int)
+signal crafting_progress(current: int, total: int, progress: float)
+signal single_craft_completed(success: bool, recipe_name: String)
 signal crafting_finished(recipe_id: String, success_count: int, fail_count: int)
-signal log_message(message: String)  # 炼丹日志信号
+signal crafting_stopped(completed_count: int, remaining_count: int)
+signal log_message(message: String)
 
 # 引用
 var player: Node = null
@@ -18,10 +21,28 @@ var inventory: Node = null
 var is_crafting: bool = false
 var current_craft_recipe: String = ""
 var current_craft_count: int = 0
-var current_craft_progress: float = 0.0
+var current_craft_index: int = 0
+var craft_timer: float = 0.0
+var craft_success_count: int = 0
+var craft_fail_count: int = 0
+var craft_time_per_pill: float = 0.0
 
 func _ready():
 	pass
+
+func _process(delta):
+	if not is_crafting:
+		return
+	
+	craft_timer += delta
+	
+	var progress = (craft_timer / craft_time_per_pill) * 100.0
+	progress = min(progress, 100.0)
+	crafting_progress.emit(current_craft_index + 1, current_craft_count, progress)
+	
+	if craft_timer >= craft_time_per_pill:
+		craft_timer = 0.0
+		_complete_single_pill()
 
 func set_player(player_node: Node):
 	player = player_node
@@ -40,15 +61,12 @@ func learn_recipe(recipe_id: String) -> bool:
 	if not player:
 		return false
 	
-	# 检查丹方是否存在
 	if not recipe_data or recipe_data.get_recipe_data(recipe_id).is_empty():
 		return false
 	
-	# 检查是否已学会
 	if recipe_id in player.learned_recipes:
 		return false
 	
-	# 添加到已学会列表
 	player.learned_recipes.append(recipe_id)
 	recipe_learned.emit(recipe_id)
 	return true
@@ -83,7 +101,6 @@ func get_alchemy_bonus() -> Dictionary:
 	if not spell_system:
 		return bonus
 	
-	# 获取炼丹术法信息
 	var spell_info = spell_system.get_spell_info("alchemy")
 	if spell_info.is_empty() or not spell_info.obtained:
 		return bonus
@@ -112,7 +129,6 @@ func get_furnace_bonus() -> Dictionary:
 		return bonus
 	
 	bonus.has_furnace = true
-	# 初级丹炉固定加成
 	bonus.success_bonus = 10
 	bonus.speed_rate = 0.1
 	
@@ -129,7 +145,6 @@ func calculate_success_rate(recipe_id: String) -> int:
 	
 	var final_value = base_value + alchemy_bonus.success_bonus + furnace_bonus.success_bonus
 	
-	# 限制在1-100之间
 	return clamp(final_value, 1, 100)
 
 # 计算炼制耗时（秒/颗）
@@ -174,8 +189,59 @@ func check_materials(recipe_id: String, count: int) -> Dictionary:
 	result.enough = result.missing.is_empty()
 	return result
 
-# 开始炼制
-func start_crafting(recipe_id: String, count: int) -> Dictionary:
+# 检查灵气是否足够
+func check_spirit_energy(recipe_id: String, count: int) -> Dictionary:
+	var result = {
+		"enough": true,
+		"required": 0,
+		"has": 0
+	}
+	
+	if not player or not recipe_data:
+		return result
+	
+	var spirit_per_pill = recipe_data.get_recipe_spirit_energy(recipe_id)
+	result.required = spirit_per_pill * count
+	result.has = int(player.spirit_energy)
+	result.enough = result.has >= result.required
+	
+	return result
+
+# 检查单颗材料是否足够
+func _check_single_craft_materials() -> bool:
+	if not recipe_data or not inventory:
+		return false
+	
+	var materials = recipe_data.get_recipe_materials(current_craft_recipe)
+	for material_id in materials.keys():
+		var required = materials[material_id]
+		var has = inventory.get_item_count(material_id)
+		if has < required:
+			return false
+	
+	var spirit_required = recipe_data.get_recipe_spirit_energy(current_craft_recipe)
+	if spirit_required > 0 and player:
+		if player.spirit_energy < spirit_required:
+			return false
+	
+	return true
+
+# 扣除单颗材料
+func _consume_single_craft_materials():
+	if not recipe_data or not inventory:
+		return
+	
+	var materials = recipe_data.get_recipe_materials(current_craft_recipe)
+	for material_id in materials.keys():
+		var required = materials[material_id]
+		inventory.remove_item(material_id, required)
+	
+	var spirit_required = recipe_data.get_recipe_spirit_energy(current_craft_recipe)
+	if spirit_required > 0 and player:
+		player.consume_spirit(spirit_required)
+
+# 开始批量炼制
+func start_crafting_batch(recipe_id: String, count: int) -> Dictionary:
 	var result = {
 		"success": false,
 		"reason": "",
@@ -183,84 +249,154 @@ func start_crafting(recipe_id: String, count: int) -> Dictionary:
 		"count": count
 	}
 	
-	# 检查是否学会丹方
 	if not has_learned_recipe(recipe_id):
 		result.reason = "未学会该丹方"
 		return result
 	
-	# 检查是否正在炼制
 	if is_crafting:
 		result.reason = "正在炼制中"
 		return result
 	
-	# 检查材料
 	var material_check = check_materials(recipe_id, count)
 	if not material_check.enough:
 		result.reason = "材料不足"
 		return result
 	
-	# 扣除材料
-	var materials = recipe_data.get_recipe_materials(recipe_id)
-	for material_id in materials.keys():
-		var required = materials[material_id] * count
-		inventory.remove_item(material_id, required)
+	var spirit_check = check_spirit_energy(recipe_id, count)
+	if not spirit_check.enough:
+		result.reason = "灵气不足"
+		return result
 	
-	# 开始炼制
 	is_crafting = true
 	current_craft_recipe = recipe_id
 	current_craft_count = count
-	current_craft_progress = 0.0
+	current_craft_index = 0
+	craft_timer = 0.0
+	craft_success_count = 0
+	craft_fail_count = 0
+	craft_time_per_pill = calculate_craft_time(recipe_id)
+	
+	# 预先消耗第一颗丹药的材料
+	_consume_single_craft_materials()
 	
 	crafting_started.emit(recipe_id, count)
 	log_message.emit("开炉炼丹，开始炼制 [" + recipe_data.get_recipe_name(recipe_id) + "]")
 	
-	# 执行炼制（立即完成，实际游戏中可以加入延时）
-	_perform_crafting()
-	
 	result.success = true
 	return result
 
-# 执行炼制（计算成功/失败）
-func _perform_crafting():
+# 完成单颗炼制
+func _complete_single_pill():
 	if not is_crafting:
 		return
 	
-	var success_count = 0
-	var fail_count = 0
+	current_craft_index += 1
+	
 	var success_rate = calculate_success_rate(current_craft_recipe)
+	var roll = randf() * 100.0
+	var recipe_name = recipe_data.get_recipe_name(current_craft_recipe)
 	
-	for i in range(current_craft_count):
-		var roll = randi() % 100 + 1  # 1-100
-		if roll <= success_rate:
-			success_count += 1
-		else:
-			fail_count += 1
+	if spell_system:
+		spell_system.add_spell_use_count("alchemy")
 	
-	# 发放成品
-	if success_count > 0 and inventory:
+	if roll <= success_rate:
+		craft_success_count += 1
 		var product = recipe_data.get_recipe_product(current_craft_recipe)
-		inventory.add_item(product, success_count)
+		var product_count = recipe_data.get_recipe_product_count(current_craft_recipe)
+		inventory.add_item(product, product_count)
+		log_message.emit("丹香四溢，[" + recipe_name + "]炼制成功")
+		single_craft_completed.emit(true, recipe_name)
+	else:
+		craft_fail_count += 1
+		_return_half_materials(1)
+		log_message.emit("火候失控，[" + recipe_name + "]炼制失败，药渣可回收部分材料")
+		single_craft_completed.emit(false, recipe_name)
 	
-	# 失败时返还一半材料
-	if fail_count > 0:
+	if current_craft_index >= current_craft_count:
+		_finish_crafting()
+		return
+	
+	if not _check_single_craft_materials():
+		log_message.emit("灵材耗尽，炼丹中断")
+		_finish_crafting()
+		return
+	
+	_consume_single_craft_materials()
+
+# 返还一半材料（失败时）
+func _return_half_materials(fail_count: int):
+	if not recipe_data or not inventory:
+		return
+	
+	var materials = recipe_data.get_recipe_materials(current_craft_recipe)
+	for material_id in materials.keys():
+		var return_amount = int(materials[material_id] * fail_count / 2.0)
+		if return_amount > 0:
+			inventory.add_item(material_id, return_amount)
+
+# 停止炼制
+func stop_crafting() -> Dictionary:
+	var result = {
+		"success": false,
+		"reason": "",
+		"completed_count": 0,
+		"remaining_count": 0
+	}
+	
+	if not is_crafting:
+		result.reason = "未在炼制中"
+		return result
+	
+	var remaining_count = max(current_craft_count - current_craft_index, 0)
+	var completed_count = current_craft_index
+	
+	# 返还剩余未炼制的材料（每颗一份）
+	if remaining_count > 0 and recipe_data and inventory:
 		var materials = recipe_data.get_recipe_materials(current_craft_recipe)
 		for material_id in materials.keys():
-			var required_per = materials[material_id]
-			var return_count = ceil(required_per * fail_count * 0.5)
-			if return_count > 0:
-				inventory.add_item(material_id, return_count)
+			var return_amount = materials[material_id] * remaining_count
+			if return_amount > 0:
+				inventory.add_item(material_id, return_amount)
+		
+		var spirit_required = recipe_data.get_recipe_spirit_energy(current_craft_recipe)
+		if spirit_required > 0 and player:
+			player.add_spirit(spirit_required * remaining_count)
 	
-	# 增加炼丹术使用次数
-	if spell_system:
-		for i in range(current_craft_count):
-			spell_system.add_spell_use_count("alchemy")
+	log_message.emit("收丹停火，返还材料，成功%d枚，废丹%d枚" % [craft_success_count, craft_fail_count])
 	
-	# 结束炼制
+	_reset_crafting_state()
+	
+	result.success = true
+	result.completed_count = completed_count
+	result.remaining_count = remaining_count
+	crafting_stopped.emit(completed_count, remaining_count)
+	
+	return result
+
+# 完成炼制
+func _finish_crafting():
+	var recipe_id = current_craft_recipe
+	var success_count = craft_success_count
+	var fail_count = craft_fail_count
+	
+	_reset_crafting_state()
+	
+	crafting_finished.emit(recipe_id, success_count, fail_count)
+	
+	var recipe_name = recipe_data.get_recipe_name(recipe_id) if recipe_data else "丹药"
+	if success_count > 0 or fail_count > 0:
+		log_message.emit("此次炼丹结束，成丹%d枚，废丹%d枚" % [success_count, fail_count])
+
+# 重置炼制状态
+func _reset_crafting_state():
 	is_crafting = false
-	crafting_finished.emit(current_craft_recipe, success_count, fail_count)
 	current_craft_recipe = ""
 	current_craft_count = 0
-	current_craft_progress = 0.0
+	current_craft_index = 0
+	craft_timer = 0.0
+	craft_success_count = 0
+	craft_fail_count = 0
+	craft_time_per_pill = 0.0
 
 # 获取炼制预览信息
 func get_craft_preview(recipe_id: String, count: int) -> Dictionary:
@@ -272,6 +408,7 @@ func get_craft_preview(recipe_id: String, count: int) -> Dictionary:
 		"craft_time": 0.0,
 		"total_time": 0.0,
 		"materials": {},
+		"spirit_energy": {},
 		"alchemy_bonus": {},
 		"furnace_bonus": {},
 		"can_craft": false,
@@ -292,12 +429,16 @@ func get_craft_preview(recipe_id: String, count: int) -> Dictionary:
 	preview.total_time = preview.craft_time * count
 	var materials_check = check_materials(recipe_id, count)
 	preview.materials = materials_check.materials
+	preview.spirit_energy = check_spirit_energy(recipe_id, count)
 	preview.alchemy_bonus = get_alchemy_bonus()
 	preview.furnace_bonus = get_furnace_bonus()
-	preview.can_craft = materials_check.enough
+	preview.can_craft = materials_check.enough and preview.spirit_energy.enough
 	
 	if not preview.can_craft:
-		preview.reason = "材料不足"
+		if not materials_check.enough:
+			preview.reason = "材料不足"
+		else:
+			preview.reason = "灵气不足"
 	
 	return preview
 
@@ -314,3 +455,15 @@ func get_craftable_recipes() -> Array:
 			craftable.append(recipe_id)
 	
 	return craftable
+
+# 获取当前炼制状态
+func get_crafting_state() -> Dictionary:
+	return {
+		"is_crafting": is_crafting,
+		"recipe_id": current_craft_recipe,
+		"current_index": current_craft_index,
+		"total_count": current_craft_count,
+		"success_count": craft_success_count,
+		"fail_count": craft_fail_count,
+		"progress": (craft_timer / craft_time_per_pill) * 100.0 if craft_time_per_pill > 0 else 0.0
+	}

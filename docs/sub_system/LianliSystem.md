@@ -34,6 +34,7 @@
 /scripts/core/LianliSystem.gd          # 核心历练系统
 /scripts/core/LianliAreaData.gd        # 历练区域数据
 /scripts/core/EndlessTowerData.gd      # 无尽塔数据
+/scripts/ui/modules/LianliModule.gd    # 历练UI模块
 /scripts/ui/GameUI.gd                  # UI交互（历练相关部分）
 ```
 
@@ -60,10 +61,9 @@ var lianli_speed: float = 1.0            # 历练倍速（1.0-2.0）
 # 无尽塔状态
 var is_in_tower: bool = false            # 是否处于无尽塔中
 var current_tower_floor: int = 0         # 当前无尽塔层数
-var tower_continuous: bool = false       # 无尽塔连续战斗模式（已废弃，使用UI状态）
 
-# 连续历练设置
-var continuous_lianli: bool = false      # 连续历练模式（已废弃，使用UI状态）
+# 连续历练设置（由UI同步）
+var continuous_lianli: bool = false      # 连续历练模式
 ```
 
 #### 2.3.2 ATB战斗数据
@@ -103,7 +103,7 @@ var combat_buffs: Dictionary = {
 
 | 区域ID | 名称 | 特点 | 通关奖励 |
 |--------|------|------|----------|
-| `foundation_herb_cave` | 破境草洞穴 | 单BOSS（破境草看守者），不可连续战斗 | 筑基丹x1，灵石x20 |
+| `foundation_herb_cave` | 破境草洞穴 | 单BOSS（破境草看守者），每日次数限制 | 破境草x10，灵石x20 |
 
 ### 3.3 无尽塔
 
@@ -156,14 +156,41 @@ _trigger_start_spells()   # 触发开局被动术法
 _handle_battle_victory()  # 处理战斗胜利
 _handle_battle_defeat()   # 处理战斗失败
 _handle_tower_victory()   # 处理无尽塔胜利
-_handle_tower_defeat()    # 处理无尽塔失败
 ```
 
 ---
 
 ## 5. 主体逻辑
 
-### 5.1 历练生命周期
+### 5.1 状态机模型
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        空闲状态                              │
+│                   (is_in_lianli = false)                    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+           start_lianli_in_area() / start_endless_tower()
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        历练中                                │
+│                   (is_in_lianli = true)                     │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │   等待中    │◄──►│   战斗中    │◄──►│   战斗结束  │     │
+│  │(is_waiting) │    │(is_in_battle)│    │             │     │
+│  └─────────────┘    └─────────────┘    └─────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                    end_lianli() / 战败
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        空闲状态                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 历练生命周期
 
 ```
 进入历练区域
@@ -177,13 +204,13 @@ start_lianli_in_area(area_id) / start_endless_tower()
 [战斗循环]
     ↓
 战斗胜利？
-    ├── 是 → 发放奖励 → 连续战斗？（UI状态）
-    │              ├── 是 → 等待3秒 → 开始下一场
-    │              └── 否 → 启用继续战斗按钮
-    └── 否 → 历练结束
+    ├── 是 → 发放奖励 → continuous_lianli？
+    │              ├── 是 → 等待3-5秒 → 开始下一场
+    │              └── 否 → end_lianli() → 历练结束
+    └── 否 → end_lianli() → 历练结束
 ```
 
-### 5.2 战斗生命周期
+### 5.3 战斗生命周期
 
 ```
 开始战斗 (start_battle)
@@ -205,23 +232,33 @@ ATB积累 → 满值判定 → 行动执行
 恢复气血buff → 发送 battle_ended 信号
 ```
 
-### 5.3 连续战斗机制
+### 5.4 连续战斗机制
 
-**重要**：连续战斗状态由UI控制，不再由LianliSystem维护！
+**状态同步流程**：
+```
+UI复选框 (continuous_checkbox)
+    │
+    │ on_continuous_toggled(enabled)
+    ▼
+LianliModule.on_continuous_toggled()
+    │
+    │ lianli_system.set_continuous_lianli(enabled)
+    ▼
+LianliSystem.continuous_lianli = enabled
+```
 
+**战斗结束时的判断**：
 ```gdscript
-# UI层（GameUI）控制连续战斗
-var continuous_checkbox: CheckBox  # 连续战斗复选框
-
-# 战斗结束时，UI检查勾选状态
-func _on_battle_ended(victory: bool, loot: Array, enemy_name: String):
-    if victory:
-        if _is_continuous_checked():  # 检查UI勾选状态
-            # 自动开始等待下一场
-            lianli_system.start_wait_for_next_battle()
-        else:
-            # 启用继续战斗按钮
-            _enable_continue_button()
+# 在 _handle_battle_victory() 中
+if continuous_lianli and is_in_lianli:
+    # 进入等待状态，准备下一场战斗
+    is_waiting = true
+    wait_timer = 0.0
+    current_wait_interval = get_wait_interval()
+else:
+    # 非连续战斗模式，结束历练
+    is_in_lianli = false
+    end_lianli()
 ```
 
 **默认勾选状态**：
@@ -229,9 +266,9 @@ func _on_battle_ended(victory: bool, loot: Array, enemy_name: String):
 - 无尽塔：默认不勾选
 - 特殊区域（破境草洞穴）：隐藏复选框
 
-### 5.4 ATB机制详解
+### 5.5 ATB机制详解
 
-#### 5.4.1 ATB增长公式
+#### 5.5.1 ATB增长公式
 ```gdscript
 # 每0.1秒执行一次tick计算（双方都要受倍速影响）
 player_atb += player_speed * lianli_speed
@@ -243,7 +280,7 @@ enemy_atb += enemy_speed * lianli_speed
 - **敌人ATB**：增长速度 = 敌人速度 × 历练倍速
 - **倍速效果**：2倍速时，双方ATB增长速度都翻倍，战斗节奏加快
 
-#### 5.4.2 ATB满值判定
+#### 5.5.2 ATB满值判定
 ```gdscript
 # ATB满值为100
 if player_atb >= ATB_MAX:
@@ -256,7 +293,7 @@ if player_atb >= ATB_MAX:
 - 例如：ATB=110时行动，行动后ATB=10
 - 确保速度优势能延续到下一回合
 
-#### 5.4.3 ATB同时满值行动优先级
+#### 5.5.3 ATB同时满值行动优先级
 
 当玩家和敌人在同一tick达到满值时，按以下优先级判定行动顺序：
 
@@ -418,7 +455,7 @@ func _restore_health_after_combat():
 
 ---
 
-## 8. 战胜战败机制与奖励
+## 8. 战斗结束处理
 
 ### 8.1 战斗胜利 (_handle_battle_victory)
 
@@ -427,28 +464,32 @@ func _restore_health_after_combat():
 - 在 `_process_atb_tick()` 中检查
 
 #### 8.1.2 胜利处理流程
-```gdscript
-func _handle_battle_victory():
-    is_in_battle = false
-    
-    # 1. 恢复气血buff
-    _restore_health_after_combat()
-    
-    # 2. 生成战利品
-    var loot = generate_loot()
-    
-    # 3. 发送战斗结束信号
-    battle_ended.emit(true, loot, enemy_name)
-    
-    # 4. 无尽塔特殊处理
-    if is_in_tower:
-        _handle_tower_victory()
-        return
-    
-    # 5. 单BOSS区域直接结束
-    if is_single_boss_area:
-        end_lianli()
-        return
+
+```
+战斗胜利
+    ↓
+is_in_battle = false
+    ↓
+恢复气血buff
+    ↓
+生成战利品
+    ↓
+发送 battle_ended 信号
+    ↓
+判断历练类型
+    ├── 无尽塔 → _handle_tower_victory()
+    │              ├── 更新最高层数
+    │              ├── 发放奖励层奖励
+    │              ├── 达到51层？ → end_lianli()
+    │              └── continuous_lianli？ → 等待下一层 / end_lianli()
+    │
+    ├── 特殊区域 → 消耗每日次数
+    │              ├── continuous_lianli + 剩余次数 > 0？ → 等待下一场
+    │              └── 否则 → end_lianli()
+    │
+    └── 普通区域 → continuous_lianli？
+                   ├── 是 → 等待下一场
+                   └── 否 → end_lianli()
 ```
 
 #### 8.1.3 战利品生成规则
@@ -457,8 +498,8 @@ func _handle_battle_victory():
 ```gdscript
 if is_single_boss_area(current_area_id):
     loot = [
-        {"item_id": "foundation_pill", "amount": 1},  # 筑基丹
-        {"item_id": "spirit_stone", "amount": 20}     # 灵石
+        {"item_id": "foundation_herb", "amount": 10},  # 破境草
+        {"item_id": "spirit_stone", "amount": 20}      # 灵石
     ]
 ```
 
@@ -480,16 +521,19 @@ if is_single_boss_area(current_area_id):
 #### 8.2.2 失败处理流程
 ```gdscript
 func _handle_battle_defeat():
-    is_in_battle = false
-    is_in_lianli = false
-    
-    # 1. 恢复气血buff
+    # 恢复气血buff
     _restore_health_after_combat()
     
-    # 2. 发送战斗结束信号
-    battle_ended.emit(false, [], enemy_name)
+    # 根据历练类型输出不同日志
+    if is_in_tower:
+        log_message.emit("无尽塔挑战结束，最高到达第" + str(current_tower_floor) + "层")
+    else:
+        log_message.emit("气血不足，历练结束")
     
-    # 3. 结束历练（中断连续历练）
+    # 发送战斗结束信号
+    battle_ended.emit(false, [], current_enemy.get("name", ""))
+    
+    # 统一调用 end_lianli() 清理状态
     end_lianli()
 ```
 
@@ -499,7 +543,28 @@ func _handle_battle_defeat():
 - 无战利品获得
 - 气血保持战斗结束时的状态（需手动恢复）
 
-### 8.3 战斗结算流程图
+### 8.3 状态清理 (end_lianli)
+
+**统一清理函数**，所有退出历练的场景都调用此函数：
+
+```gdscript
+func end_lianli():
+    is_in_lianli = false
+    is_in_battle = false
+    is_waiting = false
+    is_in_tower = false
+    current_tower_floor = 0
+    current_enemy = {}
+    tick_accumulator = 0.0
+    _restore_health_after_combat()
+    _reset_combat_buffs()
+    _cached_spell_system = null
+    lianli_ended.emit(false)
+```
+
+**注意**：`continuous_lianli` 不会被重置，保留用户的勾选状态。
+
+### 8.4 战斗结算流程图
 ```
 战斗进行中
     ↓
@@ -511,14 +576,14 @@ func _handle_battle_defeat():
     │      恢复气血buff
     │      生成战利品
     │      发放奖励（通过lianli_reward信号）
-    │      连续历练等待（如UI勾选）
+    │      判断是否继续历练
     │
     └── 否 → 玩家气血 <= 0？
               ├── 是 → _handle_battle_defeat()
               │         ↓
               │      恢复气血buff
               │      发送失败信号
-              │      结束历练
+              │      end_lianli()
               │
               └── 否 → 继续战斗
 ```
@@ -564,11 +629,11 @@ start_endless_tower()
     ↓
 检查是否是奖励层 → 发放奖励
     ↓
-检查是否达到51层 → 结束挑战
+检查是否达到51层 → end_lianli()
     ↓
-等待下一场（如UI勾选连续战斗）
-    ↓
-进入下一层
+continuous_lianli？
+    ├── 是 → 等待下一层
+    └── 否 → end_lianli()
 ```
 
 ### 9.4 关键函数
@@ -577,7 +642,6 @@ start_endless_tower()
 start_endless_tower() -> bool           # 开始无尽塔挑战
 _start_tower_battle() -> bool           # 开始无尽塔的一场战斗
 _handle_tower_victory()                 # 处理无尽塔战斗胜利
-_handle_tower_defeat()                  # 处理无尽塔战斗失败
 continue_tower_next_floor() -> bool     # 继续下一层（手动）
 start_wait_for_next_battle() -> bool    # 开始等待下一场
 exit_tower()                            # 退出无尽塔
@@ -677,9 +741,9 @@ signal log_message(message: String)  # 历练日志信号
 
 #### 10.4.3 UI层职责
 
-**GameUI 负责**：
+**LianliModule 负责**：
 - 显示战斗场景（血条、ATB条、敌人信息）
-- 控制连续战斗勾选框（状态管理）
+- 同步连续战斗复选框状态到 LianliSystem
 - 处理继续战斗按钮
 - 接收 `lianli_reward` 信号，调用 `inventory.add_item()`
 - 更新储纳UI显示
@@ -701,9 +765,7 @@ signal log_message(message: String)  # 历练日志信号
 | `end_lianli` | 无 | `void` | 结束历练（完全退出）|
 | `end_battle` | `victory: bool` | `void` | 结束当前战斗 |
 | `set_lianli_speed` | `speed: float` | `void` | 设置历练倍速（1.0-2.0）|
-| `set_continuous_lianli` | `enabled: bool` | `void` | 设置连续历练模式（已废弃）|
-| `set_tower_continuous` | `enabled: bool` | `void` | 设置无尽塔连续战斗（已废弃）|
-| `calculate_damage` | `attack: float, defense: float` | `int` | 计算基础伤害 |
+| `set_continuous_lianli` | `enabled: bool` | `void` | 设置连续历练模式 |
 | `get_current_tower_floor` | 无 | `int` | 获取当前无尽塔层数 |
 | `is_in_endless_tower` | 无 | `bool` | 检查是否在无尽塔中 |
 | `get_current_enemy_drops` | 无 | `Dictionary` | 获取当前敌人掉落配置 |
@@ -723,7 +785,6 @@ signal log_message(message: String)  # 历练日志信号
 | `_handle_battle_victory` | 处理战斗胜利及奖励发放 |
 | `_handle_battle_defeat` | 处理战斗失败 |
 | `_handle_tower_victory` | 处理无尽塔战斗胜利 |
-| `_handle_tower_defeat` | 处理无尽塔战斗失败 |
 | `_restore_health_after_combat` | 战斗后恢复气血buff |
 | `_start_tower_battle` | 开始无尽塔的一场战斗 |
 | `_reset_combat_buffs` | 重置战斗buff |
@@ -792,10 +853,11 @@ func _execute_enemy_action():
 5. **倍速影响**：历练倍速影响双方ATB增长速度，加快整体战斗节奏
 6. **同时满值判定**：速度相同情况下玩家优先，给予玩家先手优势
 7. **历练vs战斗**：注意区分历练（可能多场战斗）和单场战斗的概念
-8. **物品掉落提示**：历练系统通过 `lianli_reward` 信号通知物品掉落，**不负责在富文本框中提示物品获取**。物品进入储纳后，由储纳系统（Inventory）负责显示获取提示。不要在 `_on_battle_ended` 等回调中手动添加物品获取日志。
-9. **连续战斗状态**：连续战斗状态由UI层（GameUI）控制，通过复选框状态决定，不再由LianliSystem维护。LianliSystem只提供 `start_wait_for_next_battle()` 接口供UI调用。
+8. **物品掉落提示**：历练系统通过 `lianli_reward` 信号通知物品掉落，**不负责在富文本框中提示物品获取**。物品进入储纳后，由储纳系统（Inventory）负责显示获取提示。
+9. **连续战斗状态**：连续战斗状态由UI层同步到LianliSystem，在战斗结束时根据 `continuous_lianli` 决定是否继续历练。
 10. **无尽塔上限**：无尽塔最高51层，达到后自动结束挑战
-11. **特殊区域**：破境草洞穴为单BOSS区域，不可连续战斗，通关后自动结束
+11. **特殊区域**：破境草洞穴为单BOSS区域，有每日次数限制，通关后消耗次数
+12. **状态清理**：所有退出历练的场景都调用 `end_lianli()` 统一清理状态
 
 ---
 
@@ -805,4 +867,5 @@ func _execute_enemy_action():
 |------|------|----------|
 | 1.0 | 2026-02-21 | 初始文档 |
 | 1.1 | 2026-02-21 | 区分历练与战斗概念、更新命名规范、ATB机制优化 |
-| 1.2 | 2026-02-23 | 重构连续战斗机制（由UI层控制）、添加无尽塔系统、添加特殊区域说明、更新注意事项 |
+| 1.2 | 2026-02-23 | 重构连续战斗机制、添加无尽塔系统、添加特殊区域说明 |
+| 1.3 | 2026-03-01 | 重构状态管理：统一 `end_lianli()` 清理逻辑、删除废弃变量 `tower_continuous`、合并 `_handle_tower_defeat()`、更新连续战斗同步机制 |

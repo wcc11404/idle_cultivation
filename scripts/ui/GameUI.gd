@@ -638,6 +638,8 @@ func set_alchemy_system(alchemy_system_node: Node):
 	# 初始化炼丹模块的炼丹系统引用
 	if alchemy_module:
 		alchemy_module.alchemy_system = alchemy_system
+		# 重新连接信号（因为初始化时 alchemy_system 可能为 null）
+		alchemy_module._connect_alchemy_signals()
 
 func set_recipe_data(recipe_data_node: Node):
 	recipe_data = recipe_data_node
