@@ -35,15 +35,6 @@ var lianli_speed: float = 1.0
 var wait_timer: float = 0.0
 var current_wait_interval: float = 4.0
 
-var area_continuous_default: Dictionary = {
-	"qi_refining_outer": true,
-	"qi_refining_inner": true,
-	"foundation_outer": true,
-	"foundation_inner": true,
-	"foundation_herb_cave": false,
-	"endless_tower": false,
-}
-
 var base_wait_interval_min: float = 3.0
 var base_wait_interval_max: float = 5.0
 var wait_time_multiplier: float = 1.0
@@ -99,7 +90,7 @@ func start_lianli_in_area(area_id: String) -> bool:
 	
 	current_area_id = area_id
 	is_in_lianli = true
-	continuous_lianli = area_continuous_default.get(area_id, true)
+	continuous_lianli = lianli_area_data.get_default_continuous(area_id)
 	
 	lianli_started.emit(area_id)
 	
@@ -218,6 +209,8 @@ func start_battle(enemy_data_dict: Dictionary) -> bool:
 	return true
 
 func end_lianli():
+	if not is_in_lianli:
+		return
 	is_in_lianli = false
 	is_in_battle = false
 	is_waiting = false
@@ -228,6 +221,7 @@ func end_lianli():
 	_restore_health_after_combat()
 	_reset_combat_buffs()
 	_cached_spell_system = null
+	log_message.emit("已退出历练区域")
 	lianli_ended.emit(false)
 
 func _reset_combat_buffs():
@@ -288,20 +282,13 @@ func _process(delta: float):
 			wait_timer = 0.0
 			is_waiting = false
 			
-			if player and player.health <= 0:
-				is_in_lianli = false
-				log_message.emit("气血不足，历练结束")
-				end_lianli()
-				return
-			
 			if is_in_tower:
 				current_tower_floor += 1
 				_start_tower_battle()
 			else:
 				if lianli_area_data and lianli_area_data.is_special_area(current_area_id):
 					if player.get_daily_dungeon_count(current_area_id) <= 0:
-						is_in_lianli = false
-						log_message.emit("今日次数已用完，历练结束")
+						log_message.emit("今日次数已用完")
 						end_lianli()
 						return
 				start_next_battle()
@@ -481,8 +468,8 @@ func _handle_battle_victory():
 			current_wait_interval = get_wait_interval()
 			return
 		else:
-			is_in_lianli = false
 			log_message.emit("通关成功！")
+			end_lianli()
 			return
 	
 	if continuous_lianli and is_in_lianli:
@@ -490,7 +477,7 @@ func _handle_battle_victory():
 		wait_timer = 0.0
 		current_wait_interval = get_wait_interval()
 	else:
-		is_in_lianli = false
+		end_lianli()
 
 func _handle_battle_defeat():
 	_restore_health_after_combat()
@@ -498,7 +485,7 @@ func _handle_battle_defeat():
 	if is_in_tower:
 		log_message.emit("无尽塔挑战结束，最高到达第" + str(current_tower_floor) + "层")
 	else:
-		log_message.emit("气血不足，历练结束")
+		log_message.emit("气血不足，停止战斗")
 	
 	battle_ended.emit(false, [], current_enemy.get("name", ""))
 	end_lianli()
@@ -519,8 +506,7 @@ func _handle_tower_victory():
 	if current_tower_floor >= max_floor:
 		log_message.emit("恭喜！已通关无尽塔最高层！")
 		is_in_battle = false
-		is_in_lianli = false
-		is_in_tower = false
+		end_lianli()
 		return
 	
 	is_in_battle = false
@@ -530,7 +516,7 @@ func _handle_tower_victory():
 		wait_timer = 0.0
 		current_wait_interval = get_wait_interval()
 	else:
-		is_in_lianli = false
+		end_lianli()
 
 func start_wait_for_next_battle() -> bool:
 	if is_in_battle or is_waiting:

@@ -465,7 +465,7 @@ func setup_neishi_module():
 	var game_manager = get_node("/root/GameManager")
 	cultivation_system = game_manager.get_cultivation_system() if game_manager else null
 	lianli_system = game_manager.get_lianli_system() if game_manager else null
-	cultivation_module.initialize(self, player, cultivation_system, lianli_system, item_data_ref)
+	cultivation_module.initialize(self, player, cultivation_system, lianli_system, item_data_ref, alchemy_module)
 	
 	# 连接信号
 	cultivation_module.log_message.connect(_on_module_log)
@@ -530,7 +530,7 @@ func setup_lianli_module():
 	lianli_module.exit_lianli_button = exit_lianli_button
 	
 	# 初始化模块
-	lianli_module.initialize(self, player, lianli_system, lianli_area_data, endless_tower_data, item_data_ref, inventory, chuna_module, log_manager)
+	lianli_module.initialize(self, player, lianli_system, lianli_area_data, endless_tower_data, item_data_ref, inventory, chuna_module, log_manager, alchemy_module)
 	
 	# 连接信号
 	lianli_module.log_message.connect(_on_module_log)
@@ -830,14 +830,14 @@ func stop_other_activities(current_activity: String):
 				cultivation_system.stop_cultivation()
 			# 停止历练
 			if lianli_system and lianli_system.is_in_lianli:
-				lianli_system.exit_lianli()
+				lianli_system.end_lianli()
 		"cultivation":
 			# 停止炼丹
 			if alchemy_module and alchemy_module.is_crafting_active():
 				alchemy_module.stop_crafting()
 			# 停止历练
 			if lianli_system and lianli_system.is_in_lianli:
-				lianli_system.exit_lianli()
+				lianli_system.end_lianli()
 		"lianli":
 			# 停止炼丹
 			if alchemy_module and alchemy_module.is_crafting_active():

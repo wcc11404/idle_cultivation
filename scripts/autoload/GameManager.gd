@@ -103,12 +103,12 @@ func init_systems():
 	add_child(offline_reward)
 	print("离线收益系统初始化完成")
 	
-	spell_data = load("res://scripts/core/SpellData.gd").new()
+	spell_data = load("res://scripts/core/spell/SpellData.gd").new()
 	spell_data.name = "SpellData"
 	add_child(spell_data)
 	print("术法数据初始化完成")
 	
-	spell_system = load("res://scripts/core/SpellSystem.gd").new()
+	spell_system = load("res://scripts/core/spell/SpellSystem.gd").new()
 	spell_system.name = "SpellSystem"
 	add_child(spell_system)
 	spell_system.set_spell_data(spell_data)
@@ -116,12 +116,12 @@ func init_systems():
 	print("术法系统初始化完成")
 	
 	# 初始化炼丹系统
-	recipe_data = load("res://scripts/core/AlchemyRecipeData.gd").new()
+	recipe_data = load("res://scripts/core/alchemy/AlchemyRecipeData.gd").new()
 	recipe_data.name = "AlchemyRecipeData"
 	add_child(recipe_data)
 	print("丹方数据初始化完成")
 	
-	alchemy_system = load("res://scripts/core/AlchemySystem.gd").new()
+	alchemy_system = load("res://scripts/core/alchemy/AlchemySystem.gd").new()
 	alchemy_system.name = "AlchemySystem"
 	add_child(alchemy_system)
 	alchemy_system.set_recipe_data(recipe_data)

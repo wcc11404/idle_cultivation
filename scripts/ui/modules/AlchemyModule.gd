@@ -398,7 +398,7 @@ func show_alchemy_room():
 		_update_recipe_list()
 		_update_alchemy_info()
 		if selected_recipe:
-			_update_materials_display()
+			_update_craft_panel()
 
 func hide_alchemy_room():
 	if alchemy_room_panel:
@@ -808,6 +808,10 @@ func set_craft_count(count: int):
 
 func is_crafting_active() -> bool:
 	return alchemy_system.is_crafting if alchemy_system else false
+
+func stop_crafting():
+	if alchemy_system and alchemy_system.is_crafting:
+		alchemy_system.stop_crafting()
 
 func get_max_craft_count() -> int:
 	if not selected_recipe or not alchemy_system:

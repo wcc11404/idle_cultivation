@@ -26,6 +26,7 @@ var item_data_ref: Node = null
 var inventory: Node = null
 var chuna_module: Node = null
 var log_manager: Node = null
+var alchemy_module: Node = null
 
 # UI节点引用（由GameUI设置）
 var lianli_panel: Control = null
@@ -61,7 +62,7 @@ func _ready():
 func initialize(ui: Node, player_node: Node, lianli_sys: Node, 
 				area_data: Node = null, tower_data: Node = null, 
 				item_data: Node = null, inv: Node = null, 
-				chuna: Node = null, log_mgr: Node = null):
+				chuna: Node = null, log_mgr: Node = null, alchemy_mod: Node = null):
 	game_ui = ui
 	player = player_node
 	lianli_system = lianli_sys
@@ -71,6 +72,7 @@ func initialize(ui: Node, player_node: Node, lianli_sys: Node,
 	inventory = inv
 	chuna_module = chuna
 	log_manager = log_mgr
+	alchemy_module = alchemy_mod
 
 # 显示历练面板
 func show_lianli_panel():
@@ -129,6 +131,11 @@ func start_lianli_in_area(area_id: String):
 	# 如果正在修炼，先停止修炼
 	if player.get_is_cultivating():
 		_stop_cultivation()
+	
+	# 如果正在炼丹，先停止炼丹
+	if alchemy_module and alchemy_module.is_crafting_active():
+		alchemy_module.stop_crafting()
+		log_message.emit("已停止炼丹")
 	
 	# 如果正在无尽塔中，先退出
 	if lianli_system.is_in_endless_tower():
@@ -247,7 +254,6 @@ func on_lianli_speed_pressed():
 func on_exit_lianli_pressed():
 	if lianli_system:
 		lianli_system.end_lianli()
-		log_message.emit("已退出历练区域")
 	show_lianli_select_panel()
 
 # 启用继续战斗按钮
@@ -358,16 +364,16 @@ func _update_button_container():
 
 # 设置连续战斗默认值
 func _set_continuous_default():
-	if not lianli_system:
+	if not lianli_system or not lianli_area_data:
 		return
 	
 	if continuous_checkbox:
 		var is_tower = lianli_system.is_in_endless_tower()
 		if is_tower:
-			continuous_checkbox.button_pressed = lianli_system.area_continuous_default.get("endless_tower", false)
+			continuous_checkbox.button_pressed = lianli_area_data.get_default_continuous("endless_tower")
 		else:
 			var area_id = lianli_system.current_area_id
-			continuous_checkbox.button_pressed = lianli_system.area_continuous_default.get(area_id, true)
+			continuous_checkbox.button_pressed = lianli_area_data.get_default_continuous(area_id)
 		# 同步到LianliSystem
 		lianli_system.set_continuous_lianli(continuous_checkbox.button_pressed)
 

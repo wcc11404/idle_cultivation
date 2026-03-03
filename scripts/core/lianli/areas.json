@@ -3,6 +3,7 @@
 		"qi_refining_outer": {
 			"name": "炼气期外围森林",
 			"description": "最外围的森林，妖兽实力极弱，适合新手历练和长时间挂机",
+			"default_continuous": true,
 			"enemies": [
 				{
 					"template": "wolf",
@@ -24,6 +25,7 @@
 		"qi_refining_inner": {
 			"name": "炼气期内围山谷",
 			"description": "妖兽实力适中，偶尔能遇到强大的狼王，是炼气期修士的主要历练场所",
+			"default_continuous": true,
 			"enemies": [
 				{
 					"template": "wolf",
@@ -53,6 +55,7 @@
 		"foundation_outer": {
 			"name": "筑基期外围荒原",
 			"description": "荒原上栖息着筑基初期的妖兽，实力远超炼气期",
+			"default_continuous": true,
 			"enemies": [
 				{
 					"template": "wolf",
@@ -74,6 +77,7 @@
 		"foundation_inner": {
 			"name": "筑基期内围沼泽",
 			"description": "沼泽深处的妖兽更加凶猛，偶尔能遇到狼王",
+			"default_continuous": true,
 			"enemies": [
 				{
 					"template": "wolf",
@@ -105,6 +109,7 @@
 		"foundation_herb_cave": {
 			"name": "破境草洞穴",
 			"description": "神秘的洞穴，由强大的看守者守护",
+			"default_continuous": false,
 			"is_single_boss": true,
 			"enemies": [
 				{

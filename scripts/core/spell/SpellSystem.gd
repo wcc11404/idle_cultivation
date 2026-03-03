@@ -171,7 +171,7 @@ func upgrade_spell(spell_id: String) -> Dictionary:
 		return result
 	
 	var next_level = spell_info.level + 1
-	var level_data = spell_data.get_spell_level_data(spell_id, next_level)
+	var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
 	
 	var spirit_cost = level_data.get("spirit_cost", 0)
 	var use_count_required = level_data.get("use_count_required", 0)
@@ -208,9 +208,8 @@ func add_spell_use_count(spell_id: String):
 		if spell_info.level >= max_level:
 			return
 		
-		# 获取下一级所需使用次数
-		var next_level = spell_info.level + 1
-		var level_data = spell_data.get_spell_level_data(spell_id, next_level)
+		# 获取当前等级所需使用次数
+		var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
 		var use_count_required = level_data.get("use_count_required", 0)
 		
 		# 如果已达到当前等级需求的使用次数，不再增加
@@ -291,32 +290,35 @@ func get_attribute_bonuses() -> Dictionary:
 	return bonuses
 
 # 获取装备的吐纳术法效果（用于修炼时气血值回复）
+# 支持多个吐纳术法效果叠加
 func get_equipped_breathing_heal_effect() -> Dictionary:
 	if not spell_data:
-		return {"heal_amount": 0, "spell_id": ""}
+		return {"heal_amount": 0.0, "spell_ids": []}
 	
-	# 检查是否有装备的吐纳术法（吐纳心法只能装备1个）
 	var breathing_spells = equipped_spells.get(spell_data.SpellType.BREATHING, [])
 	if breathing_spells.is_empty():
-		return {"heal_amount": 0, "spell_id": ""}
+		return {"heal_amount": 0.0, "spell_ids": []}
 	
-	var breathing_spell_id = breathing_spells[0]
-	var spell_info = player_spells[breathing_spell_id]
-	if not spell_info.obtained or spell_info.level <= 0:
-		return {"heal_amount": 0, "spell_id": ""}
+	var total_heal_percent = 0.0
+	var valid_spell_ids = []
 	
-	var level_data = spell_data.get_spell_level_data(breathing_spell_id, spell_info.level)
-	var effect = level_data.get("effect", {})
+	for breathing_spell_id in breathing_spells:
+		var spell_info = player_spells[breathing_spell_id]
+		if not spell_info.obtained or spell_info.level <= 0:
+			continue
+		
+		var level_data = spell_data.get_spell_level_data(breathing_spell_id, spell_info.level)
+		var effect = level_data.get("effect", {})
+		
+		if effect.get("type") == "passive_heal":
+			var heal_percent = effect.get("heal_percent", 0.0)
+			total_heal_percent += heal_percent
+			valid_spell_ids.append(breathing_spell_id)
 	
-	if effect.get("type") == "passive_heal":
-		var heal_percent = effect.get("heal_percent", 0.0)
-		return {
-			"heal_amount": heal_percent,
-			"spell_name": spell_data.get_spell_name(breathing_spell_id),
-			"spell_id": breathing_spell_id
-		}
-	
-	return {"heal_amount": 0, "spell_id": ""}
+	return {
+		"heal_amount": total_heal_percent,
+		"spell_ids": valid_spell_ids
+	}
 
 # 给术法充灵气
 func charge_spell_spirit(spell_id: String, amount: int) -> Dictionary:
@@ -339,7 +341,7 @@ func charge_spell_spirit(spell_id: String, amount: int) -> Dictionary:
 		return result
 	
 	var next_level = spell_info.level + 1
-	var level_data = spell_data.get_spell_level_data(spell_id, next_level)
+	var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
 	var spirit_cost = level_data.get("spirit_cost", 0)
 	
 	var current_charged = spell_info.charged_spirit
@@ -511,7 +513,7 @@ func can_upgrade_spell(spell_id: String) -> Dictionary:
 		return result
 	
 	var next_level = spell_info.level + 1
-	var level_data = spell_data.get_spell_level_data(spell_id, next_level)
+	var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
 	
 	var spirit_cost = level_data.get("spirit_cost", 0)
 	var use_count_required = level_data.get("use_count_required", 0)

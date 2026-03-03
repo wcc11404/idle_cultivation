@@ -72,14 +72,8 @@ var current_tower_floor: int = 0         # 当前无尽塔层数
 var continuous_lianli: bool = false      # 连续历练模式
 
 # 区域默认连续战斗状态
-var area_continuous_default: Dictionary = {
-    "qi_refining_outer": true,
-    "qi_refining_inner": true,
-    "foundation_outer": true,
-    "foundation_inner": true,
-    "foundation_herb_cave": false,
-    "endless_tower": false,
-}
+# 连续战斗默认值现在存储在 areas.json 配置文件中
+# 每个区域都有一个 default_continuous 字段来指定默认的连续战斗状态
 ```
 
 #### 2.3.2 ATB战斗数据
@@ -241,9 +235,8 @@ var area_continuous_default: Dictionary = {
     "qi_refining_inner": true,
     "foundation_outer": true,
     "foundation_inner": true,
-    "foundation_herb_cave": false,   # 特殊区域默认不连续
-    "endless_tower": false,          # 无尽塔默认不连续
-}
+# 连续战斗默认值现在存储在 areas.json 配置文件中
+# 每个区域都有一个 default_continuous 字段来指定默认的连续战斗状态
 ```
 
 ### 5.2 连续状态设置流程
@@ -253,7 +246,7 @@ var area_continuous_default: Dictionary = {
     ↓
 start_lianli_in_area(area_id) / start_endless_tower()
     ↓
-从 area_continuous_default 读取默认值
+从 areas.json 配置文件读取默认值
     ↓
 设置 continuous_lianli = 默认值
     ↓
@@ -560,9 +553,117 @@ func end_lianli():
 
 ---
 
-## 10. 与其他系统的联动
+## 10. 活动互斥机制
 
-### 10.1 信号定义
+### 10.1 互斥活动类型
+
+游戏中存在三种需要互斥的活动：
+
+| 活动类型 | 控制系统 | 停止方法 |
+|----------|----------|----------|
+| **炼丹** | AlchemySystem | `stop_crafting()` |
+| **修炼** | CultivationSystem | `stop_cultivation()` |
+| **历练** | LianliSystem | `end_lianli()` |
+
+### 10.2 互斥规则
+
+当玩家开始某项活动时，系统会自动停止其他进行中的活动：
+
+```gdscript
+# GameUI.gd 中的 stop_other_activities 函数
+func stop_other_activities(current_activity: String):
+    match current_activity:
+        "cultivation":
+            # 开始修炼时，停止炼丹和历练
+            if alchemy_module:
+                alchemy_module.stop_crafting()
+            if lianli_system:
+                lianli_system.end_lianli()
+        
+        "lianli":
+            # 开始历练时，停止炼丹和修炼
+            if alchemy_module:
+                alchemy_module.stop_crafting()
+            if cultivation_system:
+                cultivation_system.stop_cultivation()
+        
+        "alchemy":
+            # 开始炼丹时，停止修炼和历练
+            if cultivation_system:
+                cultivation_system.stop_cultivation()
+            if lianli_system:
+                lianli_system.end_lianli()
+```
+
+### 10.3 互斥触发时机
+
+| 触发场景 | 调用位置 | 说明 |
+|----------|----------|------|
+| 点击修炼按钮 | `CultivationModule.on_cultivate_button_pressed()` | 开始修炼前停止其他活动 |
+| 点击历练区域 | `LianliModule.start_lianli_in_area()` | 进入历练区域前停止其他活动 |
+| 点击开始炼丹 | `AlchemyModule.start_crafting_batch()` | 开始炼丹前停止其他活动 |
+
+---
+
+## 11. 状态管理规范
+
+### 11.1 核心原则
+
+**`end_lianli()` 是历练状态清理的唯一控制点**，所有需要退出历练状态的场景都必须调用此函数。
+
+### 11.2 `end_lianli()` 函数实现
+
+```gdscript
+func end_lianli():
+    # 防止重复调用
+    if not is_in_lianli:
+        return
+    
+    # 清理所有状态
+    is_in_lianli = false
+    is_in_battle = false
+    is_waiting = false
+    is_in_tower = false
+    current_tower_floor = 0
+    current_enemy = {}
+    tick_accumulator = 0.0
+    
+    # 恢复战斗中的临时状态
+    _restore_health_after_combat()
+    _reset_combat_buffs()
+    _cached_spell_system = null
+    
+    # 输出日志
+    log_message.emit("已退出历练区域")
+    
+    # 发送信号
+    lianli_ended.emit(false)
+```
+
+### 11.3 调用场景
+
+| 场景 | 调用方式 | 日志输出 |
+|------|----------|----------|
+| 战斗失败 | `end_lianli()` | "气血不足，停止战斗"（在 `_handle_battle_defeat` 中输出） |
+| 通关无尽塔最高层 | `end_lianli()` | "恭喜！已通关无尽塔最高层！" |
+| 通关特殊区域BOSS | `end_lianli()` | "通关成功！" |
+| 退出无尽塔 | `end_lianli()` | "退出无尽塔，最高到达第X层" |
+| 连续历练次数用完 | `end_lianli()` | "今日次数已用完" |
+| 开始其他活动 | `end_lianli()` | "已退出历练区域" |
+| 非连续战斗胜利 | `end_lianli()` | 无（胜利日志在 `battle_ended` 后） |
+
+### 11.4 状态管理注意事项
+
+1. **防重复调用**：`end_lianli()` 开头检查 `is_in_lianli`，避免重复清理
+2. **日志输出位置**：业务日志在调用 `end_lianli()` 之前输出，`end_lianli()` 只输出通用的"已退出历练区域"
+3. **信号发送**：`lianli_ended` 信号只在 `end_lianli()` 中发送，确保信号唯一性
+4. **互斥调用**：其他活动开始时通过 `stop_other_activities()` 调用 `end_lianli()`
+
+---
+
+## 12. 与其他系统的联动
+
+### 12.1 信号定义
 
 ```gdscript
 # 历练相关信号
@@ -581,7 +682,7 @@ signal lianli_reward(item_id: String, amount: int, source: String)
 signal log_message(message: String)
 ```
 
-### 10.2 信号触发时机
+### 12.2 信号触发时机
 
 | 信号 | 触发时机 | 说明 |
 |------|----------|------|
@@ -596,9 +697,9 @@ signal log_message(message: String)
 
 ---
 
-## 11. 关键函数索引
+## 13. 关键函数索引
 
-### 11.1 公共接口
+### 13.1 公共接口
 
 | 函数名 | 参数 | 返回值 | 说明 |
 |--------|------|--------|------|
@@ -615,7 +716,7 @@ signal log_message(message: String)
 | `start_wait_for_next_battle` | 无 | `bool` | 开始等待下一场战斗 |
 | `exit_tower` | 无 | `void` | 退出无尽塔 |
 
-### 11.2 内部函数
+### 13.2 内部函数
 
 | 函数名 | 说明 |
 |--------|------|
@@ -632,7 +733,7 @@ signal log_message(message: String)
 
 ---
 
-## 12. 注意事项
+## 14. 注意事项
 
 1. **状态判断**：使用 `is_in_lianli` 判断是否显示战斗场景，而非 `is_in_battle || is_waiting`
 2. **信号区分**：`battle_ended` 表示单场战斗结束，`lianli_ended` 表示整个历练结束
@@ -649,7 +750,7 @@ signal log_message(message: String)
 
 ---
 
-## 13. 版本历史
+## 15. 版本历史
 
 | 版本 | 日期 | 修改内容 |
 |------|------|----------|
@@ -658,3 +759,4 @@ signal log_message(message: String)
 | 1.2 | 2026-02-23 | 重构连续战斗机制、添加无尽塔系统、添加特殊区域说明 |
 | 1.3 | 2026-03-01 | 重构状态管理：统一 `end_lianli()` 清理逻辑 |
 | 2.0 | 2026-03-03 | **重大重构**：状态机模型重构、文件结构重组、JSON配置分离、区域默认连续状态、信号逻辑优化 |
+| 2.1 | 2026-03-03 | 新增活动互斥机制章节、状态管理规范章节，完善 `end_lianli()` 调用场景说明 |

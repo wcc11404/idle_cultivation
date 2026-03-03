@@ -26,6 +26,7 @@ var craft_timer: float = 0.0
 var craft_success_count: int = 0
 var craft_fail_count: int = 0
 var craft_time_per_pill: float = 0.0
+var current_material_consumed: bool = false
 
 func _ready():
 	pass
@@ -275,9 +276,16 @@ func start_crafting_batch(recipe_id: String, count: int) -> Dictionary:
 	craft_success_count = 0
 	craft_fail_count = 0
 	craft_time_per_pill = calculate_craft_time(recipe_id)
+	current_material_consumed = false
 	
-	# 预先消耗第一颗丹药的材料
+	if not _check_single_craft_materials():
+		log_message.emit("材料不足，无法开始炼制")
+		_reset_crafting_state()
+		result.reason = "材料不足"
+		return result
+	
 	_consume_single_craft_materials()
+	current_material_consumed = true
 	
 	crafting_started.emit(recipe_id, count)
 	log_message.emit("开炉炼丹，开始炼制 [" + recipe_data.get_recipe_name(recipe_id) + "]")
@@ -291,6 +299,7 @@ func _complete_single_pill():
 		return
 	
 	current_craft_index += 1
+	current_material_consumed = false
 	
 	var success_rate = calculate_success_rate(current_craft_recipe)
 	var roll = randf() * 100.0
@@ -322,6 +331,7 @@ func _complete_single_pill():
 		return
 	
 	_consume_single_craft_materials()
+	current_material_consumed = true
 
 # 返还一半材料（失败时）
 func _return_half_materials(fail_count: int):
@@ -350,17 +360,16 @@ func stop_crafting() -> Dictionary:
 	var remaining_count = max(current_craft_count - current_craft_index, 0)
 	var completed_count = current_craft_index
 	
-	# 返还剩余未炼制的材料（每颗一份）
-	if remaining_count > 0 and recipe_data and inventory:
+	if current_material_consumed and recipe_data and inventory:
 		var materials = recipe_data.get_recipe_materials(current_craft_recipe)
 		for material_id in materials.keys():
-			var return_amount = materials[material_id] * remaining_count
+			var return_amount = materials[material_id]
 			if return_amount > 0:
 				inventory.add_item(material_id, return_amount)
 		
 		var spirit_required = recipe_data.get_recipe_spirit_energy(current_craft_recipe)
 		if spirit_required > 0 and player:
-			player.add_spirit(spirit_required * remaining_count)
+			player.add_spirit(spirit_required)
 	
 	log_message.emit("收丹停火，返还材料，成功%d枚，废丹%d枚" % [craft_success_count, craft_fail_count])
 	
@@ -397,6 +406,7 @@ func _reset_crafting_state():
 	craft_success_count = 0
 	craft_fail_count = 0
 	craft_time_per_pill = 0.0
+	current_material_consumed = false
 
 # 获取炼制预览信息
 func get_craft_preview(recipe_id: String, count: int) -> Dictionary:

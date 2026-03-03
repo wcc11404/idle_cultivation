@@ -49,15 +49,13 @@ func do_cultivate():
 	var total_heal = BASE_HEAL_PER_SECOND
 	
 	var spell_system = _get_spell_system()
-	var breathing_spell_id = ""
 	if spell_system:
 		var breathing_effect = spell_system.get_equipped_breathing_heal_effect()
 		if breathing_effect.heal_amount > 0:
 			total_heal += final_max_health * breathing_effect.heal_amount
-			breathing_spell_id = breathing_effect.get("spell_id", "")
 		
-		if not breathing_spell_id.is_empty():
-			spell_system.add_spell_use_count(breathing_spell_id)
+		for spell_id in breathing_effect.get("spell_ids", []):
+			spell_system.add_spell_use_count(spell_id)
 	
 	if player.health < final_max_health:
 		player.heal(total_heal)

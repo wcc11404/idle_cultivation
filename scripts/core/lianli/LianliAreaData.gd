@@ -105,3 +105,7 @@ func get_random_enemy_config(area_id: String) -> Dictionary:
 func get_enemies_list(area_id: String) -> Array:
 	var area = get_area_data(area_id)
 	return area.get("enemies", []).duplicate()
+
+func get_default_continuous(area_id: String) -> bool:
+	var area = get_area_data(area_id)
+	return area.get("default_continuous", true)
