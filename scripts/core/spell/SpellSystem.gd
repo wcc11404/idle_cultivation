@@ -45,12 +45,11 @@ func _init_player_spells():
 				"use_count": 0,
 				"charged_spirit": 0
 			}
-		# 初始化装备槽位
+		# 初始化装备槽位（杂学术法无装备概念）
 		equipped_spells = {
 			spell_data.SpellType.BREATHING: [],
 			spell_data.SpellType.ACTIVE: [],
-			spell_data.SpellType.PASSIVE: [],
-			spell_data.SpellType.MISC: []
+			spell_data.SpellType.PASSIVE: []
 		}
 
 # 检查是否在战斗中

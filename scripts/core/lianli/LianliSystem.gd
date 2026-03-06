@@ -30,6 +30,9 @@ var is_in_tower: bool = false
 var current_tower_floor: int = 0
 var endless_tower_data: Node = null
 
+var tower_highest_floor: int = 0
+var daily_dungeon_data: Dictionary = {}
+
 var continuous_lianli: bool = false
 var lianli_speed: float = 1.0
 var wait_timer: float = 0.0
@@ -77,7 +80,7 @@ func set_continuous_lianli(enabled: bool):
 	continuous_lianli = enabled
 
 func set_lianli_speed(speed: float):
-	lianli_speed = clamp(speed, 1.0, 2.0)
+	lianli_speed = max(1.0, speed)
 
 func start_lianli_in_area(area_id: String) -> bool:
 	if not lianli_area_data or not enemy_data:
@@ -113,7 +116,7 @@ func start_endless_tower() -> bool:
 	var start_floor = 1
 	var max_floor = endless_tower_data.get_max_floor()
 	if player:
-		start_floor = min(player.tower_highest_floor + 1, max_floor)
+		start_floor = min(tower_highest_floor + 1, max_floor)
 	current_tower_floor = start_floor
 	
 	lianli_started.emit(current_area_id)
@@ -287,7 +290,7 @@ func _process(delta: float):
 				_start_tower_battle()
 			else:
 				if lianli_area_data and lianli_area_data.is_special_area(current_area_id):
-					if player.get_daily_dungeon_count(current_area_id) <= 0:
+					if get_daily_dungeon_count(current_area_id) <= 0:
 						log_message.emit("今日次数已用完")
 						end_lianli()
 						return
@@ -459,10 +462,10 @@ func _handle_battle_victory():
 		return
 	
 	if lianli_area_data and lianli_area_data.is_special_area(current_area_id):
-		player.use_daily_dungeon_count(current_area_id)
+		use_daily_dungeon_count(current_area_id)
 	
 	if lianli_area_data and lianli_area_data.is_single_boss_area(current_area_id):
-		if continuous_lianli and player.get_daily_dungeon_count(current_area_id) > 0:
+		if continuous_lianli and get_daily_dungeon_count(current_area_id) > 0:
 			is_waiting = true
 			wait_timer = 0.0
 			current_wait_interval = get_wait_interval()
@@ -491,8 +494,8 @@ func _handle_battle_defeat():
 	end_lianli()
 
 func _handle_tower_victory():
-	if player and current_tower_floor > player.tower_highest_floor:
-		player.tower_highest_floor = current_tower_floor
+	if current_tower_floor > tower_highest_floor:
+		tower_highest_floor = current_tower_floor
 	
 	if endless_tower_data and endless_tower_data.is_reward_floor(current_tower_floor):
 		var reward = endless_tower_data.get_reward_for_floor(current_tower_floor)
@@ -532,7 +535,7 @@ func start_wait_for_next_battle() -> bool:
 			return false
 	else:
 		if lianli_area_data and lianli_area_data.is_special_area(current_area_id):
-			if player.get_daily_dungeon_count(current_area_id) <= 0:
+			if get_daily_dungeon_count(current_area_id) <= 0:
 				log_message.emit("今日次数已用完")
 				return false
 	
@@ -570,4 +573,42 @@ func get_spell_system() -> Node:
 
 func get_wait_interval() -> float:
 	var interval = randf_range(base_wait_interval_min, base_wait_interval_max)
-	return max(min_wait_time, interval * wait_time_multiplier)
+	var adjusted_interval = max(min_wait_time, interval * wait_time_multiplier)
+	return adjusted_interval / lianli_speed
+
+func get_save_data() -> Dictionary:
+	return {
+		"tower_highest_floor": tower_highest_floor,
+		"daily_dungeon_data": daily_dungeon_data.duplicate()
+	}
+
+func apply_save_data(data: Dictionary):
+	tower_highest_floor = data.get("tower_highest_floor", 0)
+	daily_dungeon_data = data.get("daily_dungeon_data", {}).duplicate()
+	check_and_reset_daily_dungeons()
+
+func check_and_reset_daily_dungeons():
+	var today = Time.get_date_string_from_system()
+	for dungeon_id in daily_dungeon_data.keys():
+		var last_reset = daily_dungeon_data[dungeon_id].get("last_reset_date", "")
+		if last_reset != today:
+			daily_dungeon_data[dungeon_id]["enter_count"] = 3
+			daily_dungeon_data[dungeon_id]["last_reset_date"] = today
+
+func get_daily_dungeon_count(dungeon_id: String) -> int:
+	_ensure_daily_dungeon_data(dungeon_id)
+	return daily_dungeon_data[dungeon_id]["enter_count"]
+
+func use_daily_dungeon_count(dungeon_id: String) -> bool:
+	_ensure_daily_dungeon_data(dungeon_id)
+	if daily_dungeon_data[dungeon_id]["enter_count"] <= 0:
+		return false
+	daily_dungeon_data[dungeon_id]["enter_count"] -= 1
+	return true
+
+func _ensure_daily_dungeon_data(dungeon_id: String):
+	if not daily_dungeon_data.has(dungeon_id):
+		daily_dungeon_data[dungeon_id] = {
+			"enter_count": 3,
+			"last_reset_date": Time.get_date_string_from_system()
+		}

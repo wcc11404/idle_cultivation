@@ -11,6 +11,15 @@ signal crafting_finished(recipe_id: String, success_count: int, fail_count: int)
 signal crafting_stopped(completed_count: int, remaining_count: int)
 signal log_message(message: String)
 
+# 丹炉配置（硬编码，支持多丹炉扩展）
+const FURNACE_CONFIGS = {
+	"alchemy_furnace": {
+		"name": "初级丹炉",
+		"success_bonus": 10,
+		"speed_rate": 0.1
+	}
+}
+
 # 引用
 var player: Node = null
 var recipe_data: Node = null
@@ -27,6 +36,12 @@ var craft_success_count: int = 0
 var craft_fail_count: int = 0
 var craft_time_per_pill: float = 0.0
 var current_material_consumed: bool = false
+
+# 装备的丹炉ID（空字符串表示无丹炉）
+var equipped_furnace_id: String = ""
+
+# 已学会的丹方ID列表
+var learned_recipes: Array = []
 
 func _ready():
 	pass
@@ -59,36 +74,42 @@ func set_inventory(inv: Node):
 
 # 学习丹方（使用丹方道具时调用）
 func learn_recipe(recipe_id: String) -> bool:
-	if not player:
-		return false
-	
 	if not recipe_data or recipe_data.get_recipe_data(recipe_id).is_empty():
 		return false
 	
-	if recipe_id in player.learned_recipes:
+	if recipe_id in learned_recipes:
 		return false
 	
-	player.learned_recipes.append(recipe_id)
+	learned_recipes.append(recipe_id)
 	recipe_learned.emit(recipe_id)
 	return true
 
 # 检查是否学会丹方
 func has_learned_recipe(recipe_id: String) -> bool:
-	if not player:
-		return false
-	return recipe_id in player.learned_recipes
+	return recipe_id in learned_recipes
 
 # 获取已学会的丹方列表
 func get_learned_recipes() -> Array:
-	if not player:
-		return []
-	return player.learned_recipes.duplicate()
+	return learned_recipes.duplicate()
 
 # 检查是否拥有丹炉
 func has_furnace() -> bool:
-	if not player:
+	return equipped_furnace_id != "" and FURNACE_CONFIGS.has(equipped_furnace_id)
+
+# 装备丹炉
+func equip_furnace(furnace_id: String) -> bool:
+	if not FURNACE_CONFIGS.has(furnace_id):
 		return false
-	return player.has_alchemy_furnace
+	equipped_furnace_id = furnace_id
+	return true
+
+# 获取当前装备的丹炉ID
+func get_equipped_furnace_id() -> String:
+	return equipped_furnace_id
+
+# 获取丹炉配置
+func get_furnace_config(furnace_id: String) -> Dictionary:
+	return FURNACE_CONFIGS.get(furnace_id, {})
 
 # 获取炼丹术加成
 func get_alchemy_bonus() -> Dictionary:
@@ -123,15 +144,18 @@ func get_furnace_bonus() -> Dictionary:
 	var bonus = {
 		"success_bonus": 0,
 		"speed_rate": 0.0,
-		"has_furnace": false
+		"has_furnace": false,
+		"furnace_name": ""
 	}
 	
 	if not has_furnace():
 		return bonus
 	
+	var config = FURNACE_CONFIGS.get(equipped_furnace_id, {})
 	bonus.has_furnace = true
-	bonus.success_bonus = 10
-	bonus.speed_rate = 0.1
+	bonus.success_bonus = config.get("success_bonus", 0)
+	bonus.speed_rate = config.get("speed_rate", 0.0)
+	bonus.furnace_name = config.get("name", "未知丹炉")
 	
 	return bonus
 
@@ -459,7 +483,7 @@ func get_craftable_recipes() -> Array:
 	if not player or not recipe_data:
 		return craftable
 	
-	for recipe_id in player.learned_recipes:
+	for recipe_id in learned_recipes:
 		var preview = get_craft_preview(recipe_id, 1)
 		if preview.can_craft:
 			craftable.append(recipe_id)
@@ -477,3 +501,15 @@ func get_crafting_state() -> Dictionary:
 		"fail_count": craft_fail_count,
 		"progress": (craft_timer / craft_time_per_pill) * 100.0 if craft_time_per_pill > 0 else 0.0
 	}
+
+# 存档数据
+func get_save_data() -> Dictionary:
+	return {
+		"equipped_furnace_id": equipped_furnace_id,
+		"learned_recipes": learned_recipes.duplicate()
+	}
+
+# 加载存档数据
+func apply_save_data(data: Dictionary):
+	equipped_furnace_id = data.get("equipped_furnace_id", "")
+	learned_recipes = data.get("learned_recipes", [])

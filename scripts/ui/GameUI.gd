@@ -413,7 +413,7 @@ func setup_chuna_module():
 	chuna_module.sort_button = sort_button
 	
 	# 初始化模块
-	chuna_module.initialize(self, player, inventory, item_data_ref, spell_system, spell_data_ref)
+	chuna_module.initialize(self, player, inventory, item_data_ref, spell_system, spell_data_ref, alchemy_system)
 	
 	# 连接信号
 	chuna_module.log_message.connect(_on_module_log)
@@ -640,6 +640,9 @@ func set_alchemy_system(alchemy_system_node: Node):
 		alchemy_module.alchemy_system = alchemy_system
 		# 重新连接信号（因为初始化时 alchemy_system 可能为 null）
 		alchemy_module._connect_alchemy_signals()
+	# 初始化储纳模块的炼丹系统引用
+	if chuna_module:
+		chuna_module.alchemy_system = alchemy_system
 
 func set_recipe_data(recipe_data_node: Node):
 	recipe_data = recipe_data_node
@@ -886,9 +889,9 @@ func _init_lianli_area_buttons():
 			var area_name = lianli_area_data.get_area_name(area_id) if lianli_area_data else area_id
 			
 			# 特殊区域显示剩余次数
-			if lianli_area_data and lianli_area_data.is_special_area(area_id) and player:
-				var remaining = player.get_daily_dungeon_count(area_id)
-				var max_count = PlayerData.DAILY_DUNGEON_MAX_COUNT
+			if lianli_area_data and lianli_area_data.is_special_area(area_id) and lianli_system:
+				var remaining = lianli_system.get_daily_dungeon_count(area_id)
+				var max_count = 3
 				button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
 			else:
 				button.text = area_name
@@ -916,9 +919,9 @@ func update_lianli_area_buttons_display():
 			var area_name = lianli_area_data.get_area_name(area_id)
 			
 			# 特殊区域显示剩余次数
-			if lianli_area_data.is_special_area(area_id):
-				var remaining = player.get_daily_dungeon_count(area_id)
-				var max_count = PlayerData.DAILY_DUNGEON_MAX_COUNT
+			if lianli_area_data.is_special_area(area_id) and lianli_system:
+				var remaining = lianli_system.get_daily_dungeon_count(area_id)
+				var max_count = 3
 				button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
 			else:
 				button.text = area_name

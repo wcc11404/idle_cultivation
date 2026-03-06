@@ -422,7 +422,8 @@ func _update_recipe_list():
 		child.queue_free()
 	_recipe_cards.clear()
 	
-	if player.learned_recipes.is_empty():
+	var learned = alchemy_system.get_learned_recipes() if alchemy_system else []
+	if learned.is_empty():
 		var label = Label.new()
 		label.text = "暂无学会的丹方"
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -430,7 +431,7 @@ func _update_recipe_list():
 		recipe_list_container.add_child(label)
 		return
 	
-	var sorted_recipes = _sort_recipes(player.learned_recipes)
+	var sorted_recipes = _sort_recipes(learned)
 	
 	for recipe_id in sorted_recipes:
 		var recipe_name = recipe_data.get_recipe_name(recipe_id)
@@ -710,7 +711,8 @@ func _update_alchemy_info():
 	
 	if furnace_info_label:
 		if furnace_bonus.get("has_furnace", false):
-			furnace_info_label.text = "丹炉: 初级丹炉 (+%d成功值, +%.0f%%速度)" % [
+			furnace_info_label.text = "丹炉: %s (+%d成功值, +%.0f%%速度)" % [
+				furnace_bonus.get("furnace_name", "未知丹炉"),
 				furnace_bonus.get("success_bonus", 0),
 				furnace_bonus.get("speed_rate", 0.0) * 100
 			]

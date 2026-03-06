@@ -123,7 +123,7 @@ func start_lianli_in_area(area_id: String):
 	
 	# 检查特殊区域每日次数限制（只检查，不消耗）
 	if lianli_area_data and lianli_area_data.is_special_area(area_id):
-		var remaining = player.get_daily_dungeon_count(area_id)
+		var remaining = lianli_system.get_daily_dungeon_count(area_id)
 		if remaining <= 0:
 			log_message.emit("今日进入次数已用完，请明天凌晨4点后再来")
 			return
@@ -204,8 +204,8 @@ func update_endless_tower_button_text(button: Button):
 		tower_name = endless_tower_data.get_tower_name()
 		max_floor = endless_tower_data.get_max_floor()
 	
-	if player:
-		current_floor = min(player.tower_highest_floor + 1, max_floor)
+	if lianli_system:
+		current_floor = min(lianli_system.tower_highest_floor + 1, max_floor)
 	
 	button.text = tower_name + " (第" + str(current_floor) + "层)"
 

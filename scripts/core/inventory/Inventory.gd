@@ -163,18 +163,46 @@ func clear():
 		slots[i] = {"empty": true, "id": "", "count": 0}
 
 func get_save_data() -> Dictionary:
+	var sparse_slots = {}
+	for i in range(capacity):
+		if not slots[i]["empty"]:
+			sparse_slots[str(i)] = {
+				"id": slots[i]["id"],
+				"count": slots[i]["count"]
+			}
+	
 	return {
-		"slots": slots,
-		"capacity": capacity
+		"capacity": capacity,
+		"slots": sparse_slots
 	}
 
 func apply_save_data(data: Dictionary):
-	if data.has("slots"):
-		slots = data["slots"]
-		while slots.size() < MAX_SIZE:
-			slots.append({"empty": true, "id": "", "count": 0})
-	
 	if data.has("capacity"):
 		capacity = data["capacity"]
 	else:
 		capacity = DEFAULT_SIZE
+	
+	init_slots()
+	
+	if data.has("slots"):
+		var slots_data = data["slots"]
+		
+		if typeof(slots_data) == TYPE_ARRAY:
+			for i in range(min(slots_data.size(), MAX_SIZE)):
+				var slot = slots_data[i]
+				if typeof(slot) == TYPE_DICTIONARY and not slot.get("empty", true):
+					slots[i] = {
+						"empty": false,
+						"id": slot.get("id", ""),
+						"count": slot.get("count", 0)
+					}
+		elif typeof(slots_data) == TYPE_DICTIONARY:
+			for key in slots_data.keys():
+				var index = int(key)
+				if index >= 0 and index < MAX_SIZE:
+					var slot = slots_data[key]
+					slots[index] = {
+						"empty": false,
+						"id": slot.get("id", ""),
+						"count": slot.get("count", 0)
+					}

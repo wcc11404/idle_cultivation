@@ -489,9 +489,42 @@ func _connect_alchemy_signals():
 ```gdscript
 # 已学会的丹方ID列表
 var learned_recipes: Array = []
+```
 
-# 是否拥有丹炉
-var has_alchemy_furnace: bool = false
+### 5.4 丹炉配置（AlchemySystem.gd）
+```gdscript
+# 丹炉配置（硬编码，支持多丹炉扩展）
+const FURNACE_CONFIGS = {
+    "alchemy_furnace": {
+        "name": "初级丹炉",
+        "success_bonus": 10,
+        "speed_rate": 0.1
+    }
+}
+
+# 装备的丹炉ID（空字符串表示无丹炉）
+var equipped_furnace_id: String = ""
+```
+
+### 5.5 存档数据格式
+```json
+{
+    "player": {
+        "realm": "炼气期",
+        "realm_level": 1,
+        "learned_recipes": ["health_pill"]
+    },
+    "inventory": {
+        "capacity": 50,
+        "slots": {
+            "0": {"id": "spirit_stone", "count": 100},
+            "5": {"id": "herb", "count": 50}
+        }
+    },
+    "alchemy_system": {
+        "equipped_furnace_id": "alchemy_furnace"
+    }
+}
 ```
 
 ## 六、炼丹流程详解
