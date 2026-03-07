@@ -84,7 +84,6 @@ func _test_success_rate() -> Array:
 	
 	var player = PlayerData.new()
 	player.learned_recipes = ["health_pill"]
-	player.has_alchemy_furnace = false
 	
 	var recipe_data = AlchemyRecipeData.new()
 	
@@ -106,7 +105,7 @@ func _test_success_rate() -> Array:
 	})
 	
 	# 测试有丹炉时的成功率
-	player.has_alchemy_furnace = true
+	alchemy_system.equip_furnace("alchemy_furnace")
 	var rate2 = alchemy_system.calculate_success_rate("health_pill")
 	tests.append({
 		"name": "有丹炉成功率",
@@ -121,7 +120,6 @@ func _test_craft_time() -> Array:
 	var tests = []
 	
 	var player = PlayerData.new()
-	player.has_alchemy_furnace = false
 	
 	var recipe_data = AlchemyRecipeData.new()
 	
@@ -143,7 +141,7 @@ func _test_craft_time() -> Array:
 	})
 	
 	# 测试有丹炉时的耗时
-	player.has_alchemy_furnace = true
+	alchemy_system.equip_furnace("alchemy_furnace")
 	var time2 = alchemy_system.calculate_craft_time("health_pill")
 	# 速度 = 1 + 0.1 = 1.1, 耗时 = 5 / 1.1 = 4.545...
 	tests.append({
@@ -197,7 +195,6 @@ func _test_crafting() -> Array:
 	
 	var player = PlayerData.new()
 	player.learned_recipes = ["health_pill"]
-	player.has_alchemy_furnace = false
 	
 	var recipe_data = AlchemyRecipeData.new()
 	
@@ -217,7 +214,7 @@ func _test_crafting() -> Array:
 	alchemy_system.set_spell_system(spell_system)
 	
 	# 测试开始炼制
-	var result = alchemy_system.start_crafting("health_pill", 2)
+	var result = alchemy_system.start_crafting_batch("health_pill", 2)
 	tests.append({
 		"name": "开始炼制",
 		"passed": result.success,
@@ -225,19 +222,19 @@ func _test_crafting() -> Array:
 	})
 	
 	if result.success:
-		# 检查材料是否扣除
+		# 检查材料是否扣除（第一颗丹药的材料）
 		var herb_count = inventory.get_item_count("mat_herb")
 		tests.append({
 			"name": "材料扣除",
-			"passed": herb_count == 6,  # 10 - 2*2 = 6
-			"message": "材料已扣除，剩余6个" if herb_count == 6 else "材料扣除错误: " + str(herb_count)
+			"passed": herb_count == 8,  # 10 - 2 = 8 (第一颗丹药扣除2个)
+			"message": "材料已扣除第一颗，剩余8个" if herb_count == 8 else "材料扣除错误: " + str(herb_count)
 		})
 		
-		# 检查是否获得成品（由于随机性，只能检查是否执行了）
+		# 检查是否处于炼制状态
 		tests.append({
-			"name": "炼制执行",
-			"passed": not alchemy_system.is_crafting,
-			"message": "炼制已完成" if not alchemy_system.is_crafting else "炼制状态错误"
+			"name": "炼制状态",
+			"passed": alchemy_system.is_crafting,
+			"message": "正在炼制中" if alchemy_system.is_crafting else "炼制状态错误"
 		})
 	
 	return tests

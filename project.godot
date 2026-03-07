@@ -37,6 +37,10 @@ window/handheld/orientation=1
 window/resizeable=true
 window/title="idle_cultivation"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+
 [rendering]
 
 textures/vram_compression/import_etc2_astc=true

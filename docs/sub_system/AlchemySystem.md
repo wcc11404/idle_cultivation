@@ -100,13 +100,15 @@
 
 #### 2.2.3 材料消耗
 - **炼制成功**: 消耗全部材料
-- **炼制失败**: 消耗一半材料（向上取整）
+- **炼制失败**: 消耗一半材料（向上取整），返还另一半材料（向下取整）
+  - 例如：消耗3颗灵草，失败时返还1颗，实际消耗2颗
 - **材料不足**: 无法开始炼制
+- **消耗时机**: 开始炼制时检测总数是否足够，然后消耗第一颗材料；每颗完成后消耗下一颗材料
 
 #### 2.2.4 灵气消耗
 - 每种丹方可能有灵气消耗需求
 - 灵气不足时无法开始炼制
-- 炼制开始前预扣材料，每颗炼制时单独消耗灵气
+- 每颗炼制开始时单独消耗灵气
 
 ### 2.3 道具配置
 
@@ -221,7 +223,6 @@ var recipes: Dictionary = {
     "health_pill": {
         "id": "health_pill",
         "name": "补血丹",
-        "recipe_name": "补血丹丹方",
         "success_value": 20,
         "base_time": 5.0,
         "materials": {
@@ -233,7 +234,6 @@ var recipes: Dictionary = {
     "spirit_pill": {
         "id": "spirit_pill",
         "name": "补气丹",
-        "recipe_name": "补气丹丹方",
         "success_value": 20,
         "base_time": 5.0,
         "materials": {
@@ -245,7 +245,6 @@ var recipes: Dictionary = {
     "foundation_pill": {
         "id": "foundation_pill",
         "name": "筑基丹",
-        "recipe_name": "筑基丹丹方",
         "success_value": 30,
         "base_time": 10.0,
         "materials": {
@@ -258,7 +257,6 @@ var recipes: Dictionary = {
     "golden_core_pill": {
         "id": "golden_core_pill",
         "name": "金丹丹",
-        "recipe_name": "金丹丹丹方",
         "success_value": 40,
         "base_time": 15.0,
         "materials": {
@@ -491,9 +489,42 @@ func _connect_alchemy_signals():
 ```gdscript
 # 已学会的丹方ID列表
 var learned_recipes: Array = []
+```
 
-# 是否拥有丹炉
-var has_alchemy_furnace: bool = false
+### 5.4 丹炉配置（AlchemySystem.gd）
+```gdscript
+# 丹炉配置（硬编码，支持多丹炉扩展）
+const FURNACE_CONFIGS = {
+    "alchemy_furnace": {
+        "name": "初级丹炉",
+        "success_bonus": 10,
+        "speed_rate": 0.1
+    }
+}
+
+# 装备的丹炉ID（空字符串表示无丹炉）
+var equipped_furnace_id: String = ""
+```
+
+### 5.5 存档数据格式
+```json
+{
+    "player": {
+        "realm": "炼气期",
+        "realm_level": 1,
+        "learned_recipes": ["health_pill"]
+    },
+    "inventory": {
+        "capacity": 50,
+        "slots": {
+            "0": {"id": "spirit_stone", "count": 100},
+            "5": {"id": "herb", "count": 50}
+        }
+    },
+    "alchemy_system": {
+        "equipped_furnace_id": "alchemy_furnace"
+    }
+}
 ```
 
 ## 六、炼丹流程详解
@@ -509,35 +540,61 @@ var has_alchemy_furnace: bool = false
                       或 crafting_finished
 ```
 
-### 6.2 单颗炼制流程
+### 6.2 开始炼制流程
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                start_crafting_batch(recipe_id, count)        │
+├──────────────────────────────────────────────────────────────┤
+│  1. 检查是否学会丹方                                          │
+│  2. 检查是否正在炼制                                          │
+│  3. 检查材料总数是否足够（count颗）                            │
+│  4. 检查灵气总数是否足够（count颗）                            │
+│  5. 初始化炼制状态                                            │
+│     - is_crafting = true                                     │
+│     - current_craft_recipe = recipe_id                       │
+│     - current_craft_count = count                            │
+│     - current_craft_index = 0                                │
+│     - current_material_consumed = false                      │
+│  6. 检查第一颗材料是否足够                                     │
+│  7. 消耗第一颗材料                                            │
+│  8. current_material_consumed = true                         │
+│  9. 发送 crafting_started 信号                               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 6.3 单颗炼制流程
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    _complete_single_pill()                   │
 ├──────────────────────────────────────────────────────────────┤
 │  1. current_craft_index += 1                                 │
-│  2. 计算成功率，随机判定成功/失败                             │
-│  3. 增加炼丹术使用次数                                        │
-│  4. 成功: 产出丹药 → craft_success_count += 1                │
-│     失败: 返还一半材料 → craft_fail_count += 1               │
-│  5. 发送 single_craft_completed 信号                         │
-│  6. 检查是否完成全部:                                         │
+│  2. current_material_consumed = false                        │
+│  3. 计算成功率，随机判定成功/失败                             │
+│  4. 增加炼丹术使用次数                                        │
+│  5. 成功: 产出丹药 → craft_success_count += 1                │
+│     失败: 返还一半材料（向下取整）→ craft_fail_count += 1    │
+│     （注：材料已在炼制开始时消耗，失败时返还一半）            │
+│  6. 发送 single_craft_completed 信号                         │
+│  7. 检查是否完成全部:                                         │
 │     - 是: _finish_crafting()                                 │
-│     - 否: 检查材料 → 消耗下一颗材料                           │
+│     - 否: 检查材料 → 消耗下一颗材料 → current_material_consumed = true │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### 6.3 停止炼制流程
+### 6.4 停止炼制流程
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                     stop_crafting()                          │
 ├──────────────────────────────────────────────────────────────┤
-│  1. 返还剩余未使用的材料（每颗一份）                          │
-│  2. 返还剩余未消耗的灵气                                      │
-│  3. 发送日志消息                                              │
-│  4. _reset_crafting_state()                                  │
-│  5. 发送 crafting_stopped 信号                               │
+│  1. 如果当前正在炼制的丹药已消耗材料（current_material_consumed = true）│
+│     - 返还这一颗丹药的全部材料                                │
+│     - 返还这一颗丹药的灵气                                    │
+│  2. 发送日志消息                                              │
+│  3. _reset_crafting_state()                                  │
+│  4. 发送 crafting_stopped 信号                               │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -575,7 +632,7 @@ var has_alchemy_furnace: bool = false
 ## 九、注意事项
 
 1. **丹方命名规范**: 解锁类道具以系统名开头，如 `recipe_health_pill`
-2. **材料消耗**: 失败时消耗一半材料，向上取整
+2. **材料消耗**: 失败时返还一半材料（向下取整），实际消耗一半材料（向上取整）
 3. **成功率限制**: 最低1%，最高100%
 4. **速度计算**: 基础速度1 + 炼丹术加成 + 丹炉加成
 5. **批量炼制**: 每颗丹药独立计算成功/失败
@@ -583,12 +640,13 @@ var has_alchemy_furnace: bool = false
 7. **架构原则**: 逻辑在 AlchemySystem，UI 在 AlchemyModule，通过信号通信
 8. **定时器选择**: 使用 `_process(delta)` 而非递归定时器，避免状态同步问题
 9. **初始化顺序**: `AlchemyModule` 初始化时 `alchemy_system` 可能为 null，需要在 `set_alchemy_system()` 后重新调用 `_connect_alchemy_signals()` 连接信号
-10. **材料消耗时机**: 开始炼制时预先消耗第一颗材料，每颗完成后消耗下一颗材料
-11. **停止返还**: 停止炼制时返还剩余未炼制数量的材料（非一颗）
+10. **材料消耗时机**: 开始炼制时检测总数是否足够，然后消耗第一颗材料；每颗完成后消耗下一颗材料
+11. **停止返还**: 停止炼制时，如果当前正在炼制的丹药已消耗材料，则返还这一颗丹药的全部材料
+12. **UI刷新**: 每次进入炼丹房时，调用 `_update_craft_panel()` 刷新成功率、耗时等信息
 
 ---
 
-**文档版本**: 2.1  
+**文档版本**: 2.2  
 **创建日期**: 2026-02-23  
-**最后更新**: 2026-03-02  
-**更新内容**: 补充初始化顺序、材料消耗时机、停止返还逻辑等实现细节
+**最后更新**: 2026-03-03  
+**更新内容**: 更新材料消耗时机、停止返还逻辑、UI刷新逻辑等实现细节

@@ -44,6 +44,8 @@ func save_game() -> bool:
 	var inventory = game_manager.get_inventory()
 	var account_system = game_manager.get_account_system()
 	var spell_system = game_manager.get_spell_system()
+	var alchemy_system = game_manager.get_alchemy_system()
+	var lianli_system = game_manager.get_lianli_system()
 	
 	# 获取背景颜色
 	var bg_color = Color(0.96, 0.94, 0.90)
@@ -55,6 +57,8 @@ func save_game() -> bool:
 		"player": player.get_save_data(),
 		"inventory": inventory.get_save_data() if inventory else {},
 		"spell_system": spell_system.get_save_data() if spell_system else {},
+		"alchemy_system": alchemy_system.get_save_data() if alchemy_system else {},
+		"lianli_system": lianli_system.get_save_data() if lianli_system else {},
 		"timestamp": Time.get_unix_time_from_system(),
 		"version": SAVE_VERSION
 	}
@@ -127,6 +131,16 @@ func apply_save_data(save_data: Dictionary):
 	var spell_system = game_manager.get_spell_system()
 	if spell_system and save_data.has("spell_system"):
 		spell_system.apply_save_data(save_data["spell_system"])
+	
+	# 恢复炼丹系统数据
+	var alchemy_system = game_manager.get_alchemy_system()
+	if alchemy_system and save_data.has("alchemy_system"):
+		alchemy_system.apply_save_data(save_data["alchemy_system"])
+	
+	# 恢复历练系统数据
+	var lianli_system = game_manager.get_lianli_system()
+	if lianli_system and save_data.has("lianli_system"):
+		lianli_system.apply_save_data(save_data["lianli_system"])
 	
 
 

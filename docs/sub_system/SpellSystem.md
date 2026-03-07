@@ -17,10 +17,10 @@
 
 ### 2.1 文件结构
 ```
-/Users/hsams/Documents/trae_projects/idle_cultivation/scripts/core/
+/Users/hsams/Documents/trae_projects/idle_cultivation/scripts/core/spell/
 ├── SpellSystem.gd    # 术法系统核心逻辑
-├── SpellData.gd      # 术法数据配置
-└── ItemData.gd       # 物品数据（包含术法解锁道具）
+├── SpellData.gd      # 术法数据管理（从JSON加载）
+└── spells.json       # 术法配置数据
 ```
 
 ### 2.2 术法类型枚举
@@ -37,16 +37,116 @@ enum SpellType {
 ### 2.3 装备槽位限制
 ```gdscript
 # SpellData.gd
-const MAX_ACTIVE_SPELLS = 2    # 主动术法最大装备数
-const MAX_PASSIVE_SPELLS = 2   # 被动术法最大装备数
-# 吐纳心法：1个，杂学术法：无限制
+var MAX_BREATHING_SPELLS = 1   # 吐纳心法最大装备数
+var MAX_ACTIVE_SPELLS = 2      # 主动术法最大装备数
+var MAX_PASSIVE_SPELLS = 2     # 被动术法最大装备数
+# 杂学术法：无限制（-1）
 ```
 
 ---
 
-## 3. 命名规范
+## 3. 数据结构
 
-### 3.1 数值命名规范
+### 3.1 术法配置数据 (spells.json)
+
+**重要说明**：`levels` 中的 key 表示**当前等级**，value 表示**从当前等级升级到下一级的条件**。
+
+```json
+{
+    "equipment_limits": {
+        "MAX_BREATHING_SPELLS": 1,
+        "MAX_ACTIVE_SPELLS": 2,
+        "MAX_PASSIVE_SPELLS": 2
+    },
+    "spells": {
+        "basic_boxing_techniques": {
+            "id": "basic_boxing_techniques",
+            "name": "基础拳法",
+            "type": 1,
+            "description": "战斗中{trigger_chance}概率释放，造成{damage_percent}攻击力的伤害",
+            "max_level": 3,
+            "levels": {
+                "1": {
+                    "spirit_cost": 50,
+                    "use_count_required": 50,
+                    "attribute_bonus": {"attack": 1.02},
+                    "effect": {
+                        "type": "active_damage",
+                        "damage_percent": 1.10,
+                        "trigger_chance": 0.30
+                    }
+                },
+                "2": {
+                    "spirit_cost": 200,
+                    "use_count_required": 200,
+                    "attribute_bonus": {"attack": 1.04},
+                    "effect": {
+                        "type": "active_damage",
+                        "damage_percent": 1.15,
+                        "trigger_chance": 0.30
+                    }
+                },
+                "3": {
+                    "spirit_cost": 500,
+                    "use_count_required": 500,
+                    "attribute_bonus": {"attack": 1.06},
+                    "effect": {
+                        "type": "active_damage",
+                        "damage_percent": 1.20,
+                        "trigger_chance": 0.30
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### 3.2 升级条件查询规则
+
+| 当前等级 | 查询的 key | 获取的内容 |
+|---------|-----------|-----------|
+| 1级 | "1" | 1级→2级的升级条件 |
+| 2级 | "2" | 2级→3级的升级条件 |
+| 3级（满级） | - | 无需查询，已满级 |
+
+**代码示例**：
+```gdscript
+# 获取当前等级的升级条件
+var level_data = spell_data.get_spell_level_data(spell_id, current_level)
+var spirit_cost = level_data.get("spirit_cost", 0)
+var use_count_required = level_data.get("use_count_required", 0)
+```
+
+### 3.3 玩家术法数据 (player_spells)
+```gdscript
+# SpellSystem.gd
+var player_spells: Dictionary = {}  # 键: spell_id, 值: 玩家术法数据
+
+# 单条玩家术法数据结构
+{
+    "obtained": false,          # 是否已获得
+    "level": 0,                 # 当前等级（0=未获得）
+    "use_count": 0,             # 当前等级使用次数
+    "charged_spirit": 0         # 已充灵气（用于升级）
+}
+```
+
+### 3.4 装备槽位数据 (equipped_spells)
+```gdscript
+var equipped_spells: Dictionary = {
+    SpellType.BREATHING: [],     # 已装备吐纳心法列表（最多1个）
+    SpellType.ACTIVE: [],        # 已装备主动术法列表（最多2个）
+    SpellType.PASSIVE: [],       # 已装备被动术法列表（最多2个）
+    SpellType.MISC: []           # 已装备杂学术法列表（无限制）
+}
+```
+
+---
+
+## 4. 命名规范
+
+### 4.1 数值命名规范
 
 | 后缀 | 含义 | 存储格式 | 显示格式 | 示例 |
 |------|------|----------|----------|------|
@@ -58,33 +158,7 @@ const MAX_PASSIVE_SPELLS = 2   # 被动术法最大装备数
 | `_required` | 需求值 | 整数 | 原样显示 | 100 |
 | `_bonus` | 加成值 | 整数/小数 | 原样显示 | 0.05 |
 
-### 3.2 配置字段命名规范
-
-```gdscript
-# 术法等级数据结构
-{
-    "spirit_cost": 100,           # 灵气消耗（整数）
-    "use_count_required": 100,    # 需要的使用次数（整数）
-    "attribute_bonus": {          # 属性加成
-        "attack": 1.02,           # 攻击加成（乘法，小数）
-        "defense": 1.02,          # 防御加成（乘法，小数）
-        "health": 1.02,           # 气血加成（乘法，小数）
-        "spirit_gain": 1.02,      # 灵气获取加成（乘法，小数）
-        "speed": 0.05             # 速度加成（加法，小数）
-    },
-    "effect": {                   # 战斗效果
-        "type": "active_damage",  # 效果类型
-        "damage_percent": 1.10,   # 伤害倍率（110%）
-        "trigger_chance": 0.30,   # 触发概率（30%）
-        "buff_type": "defense",   # buff类型
-        "buff_percent": 0.15,     # buff百分比（15%）
-        "buff_value": 1.0,        # buff固定值
-        "heal_percent": 0.002     # 恢复百分比（0.2%）
-    }
-}
-```
-
-### 3.3 描述占位符规范
+### 4.2 描述占位符规范
 
 ```gdscript
 # 描述中使用占位符，UI层根据命名规范自动格式化
@@ -92,68 +166,6 @@ const MAX_PASSIVE_SPELLS = 2   # 被动术法最大装备数
 "description": "战斗开始时，防御提升{buff_percent}"
 "description": "战斗开始时，速度+{buff_value}"
 "description": "修炼时每秒恢复{heal_percent}最大气血"
-```
-
-**格式化规则**：
-- `{xxx_chance}` → `AttributeCalculator.format_percent()` → "30%"
-- `{xxx_percent}` → `AttributeCalculator.format_percent()` → "15%" 或 "110%"
-- `{xxx_value}` → `AttributeCalculator.format_default()` → "1" 或 "1.5"
-
-> **注意**：术法系统的数值显示统一使用 `AttributeCalculator` 的格式化函数。详见 [属性数值系统规范](../ATTRIBUTE_SYSTEM.md) 第2.4节。
-
----
-
-## 4. 数据结构
-
-### 4.1 术法基础数据 (SpellData.SPELLS)
-```gdscript
-const SPELLS = {
-    "basic_boxing_techniques": {
-        "id": "basic_boxing_techniques",
-        "name": "基础拳法",
-        "type": SpellType.ACTIVE,
-        "description": "战斗中{trigger_chance}概率释放，造成{damage_percent}攻击力的伤害",
-        "max_level": 3,
-        "levels": {
-            1: {
-                "spirit_cost": 150,           # 升级所需灵气
-                "use_count_required": 100,    # 升级所需使用次数
-                "attribute_bonus": {"attack": 1.02},  # 属性加成（乘法）
-                "effect": {
-                    "type": "active_damage",
-                    "damage_percent": 1.10,   # 110%伤害倍率
-                    "trigger_chance": 0.30    # 30%触发概率
-                }
-            }
-            # ... 其他等级
-        }
-    }
-}
-```
-
-### 4.2 玩家术法数据 (player_spells)
-```gdscript
-# SpellSystem.gd
-var player_spells: Dictionary = {}  # 键: spell_id, 值: 玩家术法数据
-
-# 单条玩家术法数据结构
-{
-    "obtained": false,          # 是否已获得
-    "level": 0,                 # 当前等级（0=未获得）
-    "use_count": 0,             # 当前等级使用次数
-    "equipped": false,          # 是否已装备
-    "charged_spirit": 0         # 已充灵气（用于升级）
-}
-```
-
-### 4.3 装备槽位数据 (equipped_spells)
-```gdscript
-var equipped_spells: Dictionary = {
-    SpellType.BREATHING: [],     # 已装备吐纳心法列表（最多1个）
-    SpellType.ACTIVE: [],        # 已装备主动术法列表（最多2个）
-    SpellType.PASSIVE: [],       # 已装备被动术法列表（最多2个）
-    SpellType.MISC: []           # 已装备杂学术法列表（无限制）
-}
 ```
 
 ---
@@ -189,8 +201,6 @@ equip_spell(spell_id)
     ↓
 添加到装备槽位
     ↓
-更新 equipped 标记
-    ↓
 发送 spell_equipped 信号
 ```
 
@@ -200,9 +210,11 @@ equip_spell(spell_id)
     ↓
 使用次数 + 1（如果未达到上限）
     ↓
+玩家充灵气 → charge_spell_spirit(spell_id, amount)
+    ↓
 检查是否达到升级条件：
-    - use_count >= use_count_required
-    - charged_spirit >= spirit_cost
+    - use_count >= use_count_required（查询当前等级配置）
+    - charged_spirit >= spirit_cost（查询当前等级配置）
     - level < max_level
     ↓
 满足条件 → upgrade_spell(spell_id)
@@ -216,150 +228,49 @@ equip_spell(spell_id)
 
 ## 6. 核心功能详解
 
-### 6.1 术法装备管理
+### 6.1 升级条件查询
 
-#### 6.1.1 装备术法 (equip_spell)
+**关键点**：查询**当前等级**的配置数据，获取升级到下一级的条件。
+
 ```gdscript
-func equip_spell(spell_id: String) -> Dictionary
-```
-**返回值**：
-```gdscript
-{
-    "success": bool,           # 是否成功
-    "reason": String           # 失败原因（如果失败）
-}
-```
+# SpellSystem.gd - upgrade_spell()
+var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
+var spirit_cost = level_data.get("spirit_cost", 0)
+var use_count_required = level_data.get("use_count_required", 0)
 
-**装备限制检查**：
-```gdscript
-var spell_type = spell_data.get_spell_type(spell_id)
-var limit = spell_data.get_equipment_limit(spell_type)  # -1表示无限制
-
-if limit >= 0 and equipped_spells[spell_type].size() >= limit:
-    return {"success": false, "reason": "装备数量达到上限"}
-```
-
-#### 6.1.2 卸下术法 (unequip_spell)
-```gdscript
-func unequip_spell(spell_id: String) -> bool
-```
-
-### 6.2 攻击术法触发机制
-
-#### 6.2.1 触发逻辑 (trigger_attack_spell)
-```gdscript
-func trigger_attack_spell() -> Dictionary
-```
-
-**触发流程**：
-```
-获取所有已装备的主动术法
-    ↓
-计算总触发概率（所有trigger_chance之和）
-    ↓
-生成随机数 roll = randf() (0.0 - 1.0)
-    ↓
-判定是否触发术法：
-    - 普攻概率 = max(0, 1 - total_chance)
-    - 如果 roll < 普攻概率 → 返回普攻
-    ↓
-按比例选择具体术法：
-    - 归一化概率 = chance / total_chance
-    - 按累积概率选择
-    ↓
-增加使用次数
-    ↓
-返回触发结果
-```
-
-**返回值结构**：
-```gdscript
-{
-    "triggered": true,              # 是否触发术法
-    "spell_id": "thunder_strike",   # 触发的术法ID
-    "spell_name": "雷击术",         # 术法名称
-    "effect": {...},                # 完整效果数据
-    "is_normal_attack": false       # 是否为普通攻击
-}
-```
-
-### 6.3 被动术法效果获取
-
-#### 6.3.1 获取装备效果 (get_equipped_spell_effects_by_type)
-```gdscript
-func get_equipped_spell_effects_by_type(spell_type: int) -> Array
-```
-
-**返回值示例**（被动术法）：
-```gdscript
-[
-    {
-        "type": "start_buff",
-        "buff_type": "defense",
-        "buff_percent": 0.15,         # 15%防御加成
-        "trigger_chance": 1.0,        # 100%触发
-        "spell_id": "basic_defense",
-        "spell_name": "基础防御"
-    }
-]
-```
-
-### 6.4 术法升级系统
-
-#### 6.4.1 升级条件检查
-```gdscript
-# 1. 检查等级上限
-if spell_info.level >= max_level:
-    return {"success": false, "reason": "已达到最高等级"}
-
-# 2. 检查使用次数
+# 检查使用次数
 if spell_info.use_count < use_count_required:
     return {"success": false, "reason": "使用次数不足"}
 
-# 3. 检查已充灵气
+# 检查已充灵气
 if spell_info.charged_spirit < spirit_cost:
     return {"success": false, "reason": "术法灵气不足"}
 ```
 
-#### 6.4.2 属性加成计算
-
-术法属性加成作用于**静态最终属性**计算，详见 [属性数值系统规范](../ATTRIBUTE_SYSTEM.md) 第1.2节。
-
-**加成类型**：
-- **攻击/防御/气血/灵气获取**：乘法加成（如 1.02 表示 +2%）
-- **速度**：加法加成（如 0.1 表示 +0.1）
+### 6.2 充灵气逻辑
 
 ```gdscript
-# 获取所有已获取术法的属性加成
-func get_attribute_bonuses() -> Dictionary:
-    var bonuses = {
-        "attack": 1.0,      # 乘法
-        "defense": 1.0,     # 乘法
-        "health": 1.0,      # 乘法
-        "spirit_gain": 1.0, # 乘法
-        "speed": 0.0        # 加法
-    }
-    
-    # 遍历所有已获取术法，累加属性加成
-    for spell_id in player_spells.keys():
-        if spell_info.obtained and spell_info.level > 0:
-            var attribute_bonus = level_data.get("attribute_bonus", {})
-            for attr in attribute_bonus.keys():
-                if attr == "speed":
-                    bonuses.speed += attribute_bonus[attr]  # 加法
-                else:
-                    bonuses[attr] *= attribute_bonus[attr]  # 乘法
-    
-    return bonuses
+# SpellSystem.gd - charge_spell_spirit()
+var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
+var spirit_cost = level_data.get("spirit_cost", 0)
+
+var current_charged = spell_info.charged_spirit
+var need = spirit_cost - current_charged
+
+if need <= 0:
+    return {"success": false, "reason": "灵气已充足"}
 ```
 
-**静态最终属性计算**（AttributeCalculator）：
+### 6.3 使用次数上限
+
 ```gdscript
-# 示例：最终攻击 = 基础攻击 × 术法攻击加成
-static func calculate_final_attack(player: Node) -> float:
-    var base_attack = player.base_attack
-    var spell_bonuses = _get_spell_bonuses(player)
-    return base_attack * spell_bonuses.get("attack", 1.0)
+# SpellSystem.gd - add_spell_use_count()
+var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
+var use_count_required = level_data.get("use_count_required", 0)
+
+# 如果已达到当前等级需求的使用次数，不再增加
+if spell_info.use_count >= use_count_required:
+    return
 ```
 
 ---
@@ -405,19 +316,26 @@ func _execute_player_action():
 
 #### 7.2.1 吐纳心法效果
 ```gdscript
-# 获取装备的吐纳术法效果
+# 获取装备的吐纳术法效果（支持多个吐纳术法效果叠加）
 func get_equipped_breathing_heal_effect() -> Dictionary:
     var breathing_spells = equipped_spells.get(SpellType.BREATHING, [])
     if breathing_spells.is_empty():
-        return {"heal_amount": 0}
+        return {"heal_amount": 0.0, "spell_ids": []}
     
-    var spell_id = breathing_spells[0]
-    var level_data = spell_data.get_spell_level_data(spell_id, player_spells[spell_id].level)
-    var effect = level_data.get("effect", {})
+    var total_heal_percent = 0.0
+    var valid_spell_ids = []
+    
+    for spell_id in breathing_spells:
+        var level_data = spell_data.get_spell_level_data(spell_id, player_spells[spell_id].level)
+        var effect = level_data.get("effect", {})
+        
+        if effect.get("type") == "passive_heal":
+            total_heal_percent += effect.get("heal_percent", 0.0)
+            valid_spell_ids.append(spell_id)
     
     return {
-        "heal_amount": effect.get("heal_percent", 0.0),  # 每秒恢复百分比
-        "spell_name": spell_data.get_spell_name(spell_id)
+        "heal_amount": total_heal_percent,
+        "spell_ids": valid_spell_ids
     }
 ```
 
@@ -425,7 +343,7 @@ func get_equipped_breathing_heal_effect() -> Dictionary:
 
 ## 8. 当前术法列表
 
-### 8.1 吐纳心法 (BREATHING) - 1个
+### 8.1 吐纳心法 (BREATHING)
 
 | 术法ID | 名称 | 效果 | 等级1 | 等级2 | 等级3 |
 |--------|------|------|-------|-------|-------|
@@ -443,18 +361,15 @@ func get_equipped_breathing_heal_effect() -> Dictionary:
 | 术法ID | 名称 | Buff类型 | 等级1 | 等级2 | 等级3 |
 |--------|------|----------|-------|-------|-------|
 | basic_defense | 基础防御 | defense | +15% | +16% | +17% |
-| basic_steps | 基础步法 | speed | +0.5 | +0.6 | +0.7 |
+| basic_steps | 基础步法 | speed | +0.1 | +0.2 | +0.3 |
 | basic_health | 基础气血 | health | +0.5% | +1.0% | +1.5% |
 
-**注意**：基础气血和基础步法的效果已调整为更合理的数值
-- 基础气血：从15%/16%/17%调整为0.5%/1.0%/1.5%
-- 基础步法：从+1.0/+1.1/+1.2调整为+0.5/+0.6/+0.7
-
-### 8.4 杂学术法 (MISC) - 1个
+### 8.4 杂学术法 (MISC) - 2个
 
 | 术法ID | 名称 | 效果类型 | 等级1 | 等级2 | 等级3 |
 |--------|------|----------|-------|-------|-------|
 | herb_gathering | 灵草采集 | gathering | 效率1.1x,稀有5% | 效率1.2x,稀有8% | 效率1.3x,稀有12% |
+| alchemy | 炼丹术 | alchemy | 成功值+10,速度+10% | 成功值+20,速度+20% | 成功值+30,速度+30% |
 
 ---
 
@@ -475,174 +390,41 @@ func get_equipped_breathing_heal_effect() -> Dictionary:
 | `get_equipped_breathing_heal_effect` | 无 | `Dictionary` | 获取吐纳恢复效果 |
 | `get_attribute_bonuses` | 无 | `Dictionary` | 获取所有属性加成 |
 | `get_spell_info` | `spell_id: String` | `Dictionary` | 获取术法完整信息 |
-| `get_all_spells_by_type` | 无 | `Dictionary` | 获取所有术法（按类型分类） |
 
-### 9.2 UI相关函数
+### 9.2 SpellData 接口
 
 | 函数名 | 参数 | 返回值 | 说明 |
 |--------|------|--------|------|
-| `can_upgrade_spell` | `spell_id: String` | `Dictionary` | 检查术法是否可以升级（用于UI提示）|
-| `get_spell_config_info` | `spell_id: String` | `Dictionary` | 获取术法配置信息（未获得也可查看）|
-
-**can_upgrade_spell 返回值**：
-```gdscript
-{
-    "can_upgrade": bool,      # 是否可以升级
-    "reason": String,         # 不能升级的原因（如果不能）
-    "next_level": int         # 下一等级（如果可以升级）
-}
-```
-
-**get_spell_config_info 返回值**：
-```gdscript
-{
-    "id": "basic_boxing_techniques",
-    "name": "基础拳法",
-    "type": 1,                    # SpellType.ACTIVE
-    "type_name": "主动术法",
-    "description": "战斗中{trigger_chance}概率释放...",
-    "max_level": 3,
-    "levels": {
-        1: {
-            "spirit_cost": 150,
-            "use_count_required": 100,
-            "attribute_bonus": {"attack": 1.02},
-            "effect": {"type": "active_damage", "damage_percent": 1.10, "trigger_chance": 0.30}
-        },
-        2: {...},
-        3: {...}
-    }
-}
-```
-
-### 9.3 UI提示逻辑
-
-#### 9.3.1 术法升级提示
-
-**使用场景**：在术法详情界面显示升级按钮状态
-
-```gdscript
-# 检查是否可以升级
-var upgrade_check = spell_system.can_upgrade_spell(spell_id)
-
-if upgrade_check.can_upgrade:
-    # 显示"可升级"提示（如绿色按钮、闪烁效果等）
-    show_upgrade_button(true, "可升级至等级 " + str(upgrade_check.next_level))
-else:
-    # 显示不能升级的原因
-    show_upgrade_button(false, upgrade_check.reason)
-    # 常见原因：
-    # - "已达到最高等级"
-    # - "使用次数不足（50/100）"
-    # - "术法灵气不足（80/150）"
-```
-
-#### 9.3.2 未获得术法查看
-
-**使用场景**：在术法图鉴或商店预览中查看未获得的术法
-
-```gdscript
-# 获取术法配置信息（不需要拥有该术法）
-var config_info = spell_system.get_spell_config_info(spell_id)
-
-# 显示术法信息
-show_spell_name(config_info.name)
-show_spell_description(config_info.description)
-show_spell_type(config_info.type_name)
-
-# 显示各等级属性
-for level in config_info.levels.keys():
-    var level_data = config_info.levels[level]
-    show_level_info(level, level_data.attribute_bonus, level_data.effect)
-```
-
-**UI显示建议**：
-- 未获得的术法使用灰色图标或半透明效果
-- 显示"未获得"标签
-- 可以查看所有等级的属性，但不能装备/升级
-- 显示获取途径（如"通过新手礼包获得"）
-
-### 9.4 存档相关
-
-| 函数名 | 说明 |
-|--------|------|
-| `get_save_data` | 获取存档数据（只存储已获得的术法）|
-| `apply_save_data` | 加载存档数据 |
-| `_convert_old_id` | 转换旧存档ID到新ID |
-
-**存档数据格式**：
-```gdscript
-{
-    "player_spells": {
-        "basic_boxing_techniques": {
-            "obtained": true,
-            "level": 2,
-            "use_count": 50,
-            "charged_spirit": 80
-        }
-        # 只存储已获得的术法，未获得的不存储
-    },
-    "equipped_spells": {
-        0: ["basic_breathing"],           # BREATHING
-        1: ["basic_boxing_techniques"],   # ACTIVE
-        2: ["basic_defense"],             # PASSIVE
-        3: []                              # MISC
-    }
-}
-```
+| `get_spell_data` | `spell_id: String` | `Dictionary` | 获取术法基础数据 |
+| `get_spell_name` | `spell_id: String` | `String` | 获取术法名称 |
+| `get_spell_type` | `spell_id: String` | `int` | 获取术法类型 |
+| `get_spell_type_name` | `spell_type: int` | `String` | 获取术法类型名称 |
+| `get_spell_level_data` | `spell_id, level` | `Dictionary` | 获取指定等级数据 |
+| `get_all_spell_ids` | 无 | `Array` | 获取所有术法ID |
+| `get_spell_ids_by_type` | `spell_type: int` | `Array` | 按类型获取术法ID |
+| `get_equipment_limit` | `spell_type: int` | `int` | 获取装备槽位上限 |
 
 ---
 
-## 10. 扩展指南
+## 10. 注意事项
 
-### 10.1 添加新术法
-
-1. **在 SpellData.gd 中添加配置**：
-```gdscript
-"new_spell": {
-    "id": "new_spell",
-    "name": "新术法",
-    "type": SpellType.ACTIVE,
-    "description": "战斗中{trigger_chance}概率释放，造成{damage_percent}攻击力的伤害",
-    "max_level": 3,
-    "levels": {
-        1: {
-            "spirit_cost": 150,
-            "use_count_required": 100,
-            "attribute_bonus": {"attack": 1.02},
-            "effect": {
-                "type": "active_damage",
-                "damage_percent": 1.10,
-                "trigger_chance": 0.30
-            }
-        }
-    }
-}
-```
-
-2. **遵循命名规范**：
-   - 概率/百分比用 `_chance` 或 `_percent` 后缀
-   - 固定数值用 `_value` 后缀
-   - 描述中使用占位符 `{xxx_chance}` 或 `{xxx_percent}`
-
----
-
-## 11. 注意事项
-
-1. **数值存储格式**：所有百分比、概率值都用小数存储（0.25表示25%），显示时再转换
-2. **属性加成类型**：
+1. **升级条件查询**：使用**当前等级**查询升级条件，不是下一等级
+2. **数值存储格式**：所有百分比、概率值都用小数存储（0.25表示25%），显示时再转换
+3. **JSON数字类型**：Godot的JSON解析会将所有数字转为浮点数，SpellData在加载时会自动转换整数字段
+4. **属性加成类型**：
    - 攻击/防御/气血/灵气获取：乘法（1.02表示+2%）
    - 速度：加法（0.05表示+0.05）
-3. **装备上限提示**：当装备达到上限时，提示用户先卸下已有术法
-4. **杂学术法特殊性**：杂学术法无装备限制，不参与战斗触发
-5. **存档兼容**：使用ID映射表处理旧存档数据迁移
+5. **装备上限提示**：当装备达到上限时，提示用户先卸下已有术法
+6. **杂学术法特殊性**：杂学术法无装备限制，不参与战斗触发
 
 ---
 
-## 12. 版本历史
+## 11. 版本历史
 
 | 版本 | 日期 | 修改内容 |
 |------|------|----------|
 | 1.0 | 2026-02-21 | 初始文档 |
 | 1.1 | 2026-02-21 | 添加命名规范、更新术法数据结构 |
 | 1.2 | 2026-02-24 | 更新术法数值（基础气血、基础步法数值调整）|
+| 2.0 | 2026-03-03 | 重构：数据移至JSON配置、更新文件结构、明确升级条件查询规则 |
+| 2.1 | 2026-03-03 | 新增吐纳心法装备上限配置（MAX_BREATHING_SPELLS），支持多吐纳术法效果叠加 |

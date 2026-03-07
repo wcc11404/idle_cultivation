@@ -16,6 +16,7 @@ var inventory: Node = null
 var item_data: Node = null
 var spell_system: Node = null
 var spell_data: Node = null
+var alchemy_system: Node = null
 
 # UI节点引用
 var chuna_panel: Control = null
@@ -39,13 +40,14 @@ var current_selected_index: int = -1
 # 信号连接状态标记
 var _signals_connected: bool = false
 
-func initialize(ui: Node, player_node: Node, inv: Node, item_data_node: Node, spell_sys: Node = null, spell_dt: Node = null):
+func initialize(ui: Node, player_node: Node, inv: Node, item_data_node: Node, spell_sys: Node = null, spell_dt: Node = null, alchemy_sys: Node = null):
 	game_ui = ui
 	player = player_node
 	inventory = inv
 	item_data = item_data_node
 	spell_system = spell_sys
 	spell_data = spell_dt
+	alchemy_system = alchemy_sys
 	
 	# 检查必需节点
 	_check_required_nodes()
@@ -283,10 +285,10 @@ func update_inventory_ui():
 					count_label.text = ""
 			else:
 				var item_id = item.get("id", "")
-				var count = item.get("count", 0)
+				var count = int(item.get("count", 0))
 				var item_info = item_data.get_item_data(item_id) if item_data else {}
 				var item_name = item_info.get("name", "未知")
-				var quality = item_info.get("quality", 0)
+				var quality = int(item_info.get("quality", 0))
 				
 				if name_label:
 					name_label.text = item_name
@@ -319,7 +321,7 @@ func _show_item_detail(index: int):
 		return
 	
 	var item_id = item_list[index].get("id", "")
-	var count = item_list[index].get("count", 0)
+	var count = int(item_list[index].get("count", 0))
 	
 	if item_id.is_empty():
 		_clear_item_detail_panel()
@@ -453,7 +455,7 @@ func _on_use_button_pressed():
 	# 处理有效果的物品
 	if not effect.is_empty():
 		var effect_type = effect.get("type", "")
-		var effect_amount = effect.get("amount", 0)
+		var effect_amount = int(effect.get("amount", 0))
 		
 		match effect_type:
 			"add_spirit_energy_unlimited":
@@ -479,8 +481,8 @@ func _on_use_button_pressed():
 					return
 			"add_spirit_and_health":
 				if player:
-					var spirit_amount = effect.get("spirit_amount", 0)
-					var health_amount = effect.get("health_amount", 0)
+					var spirit_amount = int(effect.get("spirit_amount", 0))
+					var health_amount = int(effect.get("health_amount", 0))
 					var unlimited = effect.get("unlimited", false)
 					if unlimited:
 						player.add_spirit_energy_unlimited(spirit_amount)
@@ -498,7 +500,6 @@ func _on_use_button_pressed():
 					if result:
 						var spell_name = spell_data.get_spell_name(spell_id) if spell_data else spell_id
 						_add_log("使用" + item_name + "，成功解锁术法")
-						# 通知GameUI刷新术法UI
 						if game_ui and game_ui.has_method("_init_spell_ui"):
 							game_ui._init_spell_ui()
 					else:
@@ -511,17 +512,16 @@ func _on_use_button_pressed():
 				var feature_id = effect.get("feature_id", "")
 				match feature_id:
 					"alchemy":
-						if player:
-							if player.has_alchemy_furnace:
+						if alchemy_system:
+							if alchemy_system.has_furnace():
 								_add_log("已拥有丹炉")
 								return
-							player.has_alchemy_furnace = true
+							alchemy_system.equip_furnace(current_selected_item_id)
 							_add_log("使用" + item_name + "，成功解锁炼丹功能")
-							# 通知GameUI刷新炼丹房UI
 							if game_ui and game_ui.has_method("refresh_alchemy_ui"):
 								game_ui.refresh_alchemy_ui()
 						else:
-							_add_log("玩家未初始化，无法使用")
+							_add_log("炼丹系统未初始化，无法使用")
 							return
 					_:
 						_add_log("未知功能：" + feature_id)
@@ -536,22 +536,24 @@ func _on_use_button_pressed():
 						_add_log("无效的丹方ID")
 						return
 				
-				if not player:
-					_add_log("玩家未初始化，无法使用")
+				if not alchemy_system:
+					_add_log("炼丹系统未初始化，无法使用")
 					return
 				
 				# 检查是否已学会
-				if recipe_id in player.learned_recipes:
+				if alchemy_system.has_learned_recipe(recipe_id):
 					_add_log("已学会该丹方")
 					return
 				
-				# 添加到已学会列表
-				player.learned_recipes.append(recipe_id)
-				_add_log("使用" + item_name + "，成功学会丹方")
-				
-				# 通知GameUI刷新炼丹房UI
-				if game_ui and game_ui.has_method("refresh_alchemy_ui"):
-					game_ui.refresh_alchemy_ui()
+				# 学习丹方
+				var result = alchemy_system.learn_recipe(recipe_id)
+				if result:
+					_add_log("使用" + item_name + "，成功学会丹方")
+					# 通知GameUI刷新炼丹房UI
+					if game_ui and game_ui.has_method("refresh_alchemy_ui"):
+						game_ui.refresh_alchemy_ui()
+				else:
+					_add_log("学习丹方失败")
 			_:
 				_add_log("未知效果类型：" + effect_type)
 				return
@@ -578,7 +580,7 @@ func _on_use_button_pressed():
 						return
 		
 		for content_id in content.keys():
-			var content_count = content[content_id]
+			var content_count = int(content[content_id])
 			if inventory:
 				inventory.add_item(content_id, content_count)
 				# 物品添加的日志由 _on_item_added 处理

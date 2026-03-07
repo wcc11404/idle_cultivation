@@ -135,6 +135,12 @@ func _create_popup_content():
 	upgrade_title.text = "【升级条件】"
 	vbox.add_child(upgrade_title)
 	
+	var max_level_label = Label.new()
+	max_level_label.name = "MaxLevelLabel"
+	max_level_label.text = "已达到最高等级"
+	max_level_label.visible = false
+	vbox.add_child(max_level_label)
+	
 	var use_count_label = Label.new()
 	use_count_label.name = "UseCountLabel"
 	use_count_label.text = "使用次数："
@@ -274,31 +280,54 @@ func _update_effect_value(spell_config: Dictionary, level_data: Dictionary):
 func _update_upgrade_conditions(spell_info: Dictionary, spell_data: Node, 
 								multiplier_index: int, multipliers: Array):
 	"""更新升级条件显示"""
+	var max_level_label = vbox.get_node_or_null("MaxLevelLabel")
 	var use_count_label = vbox.get_node_or_null("UseCountLabel")
-	var spirit_amount_label = vbox.get_node_or_null("SpiritChargeContainer/SpiritAmountLabel")
+	var spirit_charge_container = vbox.get_node_or_null("SpiritChargeContainer")
 	
-	var next_level = spell_info.get("level", 0) + 1
+	var current_level = spell_info.get("level", 0)
 	var max_level = spell_info.get("max_level", 3)
 	
-	if next_level <= max_level:
-		var next_level_data = spell_data.get_spell_level_data(spell_info.get("id", ""), next_level) if spell_data else {}
-		var use_count_required = next_level_data.get("use_count_required", 0)
-		var spirit_cost = next_level_data.get("spirit_cost", 0)
+	if current_level <= 0:
+		if max_level_label:
+			max_level_label.visible = false
+		if use_count_label:
+			use_count_label.visible = true
+			use_count_label.text = "使用次数：-/-"
+		if spirit_charge_container:
+			spirit_charge_container.visible = true
+			var spirit_amount_label = spirit_charge_container.get_node_or_null("SpiritAmountLabel")
+			if spirit_amount_label:
+				spirit_amount_label.text = "-/-"
+		_set_buttons_enabled(false, multiplier_index)
+	elif current_level >= max_level:
+		if max_level_label:
+			max_level_label.visible = true
+		if use_count_label:
+			use_count_label.visible = false
+		if spirit_charge_container:
+			spirit_charge_container.visible = false
+		_set_buttons_enabled(false, multiplier_index)
+	else:
+		if max_level_label:
+			max_level_label.visible = false
+		if use_count_label:
+			use_count_label.visible = true
+		if spirit_charge_container:
+			spirit_charge_container.visible = true
+		
+		var current_level_data = spell_data.get_spell_level_data(spell_info.get("id", ""), current_level) if spell_data else {}
+		var use_count_required = current_level_data.get("use_count_required", 0)
+		var spirit_cost = current_level_data.get("spirit_cost", 0)
 		var charged_spirit = spell_info.get("charged_spirit", 0)
 		
 		if use_count_label:
 			use_count_label.text = "使用次数：" + str(spell_info.get("use_count", 0)) + "/" + str(use_count_required)
-		if spirit_amount_label:
-			spirit_amount_label.text = str(charged_spirit) + "/" + str(spirit_cost)
+		if spirit_charge_container:
+			var spirit_amount_label = spirit_charge_container.get_node_or_null("SpiritAmountLabel")
+			if spirit_amount_label:
+				spirit_amount_label.text = str(charged_spirit) + "/" + str(spirit_cost)
 		
 		_set_buttons_enabled(true, multiplier_index)
-	else:
-		if use_count_label:
-			use_count_label.text = "已达到最高等级"
-		if spirit_amount_label:
-			spirit_amount_label.text = "-/-"
-		
-		_set_buttons_enabled(false, multiplier_index)
 
 func _set_buttons_enabled(enabled: bool, multiplier_index: int):
 	"""设置按钮状态"""
@@ -312,19 +341,30 @@ func _set_buttons_enabled(enabled: bool, multiplier_index: int):
 
 func update_use_count_only(spell_info: Dictionary, spell_data: Node):
 	"""只更新使用次数（用于实时更新）"""
+	var max_level_label = vbox.get_node_or_null("MaxLevelLabel")
 	var use_count_label = vbox.get_node_or_null("UseCountLabel")
 	if not use_count_label:
 		return
 	
-	var next_level = spell_info.get("level", 0) + 1
+	var current_level = spell_info.get("level", 0)
 	var max_level = spell_info.get("max_level", 3)
 	
-	if next_level <= max_level:
-		var next_level_data = spell_data.get_spell_level_data(spell_info.get("id", ""), next_level) if spell_data else {}
-		var use_count_required = next_level_data.get("use_count_required", 0)
-		use_count_label.text = "使用次数：" + str(spell_info.get("use_count", 0)) + "/" + str(use_count_required)
+	if current_level <= 0:
+		if max_level_label:
+			max_level_label.visible = false
+		use_count_label.visible = true
+		use_count_label.text = "使用次数：-/-"
+	elif current_level >= max_level:
+		if max_level_label:
+			max_level_label.visible = true
+		use_count_label.visible = false
 	else:
-		use_count_label.text = "已达到最高等级"
+		if max_level_label:
+			max_level_label.visible = false
+		use_count_label.visible = true
+		var current_level_data = spell_data.get_spell_level_data(spell_info.get("id", ""), current_level) if spell_data else {}
+		var use_count_required = current_level_data.get("use_count_required", 0)
+		use_count_label.text = "使用次数：" + str(spell_info.get("use_count", 0)) + "/" + str(use_count_required)
 	
 	use_count_label.queue_redraw()
 

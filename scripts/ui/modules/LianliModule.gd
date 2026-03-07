@@ -26,6 +26,7 @@ var item_data_ref: Node = null
 var inventory: Node = null
 var chuna_module: Node = null
 var log_manager: Node = null
+var alchemy_module: Node = null
 
 # UI节点引用（由GameUI设置）
 var lianli_panel: Control = null
@@ -61,7 +62,7 @@ func _ready():
 func initialize(ui: Node, player_node: Node, lianli_sys: Node, 
 				area_data: Node = null, tower_data: Node = null, 
 				item_data: Node = null, inv: Node = null, 
-				chuna: Node = null, log_mgr: Node = null):
+				chuna: Node = null, log_mgr: Node = null, alchemy_mod: Node = null):
 	game_ui = ui
 	player = player_node
 	lianli_system = lianli_sys
@@ -71,6 +72,7 @@ func initialize(ui: Node, player_node: Node, lianli_sys: Node,
 	inventory = inv
 	chuna_module = chuna
 	log_manager = log_mgr
+	alchemy_module = alchemy_mod
 
 # 显示历练面板
 func show_lianli_panel():
@@ -121,7 +123,7 @@ func start_lianli_in_area(area_id: String):
 	
 	# 检查特殊区域每日次数限制（只检查，不消耗）
 	if lianli_area_data and lianli_area_data.is_special_area(area_id):
-		var remaining = player.get_daily_dungeon_count(area_id)
+		var remaining = lianli_system.get_daily_dungeon_count(area_id)
 		if remaining <= 0:
 			log_message.emit("今日进入次数已用完，请明天凌晨4点后再来")
 			return
@@ -129,6 +131,11 @@ func start_lianli_in_area(area_id: String):
 	# 如果正在修炼，先停止修炼
 	if player.get_is_cultivating():
 		_stop_cultivation()
+	
+	# 如果正在炼丹，先停止炼丹
+	if alchemy_module and alchemy_module.is_crafting_active():
+		alchemy_module.stop_crafting()
+		log_message.emit("已停止炼丹")
 	
 	# 如果正在无尽塔中，先退出
 	if lianli_system.is_in_endless_tower():
@@ -197,8 +204,8 @@ func update_endless_tower_button_text(button: Button):
 		tower_name = endless_tower_data.get_tower_name()
 		max_floor = endless_tower_data.get_max_floor()
 	
-	if player:
-		current_floor = min(player.tower_highest_floor + 1, max_floor)
+	if lianli_system:
+		current_floor = min(lianli_system.tower_highest_floor + 1, max_floor)
 	
 	button.text = tower_name + " (第" + str(current_floor) + "层)"
 
@@ -247,7 +254,6 @@ func on_lianli_speed_pressed():
 func on_exit_lianli_pressed():
 	if lianli_system:
 		lianli_system.end_lianli()
-		log_message.emit("已退出历练区域")
 	show_lianli_select_panel()
 
 # 启用继续战斗按钮
@@ -314,7 +320,7 @@ func _get_special_area_reward_text() -> String:
 	
 	var drops_text = []
 	for item_id in special_drops.keys():
-		var amount = special_drops[item_id]
+		var amount = int(special_drops[item_id])
 		if item_id == "spirit_stone":
 			drops_text.append(str(amount) + " 灵石")
 		else:
@@ -332,8 +338,8 @@ func _get_normal_area_reward_text() -> String:
 	var drops = lianli_system.get_current_enemy_drops()
 	if drops.has("spirit_stone"):
 		var stone_drop = drops["spirit_stone"]
-		var min_amount = stone_drop.get("min", 0)
-		var max_amount = stone_drop.get("max", 0)
+		var min_amount = int(stone_drop.get("min", 0))
+		var max_amount = int(stone_drop.get("max", 0))
 		return "掉落: " + str(min_amount) + "-" + str(max_amount) + " 灵石"
 	return ""
 
@@ -358,16 +364,16 @@ func _update_button_container():
 
 # 设置连续战斗默认值
 func _set_continuous_default():
-	if not lianli_system:
+	if not lianli_system or not lianli_area_data:
 		return
 	
-	var is_tower = lianli_system.is_in_endless_tower()
-	
 	if continuous_checkbox:
+		var is_tower = lianli_system.is_in_endless_tower()
 		if is_tower:
-			continuous_checkbox.button_pressed = false
+			continuous_checkbox.button_pressed = lianli_area_data.get_default_continuous("endless_tower")
 		else:
-			continuous_checkbox.button_pressed = true
+			var area_id = lianli_system.current_area_id
+			continuous_checkbox.button_pressed = lianli_area_data.get_default_continuous(area_id)
 		# 同步到LianliSystem
 		lianli_system.set_continuous_lianli(continuous_checkbox.button_pressed)
 
@@ -535,7 +541,7 @@ func on_lianli_reward(item_id: String, amount: int, source: String):
 # 等待中
 func on_lianli_waiting(time_remaining: float):
 	if lianli_status_label:
-		lianli_status_label.text = "等待下一场历练... (" + str(ceil(time_remaining)) + "秒)"
+		lianli_status_label.text = "等待下一场历练... (" + str(int(ceil(time_remaining))) + "秒)"
 		lianli_status_label.modulate = Color.GRAY
 	
 	lianli_waiting.emit(time_remaining)
