@@ -15,7 +15,7 @@ func run_tests():
 	test_player = load("res://scripts/core/PlayerData.gd").new()
 	add_child(test_player)
 	
-	test_lianli = load("res://scripts/core/LianliSystem.gd").new()
+	test_lianli = load("res://scripts/core/lianli/LianliSystem.gd").new()
 	test_lianli.set_player(test_player)
 	add_child(test_lianli)
 	
@@ -51,16 +51,13 @@ func test_lianli_round():
 		"level": 1
 	}
 	
-	test_player.attack = 20
-	test_player.defense = 5
-	test_player.speed = 10
-	test_player.health = 100
+	test_player.base_attack = 20.0
+	test_player.base_defense = 5.0
+	test_player.base_speed = 10.0
+	test_player.health = 100.0
 	
 	test_lianli.start_battle(enemy_data)
 	
-	# ATB系统：模拟时间流逝触发战斗
-	# 玩家速度10，需要10 ticks达到100 (ATB_MAX=100)
-	# 每0.1秒1个tick，需要1秒
 	test_lianli._process(1.0)
 	
 	var enemy_health = test_lianli.current_enemy.get("current_health", 100)

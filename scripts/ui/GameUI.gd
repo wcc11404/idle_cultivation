@@ -413,7 +413,7 @@ func setup_chuna_module():
 	chuna_module.sort_button = sort_button
 	
 	# 初始化模块
-	chuna_module.initialize(self, player, inventory, item_data_ref, spell_system, spell_data_ref)
+	chuna_module.initialize(self, player, inventory, item_data_ref, spell_system, spell_data_ref, alchemy_system)
 	
 	# 连接信号
 	chuna_module.log_message.connect(_on_module_log)
@@ -465,7 +465,7 @@ func setup_neishi_module():
 	var game_manager = get_node("/root/GameManager")
 	cultivation_system = game_manager.get_cultivation_system() if game_manager else null
 	lianli_system = game_manager.get_lianli_system() if game_manager else null
-	cultivation_module.initialize(self, player, cultivation_system, lianli_system, item_data_ref)
+	cultivation_module.initialize(self, player, cultivation_system, lianli_system, item_data_ref, alchemy_module)
 	
 	# 连接信号
 	cultivation_module.log_message.connect(_on_module_log)
@@ -530,7 +530,7 @@ func setup_lianli_module():
 	lianli_module.exit_lianli_button = exit_lianli_button
 	
 	# 初始化模块
-	lianli_module.initialize(self, player, lianli_system, lianli_area_data, endless_tower_data, item_data_ref, inventory, chuna_module, log_manager)
+	lianli_module.initialize(self, player, lianli_system, lianli_area_data, endless_tower_data, item_data_ref, inventory, chuna_module, log_manager, alchemy_module)
 	
 	# 连接信号
 	lianli_module.log_message.connect(_on_module_log)
@@ -638,6 +638,11 @@ func set_alchemy_system(alchemy_system_node: Node):
 	# 初始化炼丹模块的炼丹系统引用
 	if alchemy_module:
 		alchemy_module.alchemy_system = alchemy_system
+		# 重新连接信号（因为初始化时 alchemy_system 可能为 null）
+		alchemy_module._connect_alchemy_signals()
+	# 初始化储纳模块的炼丹系统引用
+	if chuna_module:
+		chuna_module.alchemy_system = alchemy_system
 
 func set_recipe_data(recipe_data_node: Node):
 	recipe_data = recipe_data_node
@@ -775,9 +780,9 @@ func show_lianli_tab():
 	if endless_tower_button and lianli_module:
 		lianli_module.update_endless_tower_button_text(endless_tower_button)
 
-	# 检查是否处于历练中（战斗中或等待中）
+	# 检查是否处于历练中
 	if lianli_module:
-		if lianli_system and (lianli_system.is_in_battle or lianli_system.is_waiting or lianli_system.is_in_lianli):
+		if lianli_system and lianli_system.is_in_lianli:
 			# 还在历练中，显示战斗场景
 			lianli_module.show_lianli_scene_panel()
 		else:
@@ -828,14 +833,14 @@ func stop_other_activities(current_activity: String):
 				cultivation_system.stop_cultivation()
 			# 停止历练
 			if lianli_system and lianli_system.is_in_lianli:
-				lianli_system.exit_lianli()
+				lianli_system.end_lianli()
 		"cultivation":
 			# 停止炼丹
 			if alchemy_module and alchemy_module.is_crafting_active():
 				alchemy_module.stop_crafting()
 			# 停止历练
 			if lianli_system and lianli_system.is_in_lianli:
-				lianli_system.exit_lianli()
+				lianli_system.end_lianli()
 		"lianli":
 			# 停止炼丹
 			if alchemy_module and alchemy_module.is_crafting_active():
@@ -884,9 +889,9 @@ func _init_lianli_area_buttons():
 			var area_name = lianli_area_data.get_area_name(area_id) if lianli_area_data else area_id
 			
 			# 特殊区域显示剩余次数
-			if lianli_area_data and lianli_area_data.is_special_area(area_id) and player:
-				var remaining = player.get_daily_dungeon_count(area_id)
-				var max_count = PlayerData.DAILY_DUNGEON_MAX_COUNT
+			if lianli_area_data and lianli_area_data.is_special_area(area_id) and lianli_system:
+				var remaining = lianli_system.get_daily_dungeon_count(area_id)
+				var max_count = 3
 				button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
 			else:
 				button.text = area_name
@@ -914,9 +919,9 @@ func update_lianli_area_buttons_display():
 			var area_name = lianli_area_data.get_area_name(area_id)
 			
 			# 特殊区域显示剩余次数
-			if lianli_area_data.is_special_area(area_id):
-				var remaining = player.get_daily_dungeon_count(area_id)
-				var max_count = PlayerData.DAILY_DUNGEON_MAX_COUNT
+			if lianli_area_data.is_special_area(area_id) and lianli_system:
+				var remaining = lianli_system.get_daily_dungeon_count(area_id)
+				var max_count = 3
 				button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
 			else:
 				button.text = area_name

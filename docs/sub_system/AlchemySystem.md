@@ -15,9 +15,31 @@
 
 ### 2.1 系统组成
 
-炼丹系统由三部分组成：
+#### 2.1.1 架构概览
 
-#### 2.1.1 丹方系统
+炼丹系统采用 **逻辑层与UI层分离** 的架构：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      GameUI                             │
+│  ┌─────────────────┐    ┌─────────────────────────┐    │
+│  │  AlchemyModule  │◄───│     AlchemySystem       │    │
+│  │    (UI层)       │    │      (逻辑层)            │    │
+│  │                 │    │                         │    │
+│  │ - 显示丹方列表   │    │ - 炼丹状态管理           │    │
+│  │ - 显示材料信息   │    │ - _process(delta)循环   │    │
+│  │ - 进度条更新     │    │ - 成功/失败判定          │    │
+│  │ - 用户交互处理   │    │ - 材料消耗/产出          │    │
+│  └─────────────────┘    └─────────────────────────┘    │
+└─────────────────────────────────────────────────────────┘
+```
+
+**关键设计决策**：
+- 使用 `_process(delta)` 替代递归定时器，避免孤儿定时器和状态同步问题
+- AlchemySystem 发出信号，AlchemyModule 监听并更新UI
+- 所有炼丹逻辑集中在 AlchemySystem，AlchemyModule 是纯UI层
+
+#### 2.1.2 丹方系统
 - **获取方式**: 使用丹方道具解锁
 - **解锁后**: 永久学会，可以无限次炼制
 - **丹方列表**:
@@ -29,7 +51,7 @@
 | `foundation_pill` | 筑基丹 | 破境草×3 + 灵草×10 | 筑基丹×1 | 30 | 10秒 |
 | `golden_core_pill` | 金丹丹 | 破境草×3 + 筑基丹×3 + 灵草×10 | 金丹丹×1 | 40 | 15秒 |
 
-#### 2.1.2 炼丹术法（杂学术法）
+#### 2.1.3 炼丹术法（杂学术法）
 - **术法ID**: `alchemy`
 - **类型**: 杂学术法（MISC）
 - **等级**: 1-3级
@@ -40,7 +62,7 @@
 | 2级 | +20 | +0.2 | 300 | 30 |
 | 3级 | +30 | +0.3 | 600 | 60 |
 
-#### 2.1.3 丹炉道具
+#### 2.1.4 丹炉道具
 - **道具ID**: `alchemy_furnace`
 - **名称**: 初级丹炉
 - **属性**:
@@ -78,8 +100,15 @@
 
 #### 2.2.3 材料消耗
 - **炼制成功**: 消耗全部材料
-- **炼制失败**: 消耗一半材料（向上取整）
+- **炼制失败**: 消耗一半材料（向上取整），返还另一半材料（向下取整）
+  - 例如：消耗3颗灵草，失败时返还1颗，实际消耗2颗
 - **材料不足**: 无法开始炼制
+- **消耗时机**: 开始炼制时检测总数是否足够，然后消耗第一颗材料；每颗完成后消耗下一颗材料
+
+#### 2.2.4 灵气消耗
+- 每种丹方可能有灵气消耗需求
+- 灵气不足时无法开始炼制
+- 每颗炼制开始时单独消耗灵气
 
 ### 2.3 道具配置
 
@@ -194,7 +223,6 @@ var recipes: Dictionary = {
     "health_pill": {
         "id": "health_pill",
         "name": "补血丹",
-        "recipe_name": "补血丹丹方",
         "success_value": 20,
         "base_time": 5.0,
         "materials": {
@@ -206,7 +234,6 @@ var recipes: Dictionary = {
     "spirit_pill": {
         "id": "spirit_pill",
         "name": "补气丹",
-        "recipe_name": "补气丹丹方",
         "success_value": 20,
         "base_time": 5.0,
         "materials": {
@@ -218,7 +245,6 @@ var recipes: Dictionary = {
     "foundation_pill": {
         "id": "foundation_pill",
         "name": "筑基丹",
-        "recipe_name": "筑基丹丹方",
         "success_value": 30,
         "base_time": 10.0,
         "materials": {
@@ -231,7 +257,6 @@ var recipes: Dictionary = {
     "golden_core_pill": {
         "id": "golden_core_pill",
         "name": "金丹丹",
-        "recipe_name": "金丹丹丹方",
         "success_value": 40,
         "base_time": 15.0,
         "materials": {
@@ -333,10 +358,33 @@ func get_all_recipe_ids() -> Array:
 
 ## 五、核心接口
 
-### 5.1 AlchemySystem.gd
-```gdscript
-extends Node
+### 5.1 AlchemySystem.gd（逻辑层）
 
+#### 信号
+```gdscript
+signal recipe_learned(recipe_id: String)                    # 学习丹方
+signal crafting_started(recipe_id: String, count: int)      # 开始炼制
+signal crafting_progress(current: int, total: int, progress: float)  # 炼制进度
+signal single_craft_completed(success: bool, recipe_name: String)    # 单颗完成
+signal crafting_finished(recipe_id: String, success_count: int, fail_count: int)  # 全部完成
+signal crafting_stopped(completed_count: int, remaining_count: int)  # 停止炼制
+signal log_message(message: String)                         # 日志消息
+```
+
+#### 状态变量
+```gdscript
+var is_crafting: bool = false           # 是否正在炼制
+var current_craft_recipe: String = ""   # 当前丹方ID
+var current_craft_count: int = 0        # 目标炼制数量
+var current_craft_index: int = 0        # 当前炼制索引
+var craft_timer: float = 0.0            # 当前计时器
+var craft_success_count: int = 0        # 成功数量
+var craft_fail_count: int = 0           # 失败数量
+var craft_time_per_pill: float = 0.0    # 每颗耗时
+```
+
+#### 核心方法
+```gdscript
 # 学习丹方（使用丹方道具时调用）
 func learn_recipe(recipe_id: String) -> bool
 
@@ -346,17 +394,29 @@ func has_learned_recipe(recipe_id: String) -> bool
 # 获取已学会的丹方列表
 func get_learned_recipes() -> Array
 
-# 计算成功率
+# 计算成功率（百分比）
 func calculate_success_rate(recipe_id: String) -> int
 
-# 计算炼制耗时
+# 计算炼制耗时（秒/颗）
 func calculate_craft_time(recipe_id: String) -> float
 
 # 检查材料是否足够
 func check_materials(recipe_id: String, count: int) -> Dictionary
 
-# 开始炼制
-func start_crafting(recipe_id: String, count: int) -> Dictionary
+# 检查灵气是否足够
+func check_spirit_energy(recipe_id: String, count: int) -> Dictionary
+
+# 开始批量炼制
+func start_crafting_batch(recipe_id: String, count: int) -> Dictionary
+
+# 停止炼制
+func stop_crafting() -> Dictionary
+
+# 获取炼制预览信息
+func get_craft_preview(recipe_id: String, count: int) -> Dictionary
+
+# 获取当前炼制状态
+func get_crafting_state() -> Dictionary
 
 # 获取炼丹术加成
 func get_alchemy_bonus() -> Dictionary
@@ -365,16 +425,180 @@ func get_alchemy_bonus() -> Dictionary
 func get_furnace_bonus() -> Dictionary
 ```
 
-### 5.2 玩家数据扩展（PlayerData.gd）
+#### 炼丹循环（_process）
+```gdscript
+func _process(delta):
+    if not is_crafting:
+        return
+    
+    craft_timer += delta
+    
+    # 发送进度信号
+    var progress = (craft_timer / craft_time_per_pill) * 100.0
+    crafting_progress.emit(current_craft_index + 1, current_craft_count, min(progress, 100.0))
+    
+    # 完成单颗炼制
+    if craft_timer >= craft_time_per_pill:
+        craft_timer = 0.0
+        _complete_single_pill()
+```
+
+### 5.2 AlchemyModule.gd（UI层）
+
+#### 信号
+```gdscript
+signal recipe_selected(recipe_id: String)    # 选择丹方
+signal log_message(message: String)          # 日志消息
+signal back_to_dongfu_requested              # 返回洞府
+```
+
+#### 核心方法
+```gdscript
+# 初始化
+func initialize(ui: Node, player_node: Node, alchemy_sys: Node, recipe_data_node: Node, item_data_node: Node)
+
+# 显示/隐藏
+func show_alchemy_room()
+func hide_alchemy_room()
+
+# 刷新UI
+func refresh_ui()
+
+# 设置炼制数量
+func set_craft_count(count: int)
+
+# 获取最大可炼制数量
+func get_max_craft_count() -> int
+
+# 检查是否正在炼制
+func is_crafting_active() -> bool
+```
+
+#### 信号连接（监听 AlchemySystem）
+```gdscript
+func _connect_alchemy_signals():
+    alchemy_system.crafting_started.connect(_on_alchemy_crafting_started)
+    alchemy_system.crafting_progress.connect(_on_alchemy_crafting_progress)
+    alchemy_system.single_craft_completed.connect(_on_alchemy_single_craft_completed)
+    alchemy_system.crafting_finished.connect(_on_alchemy_crafting_finished)
+    alchemy_system.crafting_stopped.connect(_on_alchemy_crafting_stopped)
+    alchemy_system.log_message.connect(_on_alchemy_log_message)
+```
+
+### 5.3 玩家数据扩展（PlayerData.gd）
 ```gdscript
 # 已学会的丹方ID列表
 var learned_recipes: Array = []
-
-# 是否拥有丹炉
-var has_alchemy_furnace: bool = false
 ```
 
-## 六、实施步骤
+### 5.4 丹炉配置（AlchemySystem.gd）
+```gdscript
+# 丹炉配置（硬编码，支持多丹炉扩展）
+const FURNACE_CONFIGS = {
+    "alchemy_furnace": {
+        "name": "初级丹炉",
+        "success_bonus": 10,
+        "speed_rate": 0.1
+    }
+}
+
+# 装备的丹炉ID（空字符串表示无丹炉）
+var equipped_furnace_id: String = ""
+```
+
+### 5.5 存档数据格式
+```json
+{
+    "player": {
+        "realm": "炼气期",
+        "realm_level": 1,
+        "learned_recipes": ["health_pill"]
+    },
+    "inventory": {
+        "capacity": 50,
+        "slots": {
+            "0": {"id": "spirit_stone", "count": 100},
+            "5": {"id": "herb", "count": 50}
+        }
+    },
+    "alchemy_system": {
+        "equipped_furnace_id": "alchemy_furnace"
+    }
+}
+```
+
+## 六、炼丹流程详解
+
+### 6.1 炼丹状态机
+
+```
+┌─────────────┐     start_crafting_batch()     ┌─────────────┐
+│   空闲      │ ─────────────────────────────► │   炼制中    │
+│is_crafting  │                                │is_crafting  │
+│   = false   │     stop_crafting()            │   = true    │
+└─────────────┘ ◄───────────────────────────── └─────────────┘
+                      或 crafting_finished
+```
+
+### 6.2 开始炼制流程
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                start_crafting_batch(recipe_id, count)        │
+├──────────────────────────────────────────────────────────────┤
+│  1. 检查是否学会丹方                                          │
+│  2. 检查是否正在炼制                                          │
+│  3. 检查材料总数是否足够（count颗）                            │
+│  4. 检查灵气总数是否足够（count颗）                            │
+│  5. 初始化炼制状态                                            │
+│     - is_crafting = true                                     │
+│     - current_craft_recipe = recipe_id                       │
+│     - current_craft_count = count                            │
+│     - current_craft_index = 0                                │
+│     - current_material_consumed = false                      │
+│  6. 检查第一颗材料是否足够                                     │
+│  7. 消耗第一颗材料                                            │
+│  8. current_material_consumed = true                         │
+│  9. 发送 crafting_started 信号                               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 6.3 单颗炼制流程
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    _complete_single_pill()                   │
+├──────────────────────────────────────────────────────────────┤
+│  1. current_craft_index += 1                                 │
+│  2. current_material_consumed = false                        │
+│  3. 计算成功率，随机判定成功/失败                             │
+│  4. 增加炼丹术使用次数                                        │
+│  5. 成功: 产出丹药 → craft_success_count += 1                │
+│     失败: 返还一半材料（向下取整）→ craft_fail_count += 1    │
+│     （注：材料已在炼制开始时消耗，失败时返还一半）            │
+│  6. 发送 single_craft_completed 信号                         │
+│  7. 检查是否完成全部:                                         │
+│     - 是: _finish_crafting()                                 │
+│     - 否: 检查材料 → 消耗下一颗材料 → current_material_consumed = true │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 6.4 停止炼制流程
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     stop_crafting()                          │
+├──────────────────────────────────────────────────────────────┤
+│  1. 如果当前正在炼制的丹药已消耗材料（current_material_consumed = true）│
+│     - 返还这一颗丹药的全部材料                                │
+│     - 返还这一颗丹药的灵气                                    │
+│  2. 发送日志消息                                              │
+│  3. _reset_crafting_state()                                  │
+│  4. 发送 crafting_stopped 信号                               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## 七、实施步骤
 
 ### 阶段1: 数据配置
 1. ItemData.gd - 添加4个丹方道具 + 丹炉道具
@@ -395,7 +619,7 @@ var has_alchemy_furnace: bool = false
 2. 测试炼丹流程
 3. 测试材料消耗和产出
 
-## 七、存档数据结构
+## 八、存档数据结构
 
 ```gdscript
 # PlayerData 存档扩展
@@ -405,17 +629,24 @@ var has_alchemy_furnace: bool = false
 }
 ```
 
-## 八、注意事项
+## 九、注意事项
 
 1. **丹方命名规范**: 解锁类道具以系统名开头，如 `recipe_health_pill`
-2. **材料消耗**: 失败时消耗一半材料，向上取整
+2. **材料消耗**: 失败时返还一半材料（向下取整），实际消耗一半材料（向上取整）
 3. **成功率限制**: 最低1%，最高100%
 4. **速度计算**: 基础速度1 + 炼丹术加成 + 丹炉加成
 5. **批量炼制**: 每颗丹药独立计算成功/失败
 6. **日志显示**: 使用富文本框显示炼丹日志
+7. **架构原则**: 逻辑在 AlchemySystem，UI 在 AlchemyModule，通过信号通信
+8. **定时器选择**: 使用 `_process(delta)` 而非递归定时器，避免状态同步问题
+9. **初始化顺序**: `AlchemyModule` 初始化时 `alchemy_system` 可能为 null，需要在 `set_alchemy_system()` 后重新调用 `_connect_alchemy_signals()` 连接信号
+10. **材料消耗时机**: 开始炼制时检测总数是否足够，然后消耗第一颗材料；每颗完成后消耗下一颗材料
+11. **停止返还**: 停止炼制时，如果当前正在炼制的丹药已消耗材料，则返还这一颗丹药的全部材料
+12. **UI刷新**: 每次进入炼丹房时，调用 `_update_craft_panel()` 刷新成功率、耗时等信息
 
 ---
 
-**文档版本**: 1.0  
+**文档版本**: 2.2  
 **创建日期**: 2026-02-23  
-**最后更新**: 2026-02-23
+**最后更新**: 2026-03-03  
+**更新内容**: 更新材料消耗时机、停止返还逻辑、UI刷新逻辑等实现细节

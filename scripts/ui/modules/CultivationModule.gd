@@ -16,6 +16,7 @@ var player: Node = null
 var cultivation_system: Node = null
 var lianli_system: Node = null
 var item_data: Node = null
+var alchemy_module: Node = null
 
 # UI节点引用（由GameUI设置）
 var cultivation_panel: Control = null
@@ -47,12 +48,13 @@ var _is_initialized: bool = false
 func _ready():
 	pass
 
-func initialize(ui: Node, player_node: Node, cult_sys: Node, lianli_sys: Node = null, item_data_ref: Node = null):
+func initialize(ui: Node, player_node: Node, cult_sys: Node, lianli_sys: Node = null, item_data_ref: Node = null, alchemy_mod: Node = null):
 	game_ui = ui
 	player = player_node
 	cultivation_system = cult_sys
 	lianli_system = lianli_sys
 	item_data = item_data_ref
+	alchemy_module = alchemy_mod
 	_is_initialized = true
 	
 	# 连接修炼系统日志信号
@@ -100,10 +102,14 @@ func on_cultivate_button_pressed():
 		# 如果正在历练或等待中，先停止历练
 		if lianli_system and (lianli_system.is_in_lianli or lianli_system.is_waiting):
 			lianli_system.end_lianli()
-			log_message.emit("已退出历练区域")
 			# 通知GameUI切换回内视页面
 			if game_ui and game_ui.has_method("show_neishi_tab"):
 				game_ui.show_neishi_tab()
+		
+		# 如果正在炼丹，先停止炼丹
+		if alchemy_module and alchemy_module.is_crafting_active():
+			alchemy_module.stop_crafting()
+			log_message.emit("已停止炼丹")
 		
 		# 开始修炼
 		cultivation_system.start_cultivation()
@@ -164,8 +170,8 @@ func _handle_breakthrough_failure(result: Dictionary):
 			var material_info = materials[material_id]
 			if not material_info.get("enough", true):
 				var material_name = item_data.get_item_name(material_id) if item_data else material_id
-				var current = material_info.get("current", 0)
-				var required = material_info.get("required", 0)
+				var current = int(material_info.get("current", 0))
+				var required = int(material_info.get("required", 0))
 				log_message.emit("突破失败：" + material_name + "不足 (" + str(current) + "/" + str(required) + ")")
 				break
 	else:
@@ -179,7 +185,7 @@ func _build_breakthrough_message(stone_cost: int, energy_cost: int, materials: D
 	
 	for material_id in materials.keys():
 		var material_info = materials[material_id]
-		var required_count = material_info.get("required", 0)
+		var required_count = int(material_info.get("required", 0))
 		if required_count > 0:
 			var material_name = item_data.get_item_name(material_id) if item_data else material_id
 			msg += "、" + material_name + str(required_count)

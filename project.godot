@@ -14,7 +14,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="hello_world"
+config/name="idle_cultivation"
 config/description="2D修仙题材自动挂机游戏"
 config/version="0.1"
 run/main_scene="res://scenes/main/Main.tscn"
@@ -29,13 +29,17 @@ GameManager="*res://scripts/autoload/GameManager.gd"
 
 window/size/viewport_width=720
 window/size/viewport_height=1280
+window/size/window_width_override=720
+window/size/window_height_override=1280
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
-window/size/width=720
-window/size/height=1280
 window/resizeable=true
-window/title="hello_world"
+window/title="idle_cultivation"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
 [rendering]
 

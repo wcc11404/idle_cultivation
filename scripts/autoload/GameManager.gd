@@ -50,42 +50,42 @@ func init_systems():
 	account_system.login_success.connect(_on_account_login_success)
 	print("账号系统初始化完成")
 	
-	item_data = load("res://scripts/core/ItemData.gd").new()
+	item_data = load("res://scripts/core/inventory/ItemData.gd").new()
 	item_data.name = "ItemData"
 	add_child(item_data)
 	print("物品数据初始化完成")
 	
-	lianli_area_data = load("res://scripts/core/LianliAreaData.gd").new()
+	lianli_area_data = load("res://scripts/core/lianli/LianliAreaData.gd").new()
 	lianli_area_data.name = "LianliAreaData"
 	add_child(lianli_area_data)
 	print("历练区域数据初始化完成")
 	
-	enemy_data = load("res://scripts/core/EnemyData.gd").new()
+	enemy_data = load("res://scripts/core/lianli/EnemyData.gd").new()
 	enemy_data.name = "EnemyData"
 	add_child(enemy_data)
 	print("敌人数据初始化完成")
 	
-	realm_system = load("res://scripts/core/RealmSystem.gd").new()
+	realm_system = load("res://scripts/core/realm/RealmSystem.gd").new()
 	realm_system.name = "RealmSystem"
 	add_child(realm_system)
 	print("境界系统初始化完成")
 	
-	inventory = load("res://scripts/core/Inventory.gd").new()
+	inventory = load("res://scripts/core/inventory/Inventory.gd").new()
 	inventory.name = "Inventory"
 	add_child(inventory)
 	print("储纳系统初始化完成")
 	
-	cultivation_system = load("res://scripts/core/CultivationSystem.gd").new()
+	cultivation_system = load("res://scripts/core/realm/CultivationSystem.gd").new()
 	cultivation_system.name = "CultivationSystem"
 	add_child(cultivation_system)
 	print("修炼系统初始化完成")
 	
-	endless_tower_data = load("res://scripts/core/EndlessTowerData.gd").new()
+	endless_tower_data = load("res://scripts/core/lianli/EndlessTowerData.gd").new()
 	endless_tower_data.name = "EndlessTowerData"
 	add_child(endless_tower_data)
 	print("无尽塔数据初始化完成")
 	
-	lianli_system = load("res://scripts/core/LianliSystem.gd").new()
+	lianli_system = load("res://scripts/core/lianli/LianliSystem.gd").new()
 	lianli_system.name = "LianliSystem"
 	add_child(lianli_system)
 	lianli_system.set_lianli_area_data(lianli_area_data)
@@ -103,12 +103,12 @@ func init_systems():
 	add_child(offline_reward)
 	print("离线收益系统初始化完成")
 	
-	spell_data = load("res://scripts/core/SpellData.gd").new()
+	spell_data = load("res://scripts/core/spell/SpellData.gd").new()
 	spell_data.name = "SpellData"
 	add_child(spell_data)
 	print("术法数据初始化完成")
 	
-	spell_system = load("res://scripts/core/SpellSystem.gd").new()
+	spell_system = load("res://scripts/core/spell/SpellSystem.gd").new()
 	spell_system.name = "SpellSystem"
 	add_child(spell_system)
 	spell_system.set_spell_data(spell_data)
@@ -116,12 +116,12 @@ func init_systems():
 	print("术法系统初始化完成")
 	
 	# 初始化炼丹系统
-	recipe_data = load("res://scripts/core/AlchemyRecipeData.gd").new()
+	recipe_data = load("res://scripts/core/alchemy/AlchemyRecipeData.gd").new()
 	recipe_data.name = "AlchemyRecipeData"
 	add_child(recipe_data)
 	print("丹方数据初始化完成")
 	
-	alchemy_system = load("res://scripts/core/AlchemySystem.gd").new()
+	alchemy_system = load("res://scripts/core/alchemy/AlchemySystem.gd").new()
 	alchemy_system.name = "AlchemySystem"
 	add_child(alchemy_system)
 	alchemy_system.set_recipe_data(recipe_data)
