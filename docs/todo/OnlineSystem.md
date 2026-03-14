@@ -112,11 +112,12 @@ createdb xiuxian_game
 CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(20) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    phone VARCHAR(11),                    -- 可选，用于找回密码
+    password_hash VARCHAR(255),             -- 可为空，第三方登录用户无密码
+    phone VARCHAR(11),                     -- 可选，用于找回密码
     server_id VARCHAR(20) DEFAULT 'default',  -- 区服ID
-    token_version INT DEFAULT 0,          -- 单设备登录控制，每次登录+1
-    is_banned BOOLEAN DEFAULT FALSE,      -- 封号标记
+    token_version INT DEFAULT 0,           -- 单设备登录控制，每次登录+1
+    is_banned BOOLEAN DEFAULT FALSE,       -- 封号标记
+    auth_data JSONB,                       -- 第三方登录信息（TapTap等）
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -124,7 +125,8 @@ CREATE TABLE accounts (
 CREATE TABLE player_data (
     account_id UUID PRIMARY KEY REFERENCES accounts(id),
     server_id VARCHAR(20) DEFAULT 'default',  -- 冗余存储，便于分区查询
-    data JSONB NOT NULL,                  -- 所有游戏数据（详见下文结构）
+    game_version VARCHAR(20) DEFAULT 'v1.0.0', -- 游戏版本号，记录玩家上次保存的版本
+    data JSONB NOT NULL,                   -- 所有游戏数据（详见下文结构）
     last_online_at TIMESTAMP DEFAULT NOW(), -- 用于离线收益计算
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -135,12 +137,25 @@ CREATE INDEX idx_accounts_phone ON accounts(phone);
 CREATE INDEX idx_accounts_server ON accounts(server_id);
 CREATE INDEX idx_player_data_updated ON player_data(updated_at);
 CREATE INDEX idx_player_data_server ON player_data(server_id);
+CREATE INDEX idx_player_data_version ON player_data(game_version);
 ```
 
 **字段说明**：
 - `server_id`: 区服ID，默认为 `default`，后期可扩展多区服
 - `is_banned`: 封号标记，运营后台可操作
 - `phone`: 手机号，用于找回密码（可选功能）
+- `password_hash`: 可为空，第三方登录用户（如 TapTap）无密码
+- `auth_data`: 第三方登录信息，JSONB 格式，示例：
+  ```json
+  {
+    "taptap": {
+      "openid": "用户唯一标识",
+      "access_token": "访问令牌",
+      "unionid": "跨应用唯一标识"
+    }
+  }
+  ```
+- `game_version`: 游戏版本号，记录玩家上次保存的版本，方便大版本更新时数据迁移
 
 **后期扩展**：玩家数量增长后，可使用 PostgreSQL 分区表按 `server_id` 分区，无需修改代码。
 
