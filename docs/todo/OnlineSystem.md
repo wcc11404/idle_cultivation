@@ -113,14 +113,17 @@ CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(20) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    phone VARCHAR(11),                    -- 可选，后续绑定手机号用于找回密码
+    phone VARCHAR(11),                    -- 可选，用于找回密码
+    server_id VARCHAR(20) DEFAULT 'default',  -- 区服ID
     token_version INT DEFAULT 0,          -- 单设备登录控制，每次登录+1
+    is_banned BOOLEAN DEFAULT FALSE,      -- 封号标记
     created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- 玩家数据表
 CREATE TABLE player_data (
     account_id UUID PRIMARY KEY REFERENCES accounts(id),
+    server_id VARCHAR(20) DEFAULT 'default',  -- 冗余存储，便于分区查询
     data JSONB NOT NULL,                  -- 所有游戏数据（详见下文结构）
     last_online_at TIMESTAMP DEFAULT NOW(), -- 用于离线收益计算
     updated_at TIMESTAMP DEFAULT NOW()
@@ -128,10 +131,22 @@ CREATE TABLE player_data (
 
 -- 索引
 CREATE INDEX idx_accounts_username ON accounts(username);
+CREATE INDEX idx_accounts_phone ON accounts(phone);
+CREATE INDEX idx_accounts_server ON accounts(server_id);
 CREATE INDEX idx_player_data_updated ON player_data(updated_at);
+CREATE INDEX idx_player_data_server ON player_data(server_id);
 ```
 
+**字段说明**：
+- `server_id`: 区服ID，默认为 `default`，后期可扩展多区服
+- `is_banned`: 封号标记，运营后台可操作
+- `phone`: 手机号，用于找回密码（可选功能）
+
+**后期扩展**：玩家数量增长后，可使用 PostgreSQL 分区表按 `server_id` 分区，无需修改代码。
+
 ### 3.2 player_data.data JSONB结构
+
+基于实际代码的存档数据结构：
 
 ```json
 {
@@ -139,30 +154,50 @@ CREATE INDEX idx_player_data_updated ON player_data(updated_at);
     "player": {
         "realm": "炼气期",
         "realm_level": 1,
-        "health": 100,
-        "spirit_energy": 50,
-        "spirit_stones": 1000,
-        "tower_highest_floor": 0,
-        "learned_recipes": [],
-        "has_alchemy_furnace": false
+        "health": 500.0,
+        "spirit_energy": 0.0
     },
     "inventory": {
-        "slots": [
-            {"item_id": "spirit_stone", "quantity": 100}
-        ],
-        "capacity": 50
+        "capacity": 50,
+        "slots": {
+            "0": {"id": "spirit_stone", "count": 100},
+            "5": {"id": "mat_herb", "count": 50}
+        }
     },
     "spell_system": {
-        "player_spells": {},
+        "player_spells": {
+            "basic_breathing": {
+                "obtained": true,
+                "level": 1,
+                "use_count": 100,
+                "charged_spirit": 0
+            }
+        },
         "equipped_spells": {
-            "tuna": null,
+            "tuna": "basic_breathing",
             "active": [],
             "passive": []
         }
     },
+    "alchemy_system": {
+        "equipped_furnace_id": "",
+        "learned_recipes": ["health_pill"]
+    },
+    "lianli_system": {
+        "tower_highest_floor": 0,
+        "daily_dungeon_data": {}
+    },
     "timestamp": 1234567890
 }
 ```
+
+**字段说明：**
+- `player`: 玩家基础属性（境界、等级、气血、灵气）
+- `inventory`: 储纳系统（容量、稀疏存储的物品槽位）
+- `spell_system`: 术法系统（已获得术法、装备配置）
+- `alchemy_system`: 炼丹系统（装备的丹炉、已学丹方）
+- `lianli_system`: 历练系统（无尽塔最高层、每日副本数据）
+- `timestamp`: 存档时间戳
 
 ### 3.3 扩展性说明
 
@@ -1657,7 +1692,169 @@ func _on_login_pressed():
 
 ---
 
-## 10. 参考文档
+## 10. 开发阶段划分
+
+### 10.1 第一阶段：环境配置
+
+**目标**：搭建开发环境
+
+| 配置项 | 值 |
+|--------|-----|
+| 服务端目录 | `idle_cultivation_server/`（与客户端同级） |
+| 数据库名 | `idle_cultivation_game` |
+| 服务端端口 | `8444` |
+
+**安装清单**：
+
+```bash
+# 1. 创建服务端项目目录
+mkdir idle_cultivation_server
+cd idle_cultivation_server
+
+# 2. 创建 Python 虚拟环境
+python3.11 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate  # Windows
+
+# 3. 安装依赖
+pip install fastapi uvicorn
+pip install "tortoise-orm[asyncpg]"
+pip install pyjwt
+pip install "passlib[bcrypt]"
+pip install streamlit
+pip install python-multipart  # 表单支持
+pip install python-dotenv     # 环境变量
+
+# 4. 安装 PostgreSQL
+# Linux: sudo apt install postgresql
+# Mac: brew install postgresql
+# Windows: 下载安装包
+
+# 5. 创建数据库
+createdb idle_cultivation_game
+```
+
+**验收标准**：
+- PostgreSQL 可连接
+- Python 虚拟环境正常
+- 依赖安装成功
+
+---
+
+### 10.2 第二阶段：搭建服务端基础
+
+**目标**：实现注册/登录 API
+
+**配置项**：
+| 配置项 | 值 |
+|--------|-----|
+| 服务端端口 | `8444` |
+| JWT 密钥管理 | 配置文件 `config/secrets.yaml`（不入库） |
+
+**开发内容**：
+1. 项目目录结构
+2. 数据库表创建（accounts, player_data）
+3. JWT 工具类
+4. 注册 API: `POST /api/v1/auth/register`
+5. 登录 API: `POST /api/v1/auth/login`
+6. Token 续期 API: `POST /api/v1/auth/refresh`
+7. 基础错误码定义
+
+**验收标准**：
+- 可用 Postman 测试注册/登录 API
+- JWT Token 生成和验证正常
+
+---
+
+### 10.3 第三阶段：客户端网络层
+
+**目标**：客户端可调用服务端 API
+
+**配置项**：
+| 配置项 | 值 |
+|--------|-----|
+| 服务端地址 | 配置文件 `ServerConfig.gd` |
+
+**开发内容**：
+1. `scripts/network/ServerConfig.gd` - 服务端配置
+2. `scripts/network/NetworkManager.gd` - HTTP 请求管理、Token 管理
+3. `scripts/network/GameServerAPI.gd` - API 封装
+4. 网络错误处理
+5. 加载弹窗组件
+
+**验收标准**：
+- 客户端可调用 API 并处理响应
+- Token 自动存储和续期
+
+---
+
+### 10.4 第四阶段：存档同步 + 账号认证
+
+**目标**：完整联网功能，可测试
+
+**存档触发时机**：
+| 触发时机 | 操作 |
+|----------|------|
+| 登录成功 | 自动加载云端数据 |
+| 第一次登录 | 自动触发一次保存 |
+| 退出游戏 | 自动保存 |
+| 定时（5分钟） | 自动保存 |
+
+**⚠️ 重要变更**：
+- 设置界面的「保存」「读取」按钮 → **废弃**
+- 所有存档操作 → **全自动，用户无感知**
+
+**开发内容**：
+1. 登录/注册界面
+2. CloudSaveManager 替代 SaveManager
+3. 登录时加载云端数据
+4. 定时自动保存
+5. 离线收益计算（服务端计算，登录时返回）
+
+**验收标准**：
+- 注册 → 登录 → 游玩 → 退出 → 登录 → 数据正确
+
+---
+
+### 10.5 第五阶段：关键操作验证
+
+**目标**：关键操作服务端验证
+
+**验证操作**：
+| 操作 | 验证内容 |
+|------|----------|
+| 突破境界 | 验证资源是否足够 |
+| 战斗胜利 | 验证战斗合法性，计算掉落 |
+| 重要道具使用 | 验证道具是否拥有 |
+| 术法升级/充能 | 验证资源是否足够 |
+| 学习丹方 | 验证条件是否满足 |
+
+**验收标准**：
+- 关键操作有服务端验证
+- 作弊操作被拒绝
+
+---
+
+### 10.6 第六阶段：运营管理平台
+
+**目标**：可视化管理后台
+
+**技术选型**：Streamlit（Python 快速 Web 框架）
+
+**功能清单**：
+1. 管理员登录
+2. 玩家列表/搜索
+3. 玩家详情查看
+4. 封号/解封功能
+5. 区服管理
+
+**验收标准**：
+- 管理员可查看玩家详情
+- 管理员可封禁/解封玩家
+
+---
+
+## 11. 参考文档
 
 - [PostgreSQL JSONB文档](https://www.postgresql.org/docs/current/datatype-json.html)
 - [JWT官方文档](https://jwt.io/introduction)
@@ -1666,6 +1863,11 @@ func _on_login_pressed():
 
 ---
 
-**文档版本**: 1.0  
+**文档版本**: 1.2  
 **创建日期**: 2026-02-26  
-**最后更新**: 2026-02-26
+**最后更新**: 2026-03-14
+
+**更新记录**:
+- v1.2 (2026-03-14): 新增开发阶段划分，更新数据表结构（新增 server_id、is_banned 字段）
+- v1.1 (2026-03-14): 更新 player_data.data JSONB 结构，使其与实际代码一致
+- v1.0 (2026-02-26): 初始版本
