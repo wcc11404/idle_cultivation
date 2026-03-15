@@ -587,24 +587,54 @@ func apply_save_data(data: Dictionary):
 	# 先初始化所有术法
 	_init_player_spells()
 	
+	if data == null:
+		return
+	
 	if data.has("player_spells"):
 		var loaded_spells = data.player_spells
-		for spell_id in loaded_spells.keys():
-			if player_spells.has(spell_id):
-				var spell_info = loaded_spells[spell_id]
-				player_spells[spell_id] = {
-					"obtained": spell_info.get("obtained", false),
-					"level": int(spell_info.get("level", 0)),
-					"use_count": int(spell_info.get("use_count", 0)),
-					"charged_spirit": int(spell_info.get("charged_spirit", 0))
-				}
+		if loaded_spells:
+			for spell_id in loaded_spells.keys():
+				if player_spells.has(spell_id):
+					var spell_info = loaded_spells[spell_id]
+					player_spells[spell_id] = {
+						"obtained": spell_info.get("obtained", false),
+						"level": int(spell_info.get("level", 0)),
+						"use_count": int(spell_info.get("use_count", 0)),
+						"charged_spirit": int(spell_info.get("charged_spirit", 0))
+					}
 	
 	if data.has("equipped_spells"):
 		var loaded_equipped = data.equipped_spells
-		for spell_type in loaded_equipped.keys():
-			var type_value = int(spell_type)
-			var spell_list = loaded_equipped[spell_type]
-			equipped_spells[type_value] = []
-			for spell_id in spell_list:
-				if player_spells.has(spell_id) and player_spells[spell_id].obtained:
-					equipped_spells[type_value].append(spell_id)
+		if loaded_equipped:
+			# 处理服务端格式（字符串键）和客户端格式（数字键）
+			if loaded_equipped.has("tuna"):
+				# 服务端格式：{"tuna": null, "active": [], "passive": []}
+				var tuna_spell = loaded_equipped.get("tuna")
+				if tuna_spell and player_spells.has(tuna_spell) and player_spells[tuna_spell].obtained:
+					equipped_spells[spell_data.SpellType.BREATHING] = [tuna_spell]
+				else:
+					equipped_spells[spell_data.SpellType.BREATHING] = []
+				
+				var active_spells = loaded_equipped.get("active", [])
+				equipped_spells[spell_data.SpellType.ACTIVE] = []
+				if active_spells:
+					for spell_id in active_spells:
+						if player_spells.has(spell_id) and player_spells[spell_id].obtained:
+							equipped_spells[spell_data.SpellType.ACTIVE].append(spell_id)
+				
+				var passive_spells = loaded_equipped.get("passive", [])
+				equipped_spells[spell_data.SpellType.PASSIVE] = []
+				if passive_spells:
+					for spell_id in passive_spells:
+						if player_spells.has(spell_id) and player_spells[spell_id].obtained:
+							equipped_spells[spell_data.SpellType.PASSIVE].append(spell_id)
+			else:
+				# 客户端格式：{0: [], 1: [], 2: []}
+				for spell_type in loaded_equipped.keys():
+					var type_value = int(spell_type)
+					var spell_list = loaded_equipped[spell_type]
+					equipped_spells[type_value] = []
+					if spell_list:
+						for spell_id in spell_list:
+							if player_spells.has(spell_id) and player_spells[spell_id].obtained:
+								equipped_spells[type_value].append(spell_id)

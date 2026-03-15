@@ -1,0 +1,117 @@
+extends Node
+
+const GameServerAPI = preload("res://scripts/network/GameServerAPI.gd")
+
+const AUTO_SAVE_INTERVAL = 300  # 5分钟
+const MAX_SAVE_FAILURES = 3
+
+var api: GameServerAPI = null
+var save_failure_count: int = 0
+var last_save_time: int = 0
+var is_autosave_running: bool = false
+
+func _ready():
+	api = GameServerAPI.new()
+	add_child(api)
+	
+	# 开始自动保存
+	start_auto_save()
+
+func start_auto_save():
+	if is_autosave_running:
+		return
+	
+	is_autosave_running = true
+	_auto_save_loop()
+
+func _auto_save_loop():
+	while is_autosave_running:
+		await get_tree().create_timer(AUTO_SAVE_INTERVAL).timeout
+		await save_game()
+
+func save_game() -> bool:
+	var data = collect_game_data()
+	var result = await api.save_game(data)
+	
+	if result.success:
+		last_save_time = Time.get_unix_time_from_system()
+		save_failure_count = 0
+		print("自动保存成功")
+		return true
+	else:
+		save_failure_count += 1
+		print("自动保存失败 (" + str(save_failure_count) + "/" + str(MAX_SAVE_FAILURES) + ")")
+		
+		if save_failure_count >= MAX_SAVE_FAILURES:
+			_force_logout()
+		return false
+
+func load_game() -> bool:
+	var result = await api.load_game()
+	if result.success:
+		apply_game_data(result.data)
+		return true
+	return false
+
+func collect_game_data() -> Dictionary:
+	var game_manager = get_node_or_null("/root/GameManager")
+	if not game_manager:
+		print("GameManager not found")
+		return {}
+	
+	var player = game_manager.get_player()
+	var inventory = game_manager.get_inventory()
+	var spell_system = game_manager.get_spell_system()
+	var lianli_system = game_manager.get_lianli_system()
+	var alchemy_system = game_manager.get_alchemy_system()
+	
+	return {
+		"player": player.get_save_data() if player else {},
+		"inventory": inventory.get_save_data() if inventory else {},
+		"spell_system": spell_system.get_save_data() if spell_system else {},
+		"lianli_system": lianli_system.get_save_data() if lianli_system else {},
+		"alchemy_system": alchemy_system.get_save_data() if alchemy_system else {},
+		"timestamp": Time.get_unix_time_from_system()
+	}
+
+func apply_game_data(data: Dictionary):
+	var game_manager = get_node_or_null("/root/GameManager")
+	if not game_manager:
+		print("GameManager not found")
+		return
+	
+	var player = game_manager.get_player()
+	var inventory = game_manager.get_inventory()
+	var spell_system = game_manager.get_spell_system()
+	var lianli_system = game_manager.get_lianli_system()
+	var alchemy_system = game_manager.get_alchemy_system()
+	
+	if player and data.has("player"):
+		player.apply_save_data(data.player)
+	
+	if inventory and data.has("inventory"):
+		inventory.apply_save_data(data.inventory)
+	
+	if spell_system and data.has("spell_system"):
+		spell_system.apply_save_data(data.spell_system)
+	
+	if lianli_system and data.has("lianli_system"):
+		lianli_system.apply_save_data(data.lianli_system)
+	
+	if alchemy_system and data.has("alchemy_system"):
+		alchemy_system.apply_save_data(data.alchemy_system)
+
+func _force_logout():
+	print("网络连接异常，强制登出")
+	# 清除本地Token
+	api.network_manager.clear_token()
+	# 返回登录界面
+	get_tree().change_scene_to_file("res://scenes/login/Login.tscn")
+
+func stop_auto_save():
+	is_autosave_running = false
+
+func on_game_exit():
+	# 游戏退出前保存
+	save_game()
+	stop_auto_save()

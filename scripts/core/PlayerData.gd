@@ -1,6 +1,7 @@
 class_name PlayerData extends Node
 
 const AttributeCalculator = preload("res://scripts/core/AttributeCalculator.gd")
+const DAILY_DUNGEON_MAX_COUNT = 3
 
 signal realm_breakthrough(new_realm: String, new_level: int)
 signal breakthrough_failed(message: String)

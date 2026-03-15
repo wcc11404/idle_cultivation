@@ -1030,11 +1030,7 @@ func update_account_ui():
 	if not game_manager:
 		return
 	
-	var account_system = game_manager.get_account_system()
-	if not account_system:
-		return
-	
-	var account_info = account_system.get_current_account()
+	var account_info = game_manager.get_account_info()
 	if account_info.is_empty():
 		return
 	

@@ -10,21 +10,17 @@ var player: Node = null
 var cultivation_system: Node = null
 var lianli_system: Node = null
 var realm_system: Node = null
-var save_manager: Node = null
-var offline_reward: Node = null
+var cloud_save_manager: Node = null
 var inventory: Node = null
 var item_data: Node = null
 var lianli_area_data: Node = null
 var enemy_data: Node = null
 var spell_data: Node = null
-var account_system: Node = null
 var spell_system: Node = null
 var endless_tower_data: Node = null
 var alchemy_system: Node = null
 var recipe_data: Node = null
-
-
-var current_user_save_path: String = ""
+var account_info: Dictionary = {}
 
 func _ready():
 	# 防止重复初始化（在编辑器中脚本重新加载时）
@@ -33,23 +29,11 @@ func _ready():
 	
 	init_systems()
 	_systems_initialized = true
-	# 先初始化账号系统
-	login_default_account()
 	create_player()
-	give_starter_pack_item()
-	give_test_pack_item()
 	print("游戏初始化完成")
 	print("=== GameManager._ready() 结束 ===")
 
 func init_systems():
-	
-	# 初始化账号系统
-	account_system = load("res://scripts/core/AccountSystem.gd").new()
-	account_system.name = "AccountSystem"
-	add_child(account_system)
-	account_system.login_success.connect(_on_account_login_success)
-	print("账号系统初始化完成")
-	
 	item_data = load("res://scripts/core/inventory/ItemData.gd").new()
 	item_data.name = "ItemData"
 	add_child(item_data)
@@ -93,15 +77,11 @@ func init_systems():
 	lianli_system.set_endless_tower_data(endless_tower_data)
 	print("历练系统初始化完成")
 	
-	save_manager = load("res://scripts/core/SaveManager.gd").new()
-	save_manager.name = "SaveManager"
-	add_child(save_manager)
-	print("存档系统初始化完成")
-	
-	offline_reward = load("res://scripts/core/OfflineReward.gd").new()
-	offline_reward.name = "OfflineReward"
-	add_child(offline_reward)
-	print("离线收益系统初始化完成")
+	# 使用 CloudSaveManager 替代 SaveManager
+	cloud_save_manager = load("res://scripts/managers/CloudSaveManager.gd").new()
+	cloud_save_manager.name = "CloudSaveManager"
+	add_child(cloud_save_manager)
+	print("云端存档系统初始化完成")
 	
 	spell_data = load("res://scripts/core/spell/SpellData.gd").new()
 	spell_data.name = "SpellData"
@@ -129,31 +109,6 @@ func init_systems():
 	alchemy_system.set_spell_system(spell_system)
 	print("炼丹系统初始化完成")
 
-func login_default_account():
-	# 使用默认账号登录
-	if account_system:
-		account_system.login(account_system.DEFAULT_USERNAME, account_system.DEFAULT_PASSWORD)
-
-func _on_account_login_success(username: String):
-	# 更新存档路径
-	update_save_path(username)
-	account_logged_in.emit(account_system.get_current_account())
-	print("账号登录成功: ", username)
-
-func update_save_path(username: String):
-	# 每个用户有独立的存档文件
-	current_user_save_path = "user://save_" + username + ".json"
-	if save_manager:
-		save_manager.set_save_path(current_user_save_path)
-
-func give_starter_pack_item():
-	inventory.add_item("starter_pack", 1)
-	print("新手礼包已发放到储纳")
-
-func give_test_pack_item():
-	inventory.add_item("test_pack", 1)
-	print("测试礼包已发放到储纳")
-
 func create_player():
 	player = load("res://scripts/core/PlayerData.gd").new()
 	player.name = "Player"
@@ -179,10 +134,7 @@ func get_realm_system():
 	return realm_system
 
 func get_save_manager():
-	return save_manager
-
-func get_offline_reward():
-	return offline_reward
+	return cloud_save_manager
 
 func get_inventory():
 	return inventory
@@ -211,52 +163,29 @@ func get_alchemy_system():
 func get_recipe_data():
 	return recipe_data
 
-func get_account_system():
-	return account_system
+func get_account_info() -> Dictionary:
+	return account_info
 
-func get_current_account_info() -> Dictionary:
-	if account_system:
-		return account_system.get_current_account()
-	return {}
+func set_account_info(info: Dictionary):
+	account_info = info
+	account_logged_in.emit(info)
 
 func _notification(what):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		# 关闭游戏时不自动保存
-		pass
+		# 关闭游戏时自动保存
+		save_game()
 
 func save_game():
-	if save_manager:
-		save_manager.save_game()
+	if cloud_save_manager:
+		cloud_save_manager.save_game()
 		print("游戏已保存")
 	else:
-		push_error("save_game: save_manager 为 null!")
+		push_error("save_game: cloud_save_manager 为 null!")
 
 func load_game():
-	if save_manager:
-		var success = save_manager.load_game()
+	if cloud_save_manager:
+		var success = cloud_save_manager.load_game()
 		if success:
-			apply_loaded_data()
 			print("游戏已加载")
 		return success
 	return false
-
-func apply_loaded_data():
-	if player and save_manager.current_save_data.has("player"):
-		var player_data = save_manager.current_save_data["player"]
-		player.apply_save_data(player_data)
-	
-	# 计算并显示离线奖励
-	if player and offline_reward:
-		# 从存档的 timestamp 获取上次保存时间
-		var last_save_time = save_manager.current_save_data.get("timestamp", 0)
-		var rewards = offline_reward.calculate_offline_reward(player, last_save_time)
-		
-		if rewards:
-			var offline_hours = rewards.get("offline_hours", 0)
-			
-			if offline_hours > 0:
-				# 发送信号通知UI
-				offline_reward_received.emit(rewards)
-				
-				# 应用奖励
-				offline_reward.apply_offline_reward(player, rewards)

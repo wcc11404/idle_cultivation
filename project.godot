@@ -17,7 +17,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="idle_cultivation_client"
 config/description="2D修仙题材自动挂机游戏"
 config/version="0.1"
-run/main_scene="res://scenes/main/Main.tscn"
+run/main_scene="res://scenes/login/Login.tscn"
 config/features=PackedStringArray("4.6")
 config/icon="res://assets/icon.png"
 
