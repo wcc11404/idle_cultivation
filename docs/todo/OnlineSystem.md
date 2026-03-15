@@ -191,8 +191,8 @@ CREATE TABLE accounts (
     server_id VARCHAR(20) DEFAULT 'default',  -- 区服ID
     token_version INT DEFAULT 0,              -- 单设备登录控制，每次登录+1
     is_banned BOOLEAN DEFAULT FALSE,          -- 封号标记
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),     -- 带时区的时间戳
+    updated_at TIMESTAMPTZ DEFAULT NOW()      -- 带时区的时间戳
 );
 
 -- 玩家数据表
@@ -201,8 +201,7 @@ CREATE TABLE player_data (
     server_id VARCHAR(20) DEFAULT 'default',  -- 冗余存储，便于分区查询
     game_version VARCHAR(20) DEFAULT 'v1.0.0', -- 游戏版本号，记录玩家上次保存的版本
     data JSONB NOT NULL,                      -- 所有游戏数据（详见下文结构）
-    last_online_at TIMESTAMP DEFAULT NOW(),   -- 用于离线收益计算
-    updated_at TIMESTAMP DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW()      -- 带时区的时间戳，用于离线收益计算
 );
 
 -- 索引
@@ -503,8 +502,7 @@ Response:
 ```sql
 UPDATE player_data 
 SET data = $1, 
-    updated_at = NOW(),
-    last_online_at = NOW()
+    updated_at = NOW()
 WHERE account_id = $2
 ```
 
@@ -532,7 +530,7 @@ WHERE account_id = $2
 
 #### 计算公式
 ```javascript
-离线时长 = min(当前时间 - last_online_at, 4小时)
+离线时长 = min(当前时间 - updated_at, 4小时)
 
 离线收益 = {
     spirit_energy: 离线时长 * 每秒灵气获取速度,
@@ -544,12 +542,12 @@ WHERE account_id = $2
 ```javascript
 async function calculateOfflineReward(account_id) {
     const player = await db.query(
-        'SELECT data, last_online_at FROM player_data WHERE account_id = $1',
+        'SELECT data, updated_at FROM player_data WHERE account_id = $1',
         [account_id]
     );
     
     const offlineSeconds = Math.min(
-        (Date.now() - player.last_online_at) / 1000,
+        (Date.now() - player.updated_at) / 1000,
         4 * 3600  // 最大4小时
     );
     
