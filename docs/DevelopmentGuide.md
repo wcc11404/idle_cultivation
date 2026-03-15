@@ -305,7 +305,7 @@ bash run_test.sh
 open -a Godot
 
 # 打开指定项目
-open -a Godot --args --path "/Users/hsams/Documents/trae_projects/idle_cultivation"
+open -a Godot --args --path "/Users/hsams/Documents/trae_projects/idle_cultivation_client"
 ```
 
 **查看Godot版本**：
