@@ -15,7 +15,7 @@
 ## 1. 项目结构设计
 
 ```
-idle_cultivation/
+idle_cultivation_client/
 ├── project.godot                    # Godot项目配置
 ├── scenes/                         # 场景文件
 │   └── tests/                      # 测试场景
@@ -53,9 +53,9 @@ idle_cultivation/
 │   └── integration/               # 集成测试目录
 │       └── test_all_systems.gd
 └── docs/                         # 文档
-    ├── ARCHITECTURE.md           # 架构设计（本文件）
+    ├── Architecture.md           # 架构设计（本文件）
     ├── NUMERIC_DESIGN.md         # 数值设计
-    ├── DEVELOPMENT_GUIDE.md      # 开发指南
+    ├── DevelopmentGuide.md      # 开发指南
     └── DEVELOPMENT_WORKFLOW.md   # 开发工作流程
 ```
 

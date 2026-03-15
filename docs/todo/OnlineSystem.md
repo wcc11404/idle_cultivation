@@ -15,7 +15,7 @@
 采用**前后端分离**的架构，客户端和服务端分为两个独立项目：
 
 ```
-idle_cultivation/                    # 客户端（Godot）
+idle_cultivation_client/                    # 客户端（Godot）
 ├── project.godot
 ├── scripts/
 │   ├── network/               # 网络相关（新增）
