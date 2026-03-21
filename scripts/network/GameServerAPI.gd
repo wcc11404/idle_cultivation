@@ -95,3 +95,10 @@ func alchemy_start_craft(recipe_id: String, count: int, materials: Dictionary, s
 		"spirit_energy": spirit_energy
 	}
 	return await network_manager.request("POST", "/game/alchemy/start_craft", body)
+
+func claim_offline_reward(offline_seconds: float) -> Dictionary:
+	# 获取离线奖励
+	var body = {
+		"offline_seconds": offline_seconds
+	}
+	return await network_manager.request("POST", "/game/claim_offline_reward", body)

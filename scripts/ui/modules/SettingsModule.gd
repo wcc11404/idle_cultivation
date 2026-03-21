@@ -16,6 +16,7 @@ var save_manager: Node = null
 var settings_panel: Control = null
 var save_button: Button = null
 var load_button: Button = null
+var logout_button: Button = null
 
 func initialize(ui: Node, player_node: Node, save_mgr: Node):
 	game_ui = ui
@@ -29,6 +30,8 @@ func _setup_signals():
 		save_button.pressed.connect(_on_save_pressed)
 	if load_button:
 		load_button.pressed.connect(_on_load_pressed)
+	if logout_button:
+		logout_button.pressed.connect(_on_logout_pressed)
 
 # 显示设置Tab
 func show_tab():
@@ -41,7 +44,7 @@ func hide_tab():
 		settings_panel.visible = false
 
 # 保存按钮按下
-func _on_save_pressed():
+func _on_save_pressed() -> bool:
 	save_requested.emit()
 	
 	# 从GameManager获取save_manager
@@ -51,7 +54,7 @@ func _on_save_pressed():
 			save_manager = game_manager.get_save_manager()
 	
 	if save_manager:
-		var result = save_manager.save_game()
+		var result = await save_manager.save_game()
 		if result:
 			log_message.emit("存档成功！")
 		else:
@@ -89,7 +92,7 @@ func _on_load_pressed():
 func save_game() -> bool:
 	save_requested.emit()
 	if save_manager:
-		return save_manager.save_game()
+		return await save_manager.save_game()
 	return false
 
 # 加载游戏
@@ -98,3 +101,28 @@ func load_game() -> bool:
 	if save_manager:
 		return save_manager.load_game()
 	return false
+
+# 登出按钮按下
+func _on_logout_pressed():
+	# 保存游戏数据
+	log_message.emit("正在保存游戏数据...")
+	var save_result = await _on_save_pressed()
+	
+	if save_result:
+		log_message.emit("保存成功，正在登出...")
+		# 清除Token
+		var game_manager = get_node_or_null("/root/GameManager")
+		if game_manager:
+			var cloud_save_manager = game_manager.get_save_manager()
+			if cloud_save_manager and cloud_save_manager.has_method("api"):
+				var api = cloud_save_manager.api
+				if api and api.has_method("network_manager"):
+					var network_manager = api.network_manager
+					if network_manager and network_manager.has_method("clear_token"):
+						network_manager.clear_token()
+						log_message.emit("Token已清除")
+		# 退出游戏
+		log_message.emit("退出游戏")
+		get_tree().quit()
+	else:
+		log_message.emit("保存失败，无法登出")

@@ -79,6 +79,14 @@ func parse_response(response: Array) -> Dictionary:
 			# 直接合并 JSON 对象到 result 中，而不是嵌套在 data 字段
 			for key in json.keys():
 				result[key] = json[key]
+			
+			# 处理服务端错误响应格式 {"detail": "错误信息"}
+			if json.has("detail") and not success:
+				result["message"] = json["detail"]
+				result["error"] = json["detail"]
+				# 检查是否是被踢出的错误
+				if json["detail"] == "KICKED_OUT":
+					result["error_code"] = "KICKED_OUT"
 		else:
 			# 如果 JSON 解析失败，检查状态码
 			if not http_success:
@@ -124,24 +132,39 @@ func execute_critical_operation(api_path: String, body: Dictionary, on_success: 
 	if result.success:
 		on_success.call(result)
 	else:
-		show_error(result.message)
+		# 检查是否是被踢出的错误
+		if result.has("error_code") and result.error_code == "KICKED_OUT":
+			_handle_kicked_out()
+		else:
+			show_error(result.message)
+
+func _handle_kicked_out():
+	# 处理被踢出的情况
+	clear_token()
+	show_error("账号在其他设备登录，请重新登录")
+	# 跳转到登录界面
+	get_tree().change_scene_to_file("res://scenes/login/Login.tscn")
 
 func _show_loading_popup():
 	if not loading_popup:
 		loading_popup = AcceptDialog.new()
+		loading_popup.title = "请稍候"
 		loading_popup.dialog_text = "网络环境不佳，正在等待..."
 		loading_popup.get_ok_button().disabled = true
+		loading_popup.set_size(Vector2(300, 150))
 		add_child(loading_popup)
-	loading_popup.popup_centered()
+	loading_popup.popup_centered(Vector2(300, 150))
 
 func _hide_loading_popup():
 	if loading_popup and loading_popup.visible:
 		loading_popup.hide()
 
 func show_toast(message: String):
-	# 简单的提示实现
+	# 显示临时提示
 	print("Toast: " + message)
+	# 这里可以添加更美观的Toast实现
 
 func show_error(message: String):
-	# 简单的错误提示实现
+	# 显示错误提示
 	print("Error: " + message)
+	# 这里可以添加更美观的错误提示实现

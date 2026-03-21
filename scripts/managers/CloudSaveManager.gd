@@ -31,6 +31,7 @@ func _auto_save_loop():
 
 func save_game() -> bool:
 	var data = collect_game_data()
+	print("CloudSaveManager.save_game() - 当前Token: " + api.network_manager.current_token)
 	var result = await api.save_game(data)
 	
 	if result.success:
@@ -39,12 +40,28 @@ func save_game() -> bool:
 		print("自动保存成功")
 		return true
 	else:
-		save_failure_count += 1
-		print("自动保存失败 (" + str(save_failure_count) + "/" + str(MAX_SAVE_FAILURES) + ")")
+		# 检查是否是401错误（Token过期）
+		var is_401 = false
+		if result.has("response_code"):
+			var response_code = result.response_code
+			if response_code is String:
+				is_401 = response_code == "401"
+			elif response_code is int:
+				is_401 = response_code == 401
 		
-		if save_failure_count >= MAX_SAVE_FAILURES:
+		if is_401:
+			print("保存失败: Token已过期")
+			# Token过期，直接强制登出
 			_force_logout()
-		return false
+			return false
+		else:
+			# 其他错误，增加失败计数
+			save_failure_count += 1
+			print("自动保存失败 (" + str(save_failure_count) + "/" + str(MAX_SAVE_FAILURES) + ")")
+			
+			if save_failure_count >= MAX_SAVE_FAILURES:
+				_force_logout()
+			return false
 
 func load_game() -> bool:
 	var result = await api.load_game()
@@ -113,5 +130,10 @@ func stop_auto_save():
 
 func on_game_exit():
 	# 游戏退出前保存
-	save_game()
+	# 由于是协程，这里使用await等待保存完成
+	# 保存时不进行强制登出，因为游戏正在退出
+	var data = collect_game_data()
+	var result = await api.save_game(data)
+	print("游戏退出时保存结果: " + str(result.success))
+	print("游戏退出时触发保存")
 	stop_auto_save()

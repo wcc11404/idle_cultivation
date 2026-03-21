@@ -9,10 +9,12 @@ const SpellModule = preload("res://scripts/ui/modules/SpellModule.gd")
 const NeishiModule = preload("res://scripts/ui/modules/NeishiModule.gd")
 const CultivationModule = preload("res://scripts/ui/modules/CultivationModule.gd")
 const LianliModule = preload("res://scripts/ui/modules/LianliModule.gd")
+const GameServerAPI = preload("res://scripts/network/GameServerAPI.gd")
 
 var player: Node = null
 var inventory: Node = null
 var spell_system: Node = null
+var api: GameServerAPI = null
 
 # 炼丹系统引用
 var alchemy_system: Node = null
@@ -109,6 +111,7 @@ const REALM_FRAME_TEXTURES = {
 
 @onready var save_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SaveButton
 @onready var load_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/LoadButton
+@onready var logout_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/LogoutButton
 
 @onready var lianli_select_panel: Control = $VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel
 @onready var lianli_scene_panel: Control = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel
@@ -193,6 +196,10 @@ func _ready():
 	# 安全获取可选节点
 	_setup_optional_nodes()
 	
+	# 初始化GameServerAPI
+	api = GameServerAPI.new()
+	add_child(api)
+	
 	await get_tree().process_frame
 	
 	# 先初始化所有模块
@@ -218,6 +225,9 @@ func _ready():
 	
 	# 加载游戏数据（模块初始化完成后）
 	load_game_data()
+	
+	# 游戏加载完成后获取离线奖励
+	await claim_offline_reward()
 
 func _setup_optional_nodes():
 	view_button = get_node_or_null("VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/ButtonContainer/ViewButton")
@@ -375,6 +385,7 @@ func setup_settings_module():
 	settings_module.settings_panel = settings_panel
 	settings_module.save_button = save_button
 	settings_module.load_button = load_button
+	settings_module.logout_button = logout_button
 	
 	# 初始化模块
 	settings_module.initialize(self, player, null)
@@ -1047,5 +1058,69 @@ func update_account_ui():
 		if texture:
 			avatar_texture.texture = texture
 		# 头像加载失败不提示
+
+func claim_offline_reward():
+	# 计算离线时间
+	var game_manager = get_node("/root/GameManager")
+	if not game_manager:
+		return
+	
+	var last_online = game_manager.get_last_online_time()
+	var current_time = Time.get_unix_time_from_system()
+	var offline_seconds = current_time - last_online
+	
+	# 限制最大离线时间为4小时（14400秒）
+	offline_seconds = min(offline_seconds, 14400)
+	
+	# 主动获取离线奖励
+	if api:
+		var result = await api.claim_offline_reward(offline_seconds)
+		if result.success:
+			if result.has("offline_reward") and result.offline_reward != null:
+				# 成功且有奖励
+				var reward = result.offline_reward
+				var rewarded_offline_seconds = result.offline_seconds
+				
+				# 计算小时和分钟
+				var total_minutes = int(rewarded_offline_seconds / 60)
+				var hours = int(total_minutes / 60)
+				var minutes = total_minutes % 60
+				
+				# 应用奖励
+				if player:
+					# 应用灵气奖励（不超过上限）
+					if reward.has("spirit_energy"):
+						# 使用add_spirit方法，它会自动处理上限
+						player.add_spirit(reward.spirit_energy)
+					
+					# 应用灵石奖励
+					if reward.has("spirit_stones") and inventory:
+						inventory.add_item("spirit_stone", reward.spirit_stones)
+				
+				# 显示离线奖励信息
+				if log_manager:
+					log_manager.add_system_log("===================================")
+					log_manager.add_system_log("离线时长: " + str(hours) + "小时" + str(minutes) + "分钟")
+					log_manager.add_system_log("获得离线奖励：")
+					if reward.has("spirit_energy"):
+						log_manager.add_system_log("  - 灵气: +" + str(int(reward.spirit_energy)))
+					if reward.has("spirit_stones"):
+						log_manager.add_system_log("  - 灵石: +" + str(reward.spirit_stones))
+					log_manager.add_system_log("===================================")
+				# 刷新UI
+				update_ui()
+				refresh_inventory_ui()
+				# 更新最后在线时间
+				game_manager.set_last_online_time(current_time)
+				# 领取离线奖励成功后触发自动保存
+				await game_manager.save_game()
+				print("领取离线奖励后自动保存成功")
+			else:
+				# 成功但无奖励，不提示
+				pass
+		else:
+			# 获取离线奖励失败
+			if log_manager:
+				log_manager.add_system_log("获取离线奖励失败")
 
 # 内视子Tab处理已迁移到 NeishiModule

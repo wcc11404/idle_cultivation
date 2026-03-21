@@ -201,8 +201,12 @@ func apply_save_data(data: Dictionary):
 				var index = int(key)
 				if index >= 0 and index < MAX_SIZE:
 					var slot = slots_data[key]
-					slots[index] = {
-						"empty": false,
-						"id": slot.get("id", ""),
-						"count": slot.get("count", 0)
-					}
+					if typeof(slot) == TYPE_DICTIONARY:
+						slots[index] = {
+							"empty": false,
+							"id": slot.get("id", ""),
+							"count": slot.get("count", 0)
+						}
+					else:
+						# 如果slot不是字典类型，跳过
+						print("Inventory.apply_save_data: Skipping invalid slot data at index " + str(index))

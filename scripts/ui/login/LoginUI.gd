@@ -86,7 +86,9 @@ func _on_login_pressed():
 	var login_result = await api.login(username, password)
 	if login_result.success:
 		# 登录成功，保存Token
+		print("LoginUI._on_login_pressed() - 登录成功，新Token: " + login_result.token)
 		api.network_manager.save_token(login_result.token)
+		print("LoginUI._on_login_pressed() - Token保存成功")
 		
 		# 保存账号和密码到本地，以便下次自动填充
 		save_account_info(username, password)
@@ -99,17 +101,15 @@ func _on_login_pressed():
 		# 应用游戏数据
 		cloud_save.apply_game_data(login_result.data)
 		
-		# 显示离线收益
-		if login_result.offline_seconds and login_result.offline_seconds > 60:
-			show_offline_reward(login_result.offline_reward, login_result.offline_seconds)
-		else:
-			# 进入游戏
-			enter_game()
+		# 直接进入游戏界面
+		enter_game()
 	else:
 		# 登录失败
 		var error_message = "登录失败"
 		if login_result.has("message") and typeof(login_result.message) == TYPE_STRING:
 			error_message = login_result.message
+		elif login_result.has("detail") and typeof(login_result.detail) == TYPE_STRING:
+			error_message = login_result.detail
 		show_message(error_message)
 
 func _on_register_pressed():
@@ -137,6 +137,8 @@ func _on_register_pressed():
 		var error_message = "注册失败"
 		if register_result.has("message") and typeof(register_result.message) == TYPE_STRING:
 			error_message = register_result.message
+		elif register_result.has("detail") and typeof(register_result.detail) == TYPE_STRING:
+			error_message = register_result.detail
 		show_message(error_message)
 
 func load_game_data():
@@ -157,6 +159,37 @@ func enter_game():
 	# 进入游戏主场景
 	get_tree().change_scene_to_file("res://scenes/main/Main.tscn")
 
+func claim_offline_reward():
+	# 计算离线时间
+	var game_manager = get_node("/root/GameManager")
+	var last_online = 0
+	var current_time = Time.get_unix_time_from_system()
+	
+	if game_manager:
+		last_online = game_manager.get_last_online_time()
+	else:
+		last_online = current_time
+	
+	var offline_seconds = current_time - last_online
+	# 限制最大离线时间为4小时（14400秒）
+	offline_seconds = min(offline_seconds, 14400)
+	
+	# 主动获取离线奖励
+	show_message("获取离线奖励中...")
+	
+	var result = await api.claim_offline_reward(offline_seconds)
+	if result.success:
+		if result.has("offline_reward") and result.offline_reward != null:
+			# 成功且有奖励
+			show_offline_reward(result.offline_reward, result.offline_seconds)
+		else:
+			# 成功但无奖励，直接进入游戏
+			enter_game()
+	else:
+		# 获取离线奖励失败，直接进入游戏
+		print("获取离线奖励失败: " + str(result.message))
+		enter_game()
+
 func show_message(message: String):
 	message_label.text = message
 
@@ -172,9 +205,9 @@ func show_offline_reward(reward: Dictionary, seconds: int):
 	var reward_str = "欢迎回来！\n"
 	reward_str += "离线时长：" + time_str + "\n"
 	if reward:
-		if reward.spirit_energy:
+		if reward.has("spirit_energy"):
 			reward_str += "获得灵气：+" + str(reward.spirit_energy) + "\n"
-		if reward.spirit_stones:
+		if reward.has("spirit_stones"):
 			reward_str += "获得灵石：+" + str(reward.spirit_stones) + "\n"
 	
 	show_message(reward_str)
@@ -183,12 +216,15 @@ func show_offline_reward(reward: Dictionary, seconds: int):
 	get_tree().create_timer(2.0).timeout.connect(enter_game)
 
 func save_account_info(username: String, password: String):
-	# 保存账号和密码到本地文件
+	# 保存账号和密码到本地文件（密码使用简单加密）
 	var file = FileAccess.open("user://account_info.dat", FileAccess.WRITE)
 	if file:
+		# 简单的密码加密（实际项目中应使用更安全的加密方式）
+		var encrypted_password = _encrypt_password(password)
 		var account_data = {
 			"username": username,
-			"password": password
+			"password": encrypted_password,
+			"encrypted": true
 		}
 		file.store_string(JSON.stringify(account_data))
 		file.close()
@@ -206,6 +242,10 @@ func load_account_info() -> Dictionary:
 			if content:
 				var account_data = JSON.parse_string(content)
 				if account_data:
+					# 如果密码是加密的，进行解密
+					if account_data.has("encrypted") and account_data.encrypted:
+						if account_data.has("password"):
+							account_data.password = _decrypt_password(account_data.password)
 					print("LoginUI.load_account_info() - 账号信息加载成功: " + str(account_data))
 					return account_data
 				else:
@@ -215,3 +255,23 @@ func load_account_info() -> Dictionary:
 	else:
 		print("LoginUI.load_account_info() - 文件不存在")
 	return {}
+
+func _encrypt_password(password: String) -> String:
+	# 简单的密码加密（实际项目中应使用更安全的加密方式）
+	var encrypted = ""
+	for i in range(password.length()):
+		var char = password[i]
+		var code = char.unicode_at(0)
+		encrypted += str(code + 10)
+		encrypted += "-"
+	return encrypted.rstrip("-")
+
+func _decrypt_password(encrypted: String) -> String:
+	# 简单的密码解密
+	var decrypted = ""
+	var parts = encrypted.split("-")
+	for part in parts:
+		if part.is_valid_int():
+			var code = int(part) - 10
+			decrypted += String.chr(code)
+	return decrypted

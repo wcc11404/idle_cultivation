@@ -21,6 +21,7 @@ var endless_tower_data: Node = null
 var alchemy_system: Node = null
 var recipe_data: Node = null
 var account_info: Dictionary = {}
+var last_online_time: int = 0
 
 func _ready():
 	# 防止重复初始化（在编辑器中脚本重新加载时）
@@ -173,19 +174,44 @@ func set_account_info(info: Dictionary):
 func _notification(what):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		# 关闭游戏时自动保存
-		save_game()
+		# 使用call_deferred来处理协程操作
+		call_deferred("_handle_game_exit")
 
-func save_game():
+func _handle_game_exit():
+	# 处理游戏退出逻辑
+	print("开始处理游戏退出")
+	# 直接调用CloudSaveManager的on_game_exit方法，并等待它完成
 	if cloud_save_manager:
-		cloud_save_manager.save_game()
-		print("游戏已保存")
+		await cloud_save_manager.on_game_exit()
+		print("调用CloudSaveManager.on_game_exit()完成")
+	# 等待一小段时间，确保保存操作完成
+	await get_tree().create_timer(1.0).timeout
+	# 退出游戏
+	print("退出游戏")
+	get_tree().quit()
+
+func save_game() -> bool:
+	if cloud_save_manager:
+		var result = await cloud_save_manager.save_game()
+		print("游戏已保存，结果: " + str(result))
+		return result
 	else:
 		push_error("save_game: cloud_save_manager 为 null!")
+		return false
 
-func load_game():
+func load_game() -> bool:
 	if cloud_save_manager:
-		var success = cloud_save_manager.load_game()
+		var success = await cloud_save_manager.load_game()
 		if success:
 			print("游戏已加载")
 		return success
 	return false
+
+func get_last_online_time() -> int:
+	if last_online_time == 0:
+		# 首次运行，设置为当前时间
+		last_online_time = Time.get_unix_time_from_system()
+	return last_online_time
+
+func set_last_online_time(time: int):
+	last_online_time = time
