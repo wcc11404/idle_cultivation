@@ -31,13 +31,13 @@ func _auto_save_loop():
 
 func save_game() -> bool:
 	var data = collect_game_data()
-	print("CloudSaveManager.save_game() - 当前Token: " + api.network_manager.current_token)
+	# 重新加载 token，确保使用最新的
+	api.network_manager.load_token()
 	var result = await api.save_game(data)
 	
 	if result.success:
 		last_save_time = Time.get_unix_time_from_system()
 		save_failure_count = 0
-		print("自动保存成功")
 		return true
 	else:
 		# 检查是否是401错误（Token过期）
@@ -50,14 +50,12 @@ func save_game() -> bool:
 				is_401 = response_code == 401
 		
 		if is_401:
-			print("保存失败: Token已过期")
 			# Token过期，直接强制登出
 			_force_logout()
 			return false
 		else:
 			# 其他错误，增加失败计数
 			save_failure_count += 1
-			print("自动保存失败 (" + str(save_failure_count) + "/" + str(MAX_SAVE_FAILURES) + ")")
 			
 			if save_failure_count >= MAX_SAVE_FAILURES:
 				_force_logout()
@@ -88,7 +86,7 @@ func collect_game_data() -> Dictionary:
 		"spell_system": spell_system.get_save_data() if spell_system else {},
 		"lianli_system": lianli_system.get_save_data() if lianli_system else {},
 		"alchemy_system": alchemy_system.get_save_data() if alchemy_system else {},
-		"timestamp": Time.get_unix_time_from_system()
+		"timestamp": Time.get_unix_time_from_system()  # 记录保存时间，目前无实际作用，为未来功能预留
 	}
 
 func apply_game_data(data: Dictionary):
@@ -119,11 +117,14 @@ func apply_game_data(data: Dictionary):
 		alchemy_system.apply_save_data(data.alchemy_system)
 
 func _force_logout():
-	print("网络连接异常，强制登出")
 	# 清除本地Token
 	api.network_manager.clear_token()
 	# 返回登录界面
-	get_tree().change_scene_to_file("res://scenes/login/Login.tscn")
+	var tree = get_tree()
+	if tree:
+		tree.change_scene_to_file("res://scenes/login/Login.tscn")
+	else:
+		print("无法获取场景树，无法切换场景")
 
 func stop_auto_save():
 	is_autosave_running = false
@@ -133,7 +134,7 @@ func on_game_exit():
 	# 由于是协程，这里使用await等待保存完成
 	# 保存时不进行强制登出，因为游戏正在退出
 	var data = collect_game_data()
-	var result = await api.save_game(data)
-	print("游戏退出时保存结果: " + str(result.success))
-	print("游戏退出时触发保存")
+	# 重新加载 token，确保使用最新的
+	api.network_manager.load_token()
+	await api.save_game(data)
 	stop_auto_save()

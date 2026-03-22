@@ -2,13 +2,16 @@ extends Node
 
 class_name GameServerAPI
 
-const NetworkManager = preload("res://scripts/network/NetworkManager.gd")
-
-var network_manager: NetworkManager = null
+var network_manager = null
 
 func _ready():
-	network_manager = NetworkManager.new()
-	add_child(network_manager)
+	# 使用全局的 NetworkManager 单例
+	network_manager = get_node_or_null("/root/GlobalNetworkManager")
+	if not network_manager:
+		print("GlobalNetworkManager 单例未找到，创建本地实例")
+		const NetworkManager = preload("res://scripts/network/NetworkManager.gd")
+		network_manager = NetworkManager.new()
+		add_child(network_manager)
 
 func register(username: String, password: String) -> Dictionary:
 	var body = {
@@ -96,9 +99,37 @@ func alchemy_start_craft(recipe_id: String, count: int, materials: Dictionary, s
 	}
 	return await network_manager.request("POST", "/game/alchemy/start_craft", body)
 
-func claim_offline_reward(offline_seconds: float) -> Dictionary:
+func claim_offline_reward() -> Dictionary:
 	# 获取离线奖励
-	var body = {
-		"offline_seconds": offline_seconds
-	}
+	# 服务端自动计算离线时间，不需要客户端提供
+	var body = {}
 	return await network_manager.request("POST", "/game/claim_offline_reward", body)
+
+func get_dungeon_info() -> Dictionary:
+	# 获取副本信息
+	return await network_manager.request("GET", "/game/dungeon/info")
+
+func enter_dungeon(dungeon_id: String) -> Dictionary:
+	# 进入副本
+	var body = {
+		"dungeon_id": dungeon_id
+	}
+	return await network_manager.request("POST", "/game/dungeon/enter", body)
+
+func finish_dungeon(dungeon_id: String) -> Dictionary:
+	# 完成副本并扣减次数
+	var body = {
+		"dungeon_id": dungeon_id
+	}
+	return await network_manager.request("POST", "/game/dungeon/finish", body)
+
+func get_rank(server_id: String = "default") -> Dictionary:
+	# 获取排行榜
+	return await network_manager.request("GET", "/game/rank?server_id=" + server_id)
+
+func change_nickname(new_nickname: String) -> Dictionary:
+	# 修改昵称
+	var body = {
+		"nickname": new_nickname
+	}
+	return await network_manager.request("POST", "/game/player/nickname", body)

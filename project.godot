@@ -24,6 +24,7 @@ config/icon="res://assets/icon.png"
 [autoload]
 
 GameManager="*res://scripts/autoload/GameManager.gd"
+GlobalNetworkManager="*res://scripts/network/NetworkManager.gd"
 
 [display]
 

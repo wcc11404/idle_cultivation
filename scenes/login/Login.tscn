@@ -64,6 +64,22 @@ layout_mode = 2
 placeholder_text = "请输入密码"
 secret = true
 
+[node name="ServerIPLabel" type="Label" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "服务器IP"
+
+[node name="ServerIPInput" type="LineEdit" parent="Panel/VBoxContainer"]
+layout_mode = 2
+placeholder_text = "请输入服务器IP，例如：http://127.0.0.1:8444/api"
+
+[node name="ServerIPHBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="ServerIPConfirmButton" type="Button" parent="Panel/VBoxContainer/ServerIPHBoxContainer"]
+layout_mode = 2
+text = "确认服务器IP"
+
 [node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2
 alignment = 1

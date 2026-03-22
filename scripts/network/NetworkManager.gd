@@ -36,7 +36,7 @@ func request(method: String, endpoint: String, body: Dictionary = {}) -> Diction
 	var http = HTTPRequest.new()
 	add_child(http)
 	
-	var url = ServerConfig.API_BASE + endpoint
+	var url = ServerConfig.get_api_base() + endpoint
 	var headers = ["Content-Type: application/json"]
 	
 	if current_token:
@@ -74,7 +74,8 @@ func parse_response(response: Array) -> Dictionary:
 	}
 	
 	if request_success and body.size() > 0:
-		var json = JSON.parse_string(body.get_string_from_utf8())
+		var body_str = body.get_string_from_utf8()
+		var json = JSON.parse_string(body_str)
 		if json:
 			# 直接合并 JSON 对象到 result 中，而不是嵌套在 data 字段
 			for key in json.keys():
@@ -89,9 +90,13 @@ func parse_response(response: Array) -> Dictionary:
 					result["error_code"] = "KICKED_OUT"
 		else:
 			# 如果 JSON 解析失败，检查状态码
+			print("JSON 解析失败，响应体: " + body_str)
 			if not http_success:
 				result["error"] = "请求失败"
-				result["message"] = "服务器返回错误状态码: " + str(status_code)
+				result["message"] = "服务器返回错误状态码: " + str(status_code) + "，响应: " + body_str
+			else:
+				result["error"] = "JSON 解析失败"
+				result["message"] = "服务器返回的响应格式错误: " + body_str
 	else:
 		result["error"] = "网络请求失败"
 		result["message"] = "请检查网络连接"
@@ -113,7 +118,7 @@ func execute_critical_operation(api_path: String, body: Dictionary, on_success: 
 	if current_token:
 		headers.append("Authorization: Bearer " + current_token)
 	
-	http.request(ServerConfig.API_BASE + api_path, headers, HTTPClient.METHOD_POST, JSON.stringify(body))
+	http.request(ServerConfig.get_api_base() + api_path, headers, HTTPClient.METHOD_POST, JSON.stringify(body))
 	
 	await get_tree().create_timer(ServerConfig.QUICK_THRESHOLD).timeout
 	var still_waiting = is_requesting
@@ -161,10 +166,10 @@ func _hide_loading_popup():
 
 func show_toast(message: String):
 	# 显示临时提示
-	print("Toast: " + message)
 	# 这里可以添加更美观的Toast实现
+	pass
 
 func show_error(message: String):
 	# 显示错误提示
-	print("Error: " + message)
 	# 这里可以添加更美观的错误提示实现
+	pass

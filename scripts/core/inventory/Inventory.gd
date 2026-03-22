@@ -194,7 +194,7 @@ func apply_save_data(data: Dictionary):
 					slots[i] = {
 						"empty": false,
 						"id": slot.get("id", ""),
-						"count": slot.get("count", 0)
+						"count": int(slot.get("count", 0))
 					}
 		elif typeof(slots_data) == TYPE_DICTIONARY:
 			for key in slots_data.keys():
@@ -205,7 +205,7 @@ func apply_save_data(data: Dictionary):
 						slots[index] = {
 							"empty": false,
 							"id": slot.get("id", ""),
-							"count": slot.get("count", 0)
+							"count": int(slot.get("count", 0))
 						}
 					else:
 						# 如果slot不是字典类型，跳过

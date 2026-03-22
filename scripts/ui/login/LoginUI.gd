@@ -2,12 +2,15 @@ extends Control
 
 const GameServerAPI = preload("res://scripts/network/GameServerAPI.gd")
 const CloudSaveManager = preload("res://scripts/managers/CloudSaveManager.gd")
+const ServerConfig = preload("res://scripts/network/ServerConfig.gd")
 
 var api: GameServerAPI = null
 var cloud_save: CloudSaveManager = null
 
 @onready var username_input = $Panel/VBoxContainer/UsernameInput
 @onready var password_input = $Panel/VBoxContainer/PasswordInput
+@onready var server_ip_input = $Panel/VBoxContainer/ServerIPInput
+@onready var server_ip_confirm_button = $Panel/VBoxContainer/ServerIPHBoxContainer/ServerIPConfirmButton
 @onready var login_button = $Panel/VBoxContainer/HBoxContainer/LoginButton
 @onready var register_button = $Panel/VBoxContainer/HBoxContainer/RegisterButton
 @onready var message_label = $Panel/MessageLabel
@@ -22,6 +25,10 @@ func _ready():
 	# 连接信号
 	login_button.pressed.connect(_on_login_pressed)
 	register_button.pressed.connect(_on_register_pressed)
+	server_ip_confirm_button.pressed.connect(_on_server_ip_confirm_pressed)
+	
+	# 设置默认服务器IP
+	server_ip_input.text = ServerConfig.get_api_base()
 	
 	# 检查自动登录
 	check_auto_login()
@@ -29,29 +36,18 @@ func _ready():
 func check_auto_login():
 	# 尝试加载本地Token
 	var has_token = api.network_manager.load_token()
-	print("LoginUI.check_auto_login() - has_token: " + str(has_token))
-	print("LoginUI.check_auto_login() - current_token: " + api.network_manager.current_token)
 	
 	# 加载本地保存的账号信息
 	var saved_account = load_account_info()
-	print("LoginUI.check_auto_login() - saved_account: " + str(saved_account))
-	if saved_account:
-		print("LoginUI.check_auto_login() - saved_account has username: " + str(saved_account.has("username")))
-		print("LoginUI.check_auto_login() - saved_account has password: " + str(saved_account.has("password")))
 	if saved_account and saved_account.has("username"):
 		username_input.text = saved_account.username
-		print("LoginUI.check_auto_login() - filled username: " + saved_account.username)
 	if saved_account and saved_account.has("password"):
 		password_input.text = saved_account.password
-		print("LoginUI.check_auto_login() - filled password: " + saved_account.password)
 	
 	if has_token:
 		# 验证Token是否有效
-		print("LoginUI.check_auto_login() - 有Token，验证Token有效性")
 		var refresh_result = await api.refresh_token()
-		print("LoginUI.check_auto_login() - Token验证结果: " + str(refresh_result.success))
 		if refresh_result.success:
-			print("LoginUI.check_auto_login() - Token有效，自动填充账号信息")
 			# Token有效，自动填充账号信息
 			api.network_manager.save_token(refresh_result.token)
 			# 从 account_info 中获取用户名并填充
@@ -62,12 +58,10 @@ func check_auto_login():
 			# 显示提示信息
 			show_message("请点击登录按钮继续")
 		else:
-			print("LoginUI.check_auto_login() - Token无效，清除Token")
 			# Token无效，显示登录界面
 			api.network_manager.clear_token()
 			show_message("请重新登录")
 	else:
-		print("LoginUI.check_auto_login() - 无Token，显示登录界面")
 		# 无Token，显示登录界面
 		show_message("请登录账号")
 
@@ -86,9 +80,7 @@ func _on_login_pressed():
 	var login_result = await api.login(username, password)
 	if login_result.success:
 		# 登录成功，保存Token
-		print("LoginUI._on_login_pressed() - 登录成功，新Token: " + login_result.token)
 		api.network_manager.save_token(login_result.token)
-		print("LoginUI._on_login_pressed() - Token保存成功")
 		
 		# 保存账号和密码到本地，以便下次自动填充
 		save_account_info(username, password)
@@ -160,24 +152,11 @@ func enter_game():
 	get_tree().change_scene_to_file("res://scenes/main/Main.tscn")
 
 func claim_offline_reward():
-	# 计算离线时间
-	var game_manager = get_node("/root/GameManager")
-	var last_online = 0
-	var current_time = Time.get_unix_time_from_system()
-	
-	if game_manager:
-		last_online = game_manager.get_last_online_time()
-	else:
-		last_online = current_time
-	
-	var offline_seconds = current_time - last_online
-	# 限制最大离线时间为4小时（14400秒）
-	offline_seconds = min(offline_seconds, 14400)
-	
 	# 主动获取离线奖励
+	# 服务端自动计算离线时间
 	show_message("获取离线奖励中...")
 	
-	var result = await api.claim_offline_reward(offline_seconds)
+	var result = await api.claim_offline_reward()
 	if result.success:
 		if result.has("offline_reward") and result.offline_reward != null:
 			# 成功且有奖励
@@ -187,7 +166,6 @@ func claim_offline_reward():
 			enter_game()
 	else:
 		# 获取离线奖励失败，直接进入游戏
-		print("获取离线奖励失败: " + str(result.message))
 		enter_game()
 
 func show_message(message: String):
@@ -228,9 +206,6 @@ func save_account_info(username: String, password: String):
 		}
 		file.store_string(JSON.stringify(account_data))
 		file.close()
-		print("LoginUI.save_account_info() - 账号信息保存成功")
-	else:
-		print("LoginUI.save_account_info() - 账号信息保存失败")
 
 func load_account_info() -> Dictionary:
 	# 从本地文件加载账号信息
@@ -246,14 +221,7 @@ func load_account_info() -> Dictionary:
 					if account_data.has("encrypted") and account_data.encrypted:
 						if account_data.has("password"):
 							account_data.password = _decrypt_password(account_data.password)
-					print("LoginUI.load_account_info() - 账号信息加载成功: " + str(account_data))
 					return account_data
-				else:
-					print("LoginUI.load_account_info() - JSON解析失败")
-		else:
-			print("LoginUI.load_account_info() - 文件打开失败")
-	else:
-		print("LoginUI.load_account_info() - 文件不存在")
 	return {}
 
 func _encrypt_password(password: String) -> String:
@@ -275,3 +243,14 @@ func _decrypt_password(encrypted: String) -> String:
 			var code = int(part) - 10
 			decrypted += String.chr(code)
 	return decrypted
+
+func _on_server_ip_confirm_pressed():
+	# 处理服务器IP确认按钮点击事件
+	var server_ip = server_ip_input.text.strip_edges()
+	if server_ip.is_empty():
+		show_message("服务器IP不能为空")
+		return
+	
+	# 保存服务器IP
+	ServerConfig.set_api_base(server_ip)
+	show_message("服务器IP设置成功")
