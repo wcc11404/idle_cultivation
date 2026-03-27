@@ -21,7 +21,27 @@ idle_cultivation_client/                    # 客户端（Godot）
 │   ├── network/               # 网络相关（新增）
 │   │   ├── NetworkManager.gd
 │   │   └── GameServerAPI.gd
-│   └── ...
+│   ├── managers/              # 管理器（新增）
+│   │   └── CloudSaveManager.gd
+│   ├── core/                  # 核心系统
+│   │   ├── PlayerData.gd
+│   │   ├── RealmSystem.gd
+│   │   ├── CultivationSystem.gd
+│   │   ├── Inventory.gd
+│   │   ├── ItemData.gd
+│   │   ├── SpellSystem.gd
+│   │   ├── AlchemySystem.gd
+│   │   ├── LianliSystem.gd
+│   │   └── OfflineReward.gd
+│   └── autoload/
+│       └── GameManager.gd
+├── scenes/
+│   ├── login/
+│   │   ├── Login.tscn
+│   │   ├── Register.tscn
+│   │   └── LoginModule.gd
+│   └── main/
+│       └── Main.tscn
 └── docs/OnlineSystem.md       # 本文件
 
 idle_cultivation_server/             # 服务端（Python + FastAPI）
@@ -33,19 +53,28 @@ idle_cultivation_server/             # 服务端（Python + FastAPI）
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── auth.py
-│   │   └── game.py
+│   │   ├── game.py
+│   │   └── admin.py
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py
-│   │   └── security.py
+│   │   ├── security.py
+│   │   └── config_loader.py
 │   ├── db/
 │   │   ├── __init__.py
 │   │   ├── database.py
 │   │   └── models.py
 │   └── schemas/
 │       ├── __init__.py
-│       └── player.py
+│       ├── auth.py
+│       └── game.py
+├── config/                     # 配置文件软链接
+│   ├── items.json
+│   ├── realms.json
+│   ├── recipes.json
+│   └── spells.json
 ├── sql/init.sql
+├── start.sh                    # 启动脚本
 └── README.md
 ```
 
@@ -162,8 +191,8 @@ CREATE TABLE accounts (
     server_id VARCHAR(20) DEFAULT 'default',  -- 区服ID
     token_version INT DEFAULT 0,              -- 单设备登录控制，每次登录+1
     is_banned BOOLEAN DEFAULT FALSE,          -- 封号标记
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),     -- 带时区的时间戳
+    updated_at TIMESTAMPTZ DEFAULT NOW()      -- 带时区的时间戳
 );
 
 -- 玩家数据表
@@ -172,8 +201,7 @@ CREATE TABLE player_data (
     server_id VARCHAR(20) DEFAULT 'default',  -- 冗余存储，便于分区查询
     game_version VARCHAR(20) DEFAULT 'v1.0.0', -- 游戏版本号，记录玩家上次保存的版本
     data JSONB NOT NULL,                      -- 所有游戏数据（详见下文结构）
-    last_online_at TIMESTAMP DEFAULT NOW(),   -- 用于离线收益计算
-    updated_at TIMESTAMP DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW()      -- 带时区的时间戳，用于离线收益计算
 );
 
 -- 索引
@@ -474,8 +502,7 @@ Response:
 ```sql
 UPDATE player_data 
 SET data = $1, 
-    updated_at = NOW(),
-    last_online_at = NOW()
+    updated_at = NOW()
 WHERE account_id = $2
 ```
 
@@ -503,7 +530,7 @@ WHERE account_id = $2
 
 #### 计算公式
 ```javascript
-离线时长 = min(当前时间 - last_online_at, 4小时)
+离线时长 = min(当前时间 - updated_at, 4小时)
 
 离线收益 = {
     spirit_energy: 离线时长 * 每秒灵气获取速度,
@@ -515,12 +542,12 @@ WHERE account_id = $2
 ```javascript
 async function calculateOfflineReward(account_id) {
     const player = await db.query(
-        'SELECT data, last_online_at FROM player_data WHERE account_id = $1',
+        'SELECT data, updated_at FROM player_data WHERE account_id = $1',
         [account_id]
     );
     
     const offlineSeconds = Math.min(
-        (Date.now() - player.last_online_at) / 1000,
+        (Date.now() - player.updated_at) / 1000,
         4 * 3600  // 最大4小时
     );
     
@@ -740,6 +767,13 @@ func on_request_error(response_code, error_code):
 |------|------|------|------|
 | /api/game/data | GET | 拉取存档 | 需要 |
 | /api/game/save | POST | 保存存档 | 需要 |
+| /api/game/player/breakthrough | POST | 突破境界 | 需要 |
+| /api/game/inventory/use_item | POST | 使用物品 | 需要 |
+| /api/game/battle/victory | POST | 战斗胜利 | 需要 |
+| /api/game/spell/upgrade | POST | 术法升级 | 需要 |
+| /api/game/spell/charge | POST | 术法充能 | 需要 |
+| /api/game/alchemy/learn_recipe | POST | 学习丹方 | 需要 |
+| /api/game/alchemy/start_craft | POST | 开始炼丹 | 需要 |
 
 ### 5.3 管理后台
 
@@ -747,8 +781,8 @@ func on_request_error(response_code, error_code):
 |------|------|------|------|
 | /api/admin/login | POST | 管理员登录 | - |
 | /api/admin/players | GET | 玩家列表 | 管理员 |
-| /api/admin/player/:id | GET | 玩家详情 | 管理员 |
-| /api/admin/player/:id/ban | POST | 封号 | 管理员 |
+| /api/admin/player/{id} | GET | 玩家详情 | 管理员 |
+| /api/admin/player/{id}/ban | POST | 封号 | 管理员 |
 
 ---
 

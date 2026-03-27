@@ -27,6 +27,8 @@ var inventory: Node = null
 var chuna_module: Node = null
 var log_manager: Node = null
 var alchemy_module: Node = null
+var api: Node = null
+var save_manager: Node = null
 
 # UI节点引用（由GameUI设置）
 var lianli_panel: Control = null
@@ -60,9 +62,10 @@ func _ready():
 	pass
 
 func initialize(ui: Node, player_node: Node, lianli_sys: Node, 
-				area_data: Node = null, tower_data: Node = null, 
-				item_data: Node = null, inv: Node = null, 
-				chuna: Node = null, log_mgr: Node = null, alchemy_mod: Node = null):
+					area_data: Node = null, tower_data: Node = null, 
+					item_data: Node = null, inv: Node = null, 
+					chuna: Node = null, log_mgr: Node = null, alchemy_mod: Node = null, 
+					game_api: Node = null):
 	game_ui = ui
 	player = player_node
 	lianli_system = lianli_sys
@@ -73,6 +76,12 @@ func initialize(ui: Node, player_node: Node, lianli_sys: Node,
 	chuna_module = chuna
 	log_manager = log_mgr
 	alchemy_module = alchemy_mod
+	api = game_api
+	
+	# 获取save_manager
+	var game_manager = get_node_or_null("/root/GameManager")
+	if game_manager:
+		save_manager = game_manager.get_save_manager()
 
 # 显示历练面板
 func show_lianli_panel():
@@ -96,9 +105,7 @@ func show_lianli_select_panel():
 		lianli_scene_panel.visible = false
 	if lianli_select_panel:
 		lianli_select_panel.visible = true
-	# 更新历练区域按钮显示（刷新特殊区域剩余次数）
-	if game_ui:
-		game_ui.update_lianli_area_buttons_display()
+	# 不需要调用update_lianli_area_buttons_display，因为show_lianli_tab已经调用了它
 
 # ==================== 历练区域功能 ====================
 
@@ -121,12 +128,14 @@ func start_lianli_in_area(area_id: String):
 		log_message.emit("气血值不足，无法进入历练区域！请先修炼恢复气血值。")
 		return
 	
-	# 检查特殊区域每日次数限制（只检查，不消耗）
+	# 检查特殊区域每日次数限制（本地检查，次数扣减在通关后通过API调用）
 	if lianli_area_data and lianli_area_data.is_special_area(area_id):
-		var remaining = lianli_system.get_daily_dungeon_count(area_id)
-		if remaining <= 0:
-			log_message.emit("今日进入次数已用完，请明天凌晨4点后再来")
-			return
+		# 无API实例时，使用本地检查
+		if not api:
+			var remaining = lianli_system.get_daily_dungeon_count(area_id)
+			if remaining <= 0:
+				log_message.emit("今日进入次数已用完，请明天凌晨4点后再来")
+				return
 	
 	# 如果正在修炼，先停止修炼
 	if player.get_is_cultivating():
@@ -497,13 +506,65 @@ func on_battle_ended(victory: bool, loot: Array, enemy_name: String):
 		else:
 			# 没有勾选连续战斗，启用继续战斗按钮
 			enable_continue_button()
+		
+		# 检查是否是特殊区域（需要扣减次数）
+		if lianli_area_data and lianli_area_data.is_special_area(current_lianli_area_id):
+			# 使用API扣减次数
+			if api:
+				# 使用call_deferred来处理异步操作
+				call_deferred("_finish_dungeon_async", current_lianli_area_id)
+			else:
+				# 无API实例，使用本地扣减
+				lianli_system.use_daily_dungeon_count(current_lianli_area_id)
+		
+		# 破境草洞穴或无尽塔战斗胜利后保存
+		_save_after_battle_victory()
 	else:
 		# 战斗失败
 		if lianli_status_label:
 			lianli_status_label.text = "战斗失败..."
 			lianli_status_label.modulate = Color.RED
-	
+
 	battle_ended.emit(victory, loot, enemy_name)
+
+func _save_after_battle_victory():
+	var should_save = false
+	
+	if lianli_system and lianli_system.is_in_endless_tower():
+		should_save = true
+	elif lianli_area_data and current_lianli_area_id == "foundation_herb_cave":
+		should_save = true
+	
+	if should_save:
+		if not save_manager:
+			var game_manager = get_node_or_null("/root/GameManager")
+			if game_manager:
+				save_manager = game_manager.get_save_manager()
+		
+		if save_manager and save_manager.has_method("save_partial"):
+			await save_manager.save_partial(["inventory", "lianli_system", "player"])
+
+# 异步处理副本完成
+func _finish_dungeon_async(dungeon_id: String):
+	# 使用Timer来模拟异步操作
+	var timer = Timer.new()
+	add_child(timer)
+	timer.wait_time = 0.1
+	timer.one_shot = true
+	timer.start()
+	await timer.timeout
+	timer.queue_free()
+	var finish_result = await api.finish_dungeon(dungeon_id)
+	if finish_result.success:
+		# 扣减次数成功
+		var remaining_count = int(finish_result.get("remaining_count", 0))
+		log_message.emit(finish_result.get("message", "副本完成成功") + "，剩余次数: " + str(remaining_count))
+		# 更新按钮显示
+		if game_ui:
+			game_ui.update_lianli_area_buttons_display()
+	else:
+		# 扣减次数失败
+		log_message.emit(finish_result.get("message", "副本完成失败"))
 
 # 战斗行动执行
 func on_battle_action_executed(is_player: bool, damage: float, is_spell: bool, spell_name: String):

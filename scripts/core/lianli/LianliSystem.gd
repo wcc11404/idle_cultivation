@@ -136,10 +136,21 @@ func get_wait_interval() -> float:
 #region ==================== 存档相关函数 ====================
 
 func get_save_data() -> Dictionary:
-	return {
+	# 确保daily_dungeon_data中的数值为整数
+	var save_data = {
 		"tower_highest_floor": tower_highest_floor,
-		"daily_dungeon_data": daily_dungeon_data.duplicate()
+		"daily_dungeon_data": {}
 	}
+	
+	for dungeon_id in daily_dungeon_data.keys():
+		var dungeon_info = daily_dungeon_data[dungeon_id].duplicate()
+		if dungeon_info.has("max_count"):
+			dungeon_info["max_count"] = int(dungeon_info["max_count"])
+		if dungeon_info.has("remaining_count"):
+			dungeon_info["remaining_count"] = int(dungeon_info["remaining_count"])
+		save_data["daily_dungeon_data"][dungeon_id] = dungeon_info
+	
+	return save_data
 
 func apply_save_data(data: Dictionary):
 	tower_highest_floor = data.get("tower_highest_floor", 0)
@@ -147,29 +158,25 @@ func apply_save_data(data: Dictionary):
 	check_and_reset_daily_dungeons()
 
 func check_and_reset_daily_dungeons():
-	var today = Time.get_date_string_from_system()
-	for dungeon_id in daily_dungeon_data.keys():
-		var last_reset = daily_dungeon_data[dungeon_id].get("last_reset_date", "")
-		if last_reset != today:
-			daily_dungeon_data[dungeon_id]["enter_count"] = 3
-			daily_dungeon_data[dungeon_id]["last_reset_date"] = today
+	# 现在由服务端处理每日重置，客户端不再需要本地重置逻辑
+	pass
 
 func get_daily_dungeon_count(dungeon_id: String) -> int:
 	_ensure_daily_dungeon_data(dungeon_id)
-	return daily_dungeon_data[dungeon_id]["enter_count"]
+	return daily_dungeon_data[dungeon_id]["remaining_count"]
 
 func use_daily_dungeon_count(dungeon_id: String) -> bool:
 	_ensure_daily_dungeon_data(dungeon_id)
-	if daily_dungeon_data[dungeon_id]["enter_count"] <= 0:
+	if daily_dungeon_data[dungeon_id]["remaining_count"] <= 0:
 		return false
-	daily_dungeon_data[dungeon_id]["enter_count"] -= 1
+	daily_dungeon_data[dungeon_id]["remaining_count"] -= 1
 	return true
 
 func _ensure_daily_dungeon_data(dungeon_id: String):
 	if not daily_dungeon_data.has(dungeon_id):
 		daily_dungeon_data[dungeon_id] = {
-			"enter_count": 3,
-			"last_reset_date": Time.get_date_string_from_system()
+			"max_count": 3,
+			"remaining_count": 3
 		}
 
 #endregion

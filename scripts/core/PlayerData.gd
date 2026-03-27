@@ -1,6 +1,7 @@
 class_name PlayerData extends Node
 
 const AttributeCalculator = preload("res://scripts/core/AttributeCalculator.gd")
+const DAILY_DUNGEON_MAX_COUNT = 3
 
 signal realm_breakthrough(new_realm: String, new_level: int)
 signal breakthrough_failed(message: String)
@@ -11,6 +12,9 @@ var realm_level: int = 1
 # 基础属性值（不包含任何加成）- 全部使用 float
 var health: float = 500.0
 var spirit_energy: float = 0.0
+var max_spirit_energy: float = 100.0
+
+
 
 # 基础属性（随境界变化）
 var base_max_health: float = 500.0
@@ -27,12 +31,13 @@ var combat_buffs: Dictionary = {}
 
 func _ready():
 	add_to_group("player")
+	# 初始化默认值
+	health = 50.0
+	base_max_health = 50.0
 	apply_realm_stats()
 
 func apply_realm_stats():
 	var realm_system = get_node_or_null("/root/GameManager").get_realm_system() if get_node_or_null("/root/GameManager") else null
-	
-	var old_max_health = base_max_health
 	
 	if realm_system:
 		var level_info = realm_system.get_level_info(realm, realm_level)
@@ -40,6 +45,7 @@ func apply_realm_stats():
 		base_attack = float(level_info.get("attack", 50))
 		base_defense = float(level_info.get("defense", 25))
 		base_max_spirit = float(level_info.get("max_spirit_energy", 10))
+		max_spirit_energy = base_max_spirit
 		# 从境界配置获取速度
 		var realm_info = realm_system.get_realm_info(realm)
 		base_speed = float(realm_info.get("speed", 5.0))
@@ -51,19 +57,18 @@ func apply_realm_stats():
 		base_attack = float(realm_info.get("attack", 50))
 		base_defense = float(realm_info.get("defense", 25))
 		base_max_spirit = 10.0
+		max_spirit_energy = base_max_spirit
 		base_speed = 5.0
 		base_spirit_gain = 1.0
 	
-	# 同步更新当前气血（保持满血状态或按比例调整）
-	if old_max_health > 0:
-		# 按比例调整当前气血
-		health = health * base_max_health / old_max_health
-	else:
-		# 初始状态，设置为满血
-		health = get_final_max_health()
+	# 保持当前生命值不变，只更新最大生命值
 	
 	# 确保当前气血不超过最终上限（包含术法加成）
-	health = min(health, get_final_max_health())
+	var final_max_health = get_final_max_health()
+	health = min(health, final_max_health)
+	
+	# 突破时不限制灵气，让超过上限的灵气保留
+	# spirit_energy = min(spirit_energy, max_spirit_energy)
 
 func get_default_realm_info() -> Dictionary:
 	return {"health": 500, "attack": 50, "defense": 25}
@@ -311,8 +316,9 @@ func get_save_data() -> Dictionary:
 	return {
 		"realm": realm,
 		"realm_level": realm_level,
-		"health": AttributeCalculator.format_for_save(health),
-		"spirit_energy": AttributeCalculator.format_for_save(spirit_energy)
+		"health": health,
+		"spirit_energy": spirit_energy,
+		"max_spirit_energy": max_spirit_energy
 	}
 
 func apply_save_data(data: Dictionary):
@@ -324,6 +330,10 @@ func apply_save_data(data: Dictionary):
 		health = float(data["health"])
 	if data.has("spirit_energy"):
 		spirit_energy = float(data["spirit_energy"])
+	if data.has("max_spirit_energy"):
+		max_spirit_energy = float(data["max_spirit_energy"])
 
 	# 重新计算可计算属性
 	apply_realm_stats()
+
+

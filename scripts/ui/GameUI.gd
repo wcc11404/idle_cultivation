@@ -9,10 +9,12 @@ const SpellModule = preload("res://scripts/ui/modules/SpellModule.gd")
 const NeishiModule = preload("res://scripts/ui/modules/NeishiModule.gd")
 const CultivationModule = preload("res://scripts/ui/modules/CultivationModule.gd")
 const LianliModule = preload("res://scripts/ui/modules/LianliModule.gd")
+const GameServerAPI = preload("res://scripts/network/GameServerAPI.gd")
 
 var player: Node = null
 var inventory: Node = null
 var spell_system: Node = null
+var api: GameServerAPI = null
 
 # 炼丹系统引用
 var alchemy_system: Node = null
@@ -106,9 +108,14 @@ const REALM_FRAME_TEXTURES = {
 
 @onready var cultivation_panel: Control = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer
 @onready var spell_panel: Control = $VBoxContainer/ContentPanel/NeishiPanel/SpellPanel
-
 @onready var save_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SaveButton
-@onready var load_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/LoadButton
+@onready var logout_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/LogoutButton
+@onready var nickname_input: LineEdit = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/NicknameSection/NicknameHBox/NicknameInput
+@onready var confirm_nickname_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/NicknameSection/NicknameHBox/ConfirmNicknameButton
+@onready var rank_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/RankButton
+@onready var rank_panel: Control = $VBoxContainer/ContentPanel/SettingsPanel/RankPanel
+@onready var rank_list: VBoxContainer = $VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/RankList
+@onready var back_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/TitleBar/BackButton
 
 @onready var lianli_select_panel: Control = $VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel
 @onready var lianli_scene_panel: Control = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel
@@ -128,6 +135,7 @@ var view_button: Button = null
 @onready var lianli_area_3_button: Button = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer/Area3Button")
 @onready var lianli_area_4_button: Button = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer/Area4Button")
 @onready var lianli_area_5_button: Button = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer/Area5Button")
+@onready var lianli_area_6_button: Button = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer/EndlessTowerButton")
 @onready var endless_tower_button: Button = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer/EndlessTowerButton")
 
 # 炼丹房UI节点
@@ -193,6 +201,10 @@ func _ready():
 	# 安全获取可选节点
 	_setup_optional_nodes()
 	
+	# 初始化GameServerAPI
+	api = GameServerAPI.new()
+	add_child(api)
+	
 	await get_tree().process_frame
 	
 	# 先初始化所有模块
@@ -218,6 +230,9 @@ func _ready():
 	
 	# 加载游戏数据（模块初始化完成后）
 	load_game_data()
+	
+	# 游戏加载完成后获取离线奖励
+	await claim_offline_reward()
 
 func _setup_optional_nodes():
 	view_button = get_node_or_null("VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/ButtonContainer/ViewButton")
@@ -374,7 +389,13 @@ func setup_settings_module():
 	# 设置UI节点引用
 	settings_module.settings_panel = settings_panel
 	settings_module.save_button = save_button
-	settings_module.load_button = load_button
+	settings_module.logout_button = logout_button
+	settings_module.nickname_input = nickname_input
+	settings_module.confirm_nickname_button = confirm_nickname_button
+	settings_module.rank_button = rank_button
+	settings_module.rank_panel = rank_panel
+	settings_module.rank_list = rank_list
+	settings_module.back_button = back_button
 	
 	# 初始化模块
 	settings_module.initialize(self, player, null)
@@ -530,7 +551,7 @@ func setup_lianli_module():
 	lianli_module.exit_lianli_button = exit_lianli_button
 	
 	# 初始化模块
-	lianli_module.initialize(self, player, lianli_system, lianli_area_data, endless_tower_data, item_data_ref, inventory, chuna_module, log_manager, alchemy_module)
+	lianli_module.initialize(self, player, lianli_system, lianli_area_data, endless_tower_data, item_data_ref, inventory, chuna_module, log_manager, alchemy_module, api)
 	
 	# 连接信号
 	lianli_module.log_message.connect(_on_module_log)
@@ -618,6 +639,9 @@ func set_player(player_node: Node):
 	# 初始化历练模块的玩家引用
 	if lianli_module:
 		lianli_module.player = player
+	# 初始化设置模块的玩家引用
+	if settings_module:
+		settings_module.player = player
 
 func set_spell_system(spell_system_node: Node):
 	spell_system = spell_system_node
@@ -854,49 +878,55 @@ func _init_lianli_area_buttons():
 	lianli_area_buttons = []
 	lianli_area_ids = []
 	
-	# 收集所有按钮（前4个是普通区域，第5个是特殊区域）
+	# 收集所有按钮
+	# 按照：普通区域(4) + 特殊区域(1) + 每日副本(1) 的顺序
 	if lianli_area_1_button:
-		lianli_area_buttons.append(lianli_area_1_button)
+		lianli_area_buttons.append(lianli_area_1_button)  # 普通区域1
 	if lianli_area_2_button:
-		lianli_area_buttons.append(lianli_area_2_button)
+		lianli_area_buttons.append(lianli_area_2_button)  # 普通区域2
 	if lianli_area_3_button:
-		lianli_area_buttons.append(lianli_area_3_button)
+		lianli_area_buttons.append(lianli_area_3_button)  # 普通区域3
 	if lianli_area_4_button:
-		lianli_area_buttons.append(lianli_area_4_button)
+		lianli_area_buttons.append(lianli_area_4_button)  # 普通区域4
+	if lianli_area_6_button:
+		lianli_area_buttons.append(lianli_area_6_button)  # 特殊区域（无尽塔）
 	if lianli_area_5_button:
-		lianli_area_buttons.append(lianli_area_5_button)
+		lianli_area_buttons.append(lianli_area_5_button)  # 每日副本（破镜草洞穴）
 	
-	# 获取普通区域和特殊区域ID
-	var normal_area_ids = []
-	var special_area_ids = []
+	# 区域分类
+	var normal_area_ids = []  # 普通区域
+	var special_area_ids = []  # 特殊区域（包含无尽塔）
+	var daily_dungeon_ids = []  # 每日副本
 	
 	if lianli_area_data:
 		normal_area_ids = lianli_area_data.get_normal_area_ids()
 		special_area_ids = lianli_area_data.get_special_area_ids()
+		# 从特殊区域中移除破镜草洞穴，放到每日副本
+		special_area_ids.erase("foundation_herb_cave")
+		daily_dungeon_ids = ["foundation_herb_cave"]
 	else:
 		# 默认区域ID
 		normal_area_ids = ["qi_refining_outer", "qi_refining_inner", "foundation_outer", "foundation_inner"]
-		special_area_ids = ["foundation_herb_cave"]
+		special_area_ids = []  # 无尽塔单独处理
+		daily_dungeon_ids = ["foundation_herb_cave"]
 	
-	# 合并区域ID：先普通区域，后特殊区域
-	lianli_area_ids = normal_area_ids + special_area_ids
+	# 手动添加无尽塔到特殊区域
+	special_area_ids.append("endless_tower")
+
+	# 合并区域ID：普通区域 -> 特殊区域 -> 每日副本
+	lianli_area_ids = normal_area_ids + special_area_ids + daily_dungeon_ids
 	
 	# 更新按钮文本和连接信号
-	for i in range(lianli_area_buttons.size()):
-		var button = lianli_area_buttons[i]
-		if i < lianli_area_ids.size():
-			var area_id = lianli_area_ids[i]
+	var current_index = 0
+	
+	# 显示普通区域
+	for area_id in normal_area_ids:
+		if current_index < lianli_area_buttons.size():
+			var button = lianli_area_buttons[current_index]
 			var area_name = lianli_area_data.get_area_name(area_id) if lianli_area_data else area_id
-			
-			# 特殊区域显示剩余次数
-			if lianli_area_data and lianli_area_data.is_special_area(area_id) and lianli_system:
-				var remaining = lianli_system.get_daily_dungeon_count(area_id)
-				var max_count = 3
-				button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
-			else:
-				button.text = area_name
-			
+			button.text = area_name
 			button.visible = true
+			button.disabled = false
 			# 断开之前的连接（避免重复连接）
 			var connections = button.get_signal_connection_list("pressed")
 			for conn in connections:
@@ -904,27 +934,122 @@ func _init_lianli_area_buttons():
 			# 使用LianliModule处理
 			if lianli_module:
 				button.pressed.connect(lianli_module.on_lianli_area_pressed.bind(area_id))
-		else:
-			button.visible = false
+			current_index += 1
+
+	# 显示特殊区域
+	for area_id in special_area_ids:
+		if current_index < lianli_area_buttons.size():
+			var button = lianli_area_buttons[current_index]
+			var area_name = "无尽塔 (第1层)" if area_id == "endless_tower" else (lianli_area_data.get_area_name(area_id) if lianli_area_data else area_id)
+			button.text = area_name
+			button.visible = true
+			button.disabled = false
+			# 断开之前的连接（避免重复连接）
+			var connections = button.get_signal_connection_list("pressed")
+			for conn in connections:
+				button.pressed.disconnect(conn.callable)
+			# 使用LianliModule处理
+			if lianli_module:
+				if area_id == "endless_tower":
+					button.pressed.connect(lianli_module.on_endless_tower_pressed)
+				else:
+					button.pressed.connect(lianli_module.on_lianli_area_pressed.bind(area_id))
+			current_index += 1
+
+	# 显示每日副本
+	for area_id in daily_dungeon_ids:
+		if current_index < lianli_area_buttons.size():
+			var button = lianli_area_buttons[current_index]
+			var area_name = lianli_area_data.get_area_name(area_id) if lianli_area_data else area_id
+			# 使用缓存数据，不立即调用API
+			if dungeon_info_cache.has(area_id):
+				var cache_info = dungeon_info_cache[area_id]
+				var remaining = cache_info.get("remaining_count", 0)
+				var max_count = cache_info.get("max_count", 3)
+				button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
+			else:
+				# 无缓存数据，使用默认值
+				button.text = area_name + " (剩余: 0/3)"
+			button.visible = true
+			button.disabled = false
+			# 断开之前的连接（避免重复连接）
+			var connections = button.get_signal_connection_list("pressed")
+			for conn in connections:
+				button.pressed.disconnect(conn.callable)
+			# 使用LianliModule处理
+			if lianli_module:
+				button.pressed.connect(lianli_module.on_lianli_area_pressed.bind(area_id))
+			current_index += 1
+	
+	# 隐藏剩余的按钮
+	for i in range(current_index, lianli_area_buttons.size()):
+		lianli_area_buttons[i].visible = false
+
+# 副本信息缓存
+var dungeon_info_cache: Dictionary = {}
+
+# 更新副本按钮文本（只使用缓存数据）
+func _update_dungeon_button_text(button: Button, dungeon_id: String, area_name: String):
+	# 只显示缓存的信息或默认值
+	var cached_info = dungeon_info_cache.get(dungeon_id, {"remaining_count": 3, "max_count": 3})
+	var remaining = int(cached_info.get("remaining_count", 3))
+	var max_count = int(cached_info.get("max_count", 3))
+	button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
+
+
 
 # 更新历练区域按钮显示（用于刷新每日次数等）
 func update_lianli_area_buttons_display():
 	if not lianli_area_data or not player:
 		return
-	
-	for i in range(lianli_area_buttons.size()):
-		if i < lianli_area_ids.size():
-			var button = lianli_area_buttons[i]
-			var area_id = lianli_area_ids[i]
+
+	# 区域分类
+	var normal_area_ids = []  # 普通区域
+	var special_area_ids = []  # 特殊区域（包含无尽塔）
+	var daily_dungeon_ids = []  # 每日副本
+
+	normal_area_ids = lianli_area_data.get_normal_area_ids()
+	special_area_ids = lianli_area_data.get_special_area_ids()
+	# 从特殊区域中移除破镜草洞穴，放到每日副本
+	special_area_ids.erase("foundation_herb_cave")
+	daily_dungeon_ids = ["foundation_herb_cave"]
+
+	var current_index = 0
+
+	# 更新普通区域
+	for area_id in normal_area_ids:
+		if current_index < lianli_area_buttons.size():
+			var button = lianli_area_buttons[current_index]
 			var area_name = lianli_area_data.get_area_name(area_id)
-			
-			# 特殊区域显示剩余次数
-			if lianli_area_data.is_special_area(area_id) and lianli_system:
-				var remaining = lianli_system.get_daily_dungeon_count(area_id)
-				var max_count = 3
-				button.text = area_name + " (剩余: " + str(remaining) + "/" + str(max_count) + ")"
-			else:
-				button.text = area_name
+			button.text = area_name
+			button.disabled = false
+			current_index += 1
+
+	# 更新特殊区域（添加无尽塔）
+	# 手动添加无尽塔到特殊区域
+	special_area_ids.append("endless_tower")
+	# 获取lianli_system以获取tower_highest_floor
+	var lianli_system = get_node_or_null("/root/GameManager").get_lianli_system() if get_node_or_null("/root/GameManager") else null
+	var tower_floor = 1
+	if lianli_system:
+		tower_floor = lianli_system.tower_highest_floor + 1
+	for area_id in special_area_ids:
+		if current_index < lianli_area_buttons.size():
+			var button = lianli_area_buttons[current_index]
+			var area_name = "无尽塔 (第" + str(tower_floor) + "层)" if area_id == "endless_tower" else lianli_area_data.get_area_name(area_id)
+			button.text = area_name
+			button.disabled = false
+			current_index += 1
+
+	# 更新每日副本
+	for area_id in daily_dungeon_ids:
+		if current_index < lianli_area_buttons.size():
+			var button = lianli_area_buttons[current_index]
+			var area_name = lianli_area_data.get_area_name(area_id)
+			# 异步更新副本按钮文本，确保显示正确的剩余次数
+			_update_dungeon_button_text(button, area_id, area_name)
+			button.disabled = false
+			current_index += 1
 
 # ==================== 无尽塔功能 ====================
 
@@ -1030,13 +1155,8 @@ func update_account_ui():
 	if not game_manager:
 		return
 	
-	var account_system = game_manager.get_account_system()
-	if not account_system:
-		return
-	
-	var account_info = account_system.get_current_account()
-	if account_info.is_empty():
-		return
+	# 从GameManager中获取账号信息
+	var account_info = game_manager.get_account_info()
 	
 	# 更新昵称显示
 	var nickname = account_info.get("nickname", "hsams")
@@ -1044,12 +1164,70 @@ func update_account_ui():
 		player_name_label_top.text = nickname
 	
 	# 更新头像显示
-	var avatar_file = account_info.get("avatar", "avatar_abstract.png")
+	var avatar_id = account_info.get("avatar_id", "abstract")
 	if avatar_texture:
-		var avatar_path = "res://assets/avatars/" + avatar_file
+		const AvatarConfig = preload("res://scripts/core/avatar/AvatarConfig.gd")
+		var avatar_path = AvatarConfig.get_avatar_path(avatar_id)
 		var texture = load(avatar_path)
 		if texture:
 			avatar_texture.texture = texture
 		# 头像加载失败不提示
+
+func claim_offline_reward():
+	# 主动获取离线奖励
+	# 服务端自动计算离线时间
+	var game_manager = get_node("/root/GameManager")
+	if not game_manager:
+		return
+	
+	if api:
+		var result = await api.claim_offline_reward()
+		if result.success:
+			if result.has("offline_reward") and result.offline_reward != null:
+				# 成功且有奖励
+				var reward = result.offline_reward
+				var rewarded_offline_seconds = result.offline_seconds
+				
+				# 计算小时和分钟
+				var total_minutes = int(rewarded_offline_seconds / 60)
+				var hours = int(total_minutes / 60)
+				var minutes = total_minutes % 60
+				
+				# 应用奖励
+				if player:
+					# 应用灵气奖励（不超过上限）
+					if reward.has("spirit_energy"):
+						# 使用add_spirit方法，它会自动处理上限
+						player.add_spirit(reward.spirit_energy)
+					
+					# 应用灵石奖励
+					if reward.has("spirit_stones") and inventory:
+						inventory.add_item("spirit_stone", reward.spirit_stones)
+				
+				# 显示离线奖励信息
+				if log_manager:
+					log_manager.add_system_log("===================================")
+					log_manager.add_system_log("离线时长: " + str(hours) + "小时" + str(minutes) + "分钟")
+					log_manager.add_system_log("获得离线奖励：")
+					if reward.has("spirit_energy"):
+						log_manager.add_system_log("  - 灵气: +" + str(int(reward.spirit_energy)))
+					if reward.has("spirit_stones"):
+						log_manager.add_system_log("  - 灵石: +" + str(int(reward.spirit_stones)))
+					log_manager.add_system_log("===================================")
+				# 刷新UI
+				update_ui()
+				refresh_inventory_ui()
+				# 更新最后在线时间
+				var current_time = Time.get_unix_time_from_system()
+				game_manager.set_last_online_time(current_time)
+				# 领取离线奖励后触发自动保存
+				await game_manager.save_game()
+			else:
+				# 成功但无奖励，不提示
+				pass
+		else:
+			# 获取离线奖励失败
+			if log_manager:
+				log_manager.add_system_log("获取离线奖励失败")
 
 # 内视子Tab处理已迁移到 NeishiModule
