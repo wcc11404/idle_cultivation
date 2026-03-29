@@ -335,5 +335,3 @@ func apply_save_data(data: Dictionary):
 
 	# 重新计算可计算属性
 	apply_realm_stats()
-
-
