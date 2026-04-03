@@ -64,10 +64,10 @@ bash run_headless.sh
 测试脚本成功运行，输出显示：
 
 ```
-Setting HOME to: /Users/hsams/Documents/trae_projects/idle_cultivation_client
+Setting HOME to: /Users/hsams/Documents/idle_cultivation_project/idle_cultivation_client
 Godot Engine v4.6.stable.official.89cea1439 - https://godotengine.org
 
-User data dir:/Users/hsams/Documents/trae_projects/idle_cultivation_client/Library/Application Support/Godot/app_userdata/idle_cultivation_client
+User data dir:/Users/hsams/Documents/idle_cultivation_project/idle_cultivation_client/Library/Application Support/Godot/app_userdata/idle_cultivation_client
 Executable path:/Applications/Godot.app/Contents/MacOS/Godot
 Test file created successfully
 Script finished
