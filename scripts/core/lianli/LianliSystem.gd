@@ -1,6 +1,6 @@
 class_name LianliSystem extends Node
 
-const AttributeCalculator = preload("res://scripts/calculator/AttributeCalculator.gd")
+const AttributeCalculator = preload("res://scripts/core/AttributeCalculator.gd")
 
 #region ==================== 信号定义 ====================
 
@@ -149,8 +149,14 @@ func get_save_data() -> Dictionary:
 	return save_data
 
 func apply_save_data(data: Dictionary):
-	tower_highest_floor = data.get("tower_highest_floor", 0)
+	tower_highest_floor = int(data.get("tower_highest_floor", 0))
 	daily_dungeon_data = data.get("daily_dungeon_data", {}).duplicate()
+	# 确保每日副本数量是整数（Godot JSON解析会把整数变成float）
+	for dungeon_id in daily_dungeon_data.keys():
+		if daily_dungeon_data[dungeon_id].has("max_count"):
+			daily_dungeon_data[dungeon_id]["max_count"] = int(daily_dungeon_data[dungeon_id]["max_count"])
+		if daily_dungeon_data[dungeon_id].has("remaining_count"):
+			daily_dungeon_data[dungeon_id]["remaining_count"] = int(daily_dungeon_data[dungeon_id]["remaining_count"])
 	check_and_reset_daily_dungeons()
 
 func check_and_reset_daily_dungeons():
@@ -566,7 +572,7 @@ func _trigger_start_spells():
 	if not spell_system:
 		return
 	
-	var passive_effects = spell_system.get_equipped_spell_effects_by_type(spell_system.spell_data.SpellType.PASSIVE)
+	var passive_effects = spell_system.get_equipped_spell_effects_by_type("opening")
 	for effect_data in passive_effects:
 		if effect_data.is_empty():
 			continue

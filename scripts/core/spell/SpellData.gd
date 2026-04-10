@@ -1,5 +1,13 @@
 class_name SpellData extends Node
 
+# 术法类型枚举
+enum SpellType {
+	BREATHING = 0,  # 吐纳心法
+	ACTIVE = 1,     # 主动术法
+	PASSIVE = 2,    # 被动术法（开场术法）
+	MISC = 3        # 特殊术法（生产术法）
+}
+
 var MAX_BREATHING_SPELLS = 1
 var MAX_ACTIVE_SPELLS = 2
 var MAX_OPENING_SPELLS = 2
@@ -38,6 +46,8 @@ func get_spell_data(spell_id: String) -> Dictionary:
 	return SPELLS.get(spell_id, {})
 
 func get_spell_name(spell_id: String) -> String:
+	if spell_id == "norm_attack":
+		return "普通攻击"
 	var spell = get_spell_data(spell_id)
 	return spell.get("name", "未知术法")
 

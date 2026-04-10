@@ -130,6 +130,26 @@ static func _pad_zero(num: int) -> String:
 		return "0" + str(num)
 	return str(num)
 
+# ==================== 战斗数值格式化 ====================
+
+# 格式化战斗相关数值
+# 如果num < 1000，保留两位小数且去除尾零显示
+# 如果num >= 1000，采用11k，11m的格式显示
+# 入参可以是int也可以是float
+static func format_battle_number(num: Variant) -> String:
+	var float_num: float
+	if num is int:
+		float_num = float(num)
+	elif num is float:
+		float_num = num
+	else:
+		return str(num)
+	
+	if float_num >= 1000.0:
+		return format_number_precise(float_num, 1)
+	else:
+		return format_decimal(float_num, 2)
+
 # ==================== 颜色格式化 ====================
 
 # 根据数值返回颜色（用于血条等）

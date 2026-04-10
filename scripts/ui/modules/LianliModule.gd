@@ -3,6 +3,7 @@ class_name LianliModule extends Node
 ## 历练模块 - 管理历练和无尽塔功能
 ## 包括战斗UI更新、战斗控制、战斗日志等
 const ActionLockManager = preload("res://scripts/managers/ActionLockManager.gd")
+const UIUtils = preload("res://scripts/utils/ui_utils.gd")
 
 # 信号
 signal log_message(message: String)
@@ -27,6 +28,8 @@ var chuna_module: Node = null
 var log_manager: Node = null
 var alchemy_module: Node = null
 var api: Node = null
+var spell_data: Node = null
+var spell_system: Node = null
 
 # UI节点引用（由GameUI设置）
 var lianli_panel: Control = null
@@ -52,6 +55,7 @@ var exit_lianli_button: Button = null
 # 状态
 var current_lianli_area_id: String = ""
 var current_lianli_speed_index: int = 0
+var current_battle_max_speed: float = 1.0
 
 # 历练速度选项
 const LIANLI_SPEEDS = [1.0, 1.5, 2.0]
@@ -69,6 +73,13 @@ var _simulated_player_health_after: float = 0.0
 var _enemy_hp_tween: Tween = null
 var _player_hp_tween: Tween = null
 
+# 等待状态
+var _is_waiting: bool = false
+var _wait_timer: float = 0.0
+var _wait_interval: float = 4.0
+const BASE_WAIT_INTERVAL_MIN: float = 3.0
+const BASE_WAIT_INTERVAL_MAX: float = 5.0
+
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
 
@@ -85,7 +96,8 @@ func initialize(ui: Node, player_node: Node, lianli_sys: Node,
 					area_data: Node = null, 
 					item_data: Node = null, inv: Node = null, 
 					chuna: Node = null, log_mgr: Node = null, alchemy_mod: Node = null, 
-					game_api: Node = null):
+					game_api: Node = null,
+					spell_data_node: Node = null, spell_system_node: Node = null):
 	game_ui = ui
 	player = player_node
 	lianli_system = lianli_sys
@@ -96,15 +108,32 @@ func initialize(ui: Node, player_node: Node, lianli_sys: Node,
 	log_manager = log_mgr
 	alchemy_module = alchemy_mod
 	api = game_api
+	spell_data = spell_data_node
+	spell_system = spell_system_node
 	
 	_update_battle_info()
 	
 func _process(delta: float):
+	# 处理等待状态
+	if _is_waiting:
+		_wait_timer += delta
+		var time_remaining = max(0.0, _wait_interval - _wait_timer)
+		on_lianli_waiting(time_remaining)
+		
+		if _wait_timer >= _wait_interval:
+			_wait_timer = 0.0
+			_is_waiting = false
+			await _simulate_next_battle()
+		return
+	
 	if not _is_timeline_running or _finish_in_flight:
 		return
 
 	var speed = LIANLI_SPEEDS[current_lianli_speed_index]
 	_timeline_elapsed += delta * speed
+	# 更新本次战斗的最大速度
+	if speed > current_battle_max_speed:
+		current_battle_max_speed = speed
 
 	while _timeline_cursor < _battle_timeline.size() and float(_battle_timeline[_timeline_cursor].get("time", 0.0)) <= _timeline_elapsed:
 		var event = _battle_timeline[_timeline_cursor]
@@ -124,26 +153,79 @@ func _process(delta: float):
 		await _finish_current_battle(true)
 		_finish_in_flight = false
 
-func _apply_timeline_event(event: Dictionary, duration: float = 0.12):
+func _process_battle_event(event: Dictionary, duration: float) -> void:
 	var event_type = str(event.get("type", ""))
 	var info = event.get("info", {})
 	if not (info is Dictionary):
 		return
-
+	
+	var spell_id = str(info.get("spell_id", "norm_attack"))
+	
 	if event_type == "player_action":
-		var enemy_health_after = float(info.get("target_health_after", enemy_health_bar.value if enemy_health_bar else 0.0))
-		_animate_health_bar(enemy_health_bar, enemy_health_value, max(0.0, enemy_health_after), duration, true)
-
-		var spell_id = str(info.get("spell_id", "norm_attack"))
-		if spell_id == "norm_attack":
-			log_message.emit("你对敌人造成了" + AttributeCalculator.format_integer(float(info.get("damage", 0.0))) + "点伤害")
-		else:
-			log_message.emit("你施放术法，造成了" + AttributeCalculator.format_integer(float(info.get("damage", 0.0))) + "点伤害")
+		var enemy_health_after = float(info.get("target_health_after", info.get("self_health_after", enemy_health_bar.value if enemy_health_bar else 0.0)))
+		if info.has("target_health_after"):
+			_animate_health_bar(enemy_health_bar, enemy_health_value, max(0.0, enemy_health_after), duration, true)
+		elif info.has("self_health_after") and player_health_bar_lianli:
+			_simulated_player_health_after = enemy_health_after
+			_animate_health_bar(player_health_bar_lianli, player_health_value_lianli, max(0.0, enemy_health_after), duration, false)
+		
+		_update_spell_proficiency(spell_id)
 	else:
 		var player_health_after = float(info.get("target_health_after", _simulated_player_health_after))
 		_simulated_player_health_after = player_health_after
 		_animate_health_bar(player_health_bar_lianli, player_health_value_lianli, max(0.0, player_health_after), duration, false)
-		log_message.emit("敌人对你造成了" + AttributeCalculator.format_integer(float(info.get("damage", 0.0))) + "点伤害")
+	
+	var log_msg = _generate_battle_log_message(event)
+	if not log_msg.is_empty():
+		if log_manager:
+			log_manager.add_battle_log(log_msg)
+		else:
+			log_message.emit(log_msg)
+
+func _generate_battle_log_message(event: Dictionary) -> String:
+	var event_type = str(event.get("type", ""))
+	var info = event.get("info", {})
+	if not (info is Dictionary):
+		return ""
+	
+	var effect_type = str(info.get("effect_type", ""))
+	var spell_id = str(info.get("spell_id", "norm_attack"))
+	
+	var actor_name: String
+	var target_name: String
+	
+	if event_type == "player_action":
+		actor_name = "玩家"
+		target_name = str(_current_enemy_data.get("name", "敌人"))
+	else:
+		actor_name = str(_current_enemy_data.get("name", "敌人"))
+		target_name = "玩家"
+	
+	var spell_name = spell_id
+	if spell_data:
+		spell_name = spell_data.get_spell_name(spell_id)
+	
+	if effect_type == "undispellable_buff":
+		var log_effect = str(info.get("log_effect", ""))
+		return actor_name + "使用" + spell_name + "，" + log_effect
+	elif effect_type == "instant_damage":
+		var damage = info.get("damage", 0.0)
+		var damage_str = UIUtils.format_battle_number(damage)
+		return actor_name + "使用" + spell_name + "对" + target_name + "造成" + damage_str + "点伤害"
+	
+	return ""
+
+func _update_spell_proficiency(spell_id: String) -> void:
+	if spell_id == "norm_attack":
+		return
+	
+	if not spell_system:
+		return
+	
+	spell_system.add_spell_use_count(spell_id)
+
+func _apply_timeline_event(event: Dictionary, duration: float = 0.12):
+	_process_battle_event(event, duration)
 
 func _animate_health_bar(bar: ProgressBar, value_label: Label, target_health: float, duration: float, is_enemy: bool):
 	if not bar:
@@ -174,13 +256,15 @@ func _start_timeline_from_simulation(sim_result: Dictionary, area_id: String):
 	_current_enemy_data = sim_result.get("enemy_data", {})
 	_simulated_player_health_after = float(sim_result.get("player_health_after", player.health if player else 0.0))
 	current_lianli_area_id = area_id
+	# 初始化本次战斗的最大速度
+	current_battle_max_speed = LIANLI_SPEEDS[current_lianli_speed_index]
 
 	if game_ui and game_ui.has_method("set_active_mode"):
 		game_ui.set_active_mode("lianli")
 	show_lianli_scene_panel()
 
 	if enemy_name_label:
-		enemy_name_label.text = str(_current_enemy_data.get("name", "敌人")) + " Lv." + str(_current_enemy_data.get("level", 1))
+		enemy_name_label.text = str(_current_enemy_data.get("name", "敌人")) + " Lv." + str(int(_current_enemy_data.get("level", 1)))
 	if enemy_health_bar:
 		var enemy_max_hp = float(_current_enemy_data.get("health", 1.0))
 		enemy_health_bar.max_value = enemy_max_hp
@@ -211,7 +295,8 @@ func _finish_current_battle(full_settle: bool):
 	var settle_index = -1
 	if not full_settle:
 		settle_index = max(0, _timeline_cursor - 1)
-	var finish_result = await api.lianli_finish(LIANLI_SPEEDS[current_lianli_speed_index], settle_index)
+	# 使用本次战斗的最大速度
+	var finish_result = await api.lianli_finish(current_battle_max_speed, settle_index)
 	if not finish_result.get("success", false):
 		var err_msg = api.network_manager.get_api_error_text_for_ui(finish_result, "历练结算失败")
 		if not err_msg.is_empty():
@@ -228,9 +313,46 @@ func _finish_current_battle(full_settle: bool):
 		var settle_loot: Array = finish_result.get("loot_gained", _simulate_loot)
 		var battle_victory = _simulate_victory
 
+		# 战斗结果日志
+		if battle_victory:
+			if log_manager:
+				log_manager.add_battle_log("战斗胜利！")
+		else:
+			if log_manager:
+				log_manager.add_battle_log("气血不足，停止战斗")
+
+		# 掉落奖励日志
+		if battle_victory and not settle_loot.is_empty():
+			for loot_item in settle_loot:
+				var item_id = loot_item.get("item_id", "")
+				var amount = loot_item.get("amount", 0)
+				# 确保数量是整数
+				var amount_int = int(amount)
+				if not item_id.is_empty() and amount_int > 0:
+					var item_name = item_id
+					if item_data_ref and item_data_ref.has_method("get_item_name"):
+						item_name = item_data_ref.get_item_name(item_id)
+					if log_manager:
+						log_manager.add_battle_log("获得奖励: " + item_name + " x" + str(amount_int))
+
+		# 特殊区域通关日志
+		if battle_victory and lianli_area_data:
+			if lianli_area_data.is_single_boss_area(current_lianli_area_id):
+				if log_manager:
+					log_manager.add_battle_log("通关成功！")
+			elif lianli_area_data.is_tower_area(current_lianli_area_id):
+				# 无尽塔层数从 lianli_system 获取
+				if lianli_system:
+					var current_floor = lianli_system.get_current_tower_floor()
+					if log_manager:
+						log_manager.add_battle_log("挑战第" + str(current_floor) + "层成功")
+
 		on_battle_ended(battle_victory, settle_loot if battle_victory else [], str(_current_enemy_data.get("name", "敌人")))
 		if battle_victory and is_continuous_checked():
-			await _simulate_next_battle()
+			# 设置等待状态
+			_is_waiting = true
+			_wait_timer = 0.0
+			_wait_interval = randf_range(BASE_WAIT_INTERVAL_MIN, BASE_WAIT_INTERVAL_MAX)
 			return
 		if not battle_victory:
 			_on_force_exit_lianli()
@@ -263,6 +385,8 @@ func _on_force_exit_lianli():
 	_battle_timeline = []
 	_simulate_victory = false
 	_simulate_loot = []
+	_is_waiting = false
+	_wait_timer = 0.0
 	if game_ui and game_ui.has_method("clear_active_mode"):
 		game_ui.clear_active_mode("lianli")
 	show_lianli_select_panel()
@@ -306,7 +430,7 @@ func start_lianli_in_area(area_id: String):
 	if not player:
 		log_message.emit("错误: player 未初始化")
 		return
-	if _is_timeline_running:
+	if _is_timeline_running or _is_waiting:
 		return
 	if not _begin_action_lock("lianli_simulate_start"):
 		return
@@ -331,6 +455,10 @@ func start_lianli_in_area(area_id: String):
 		log_message.emit("历练前修炼同步失败，请稍后重试")
 		_end_action_lock("lianli_simulate_start")
 		return
+
+	# 重置等待状态
+	_is_waiting = false
+	_wait_timer = 0.0
 
 	var sim_result = await api.lianli_simulate(area_id)
 	if not sim_result.get("success", false):
@@ -376,9 +504,13 @@ func update_endless_tower_button_text(button: Button):
 
 # 继续战斗按钮点击
 func on_continue_pressed():
-	if _is_timeline_running or _finish_in_flight:
+	if _is_timeline_running or _finish_in_flight or _is_waiting:
 		return
-	await _simulate_next_battle()
+	
+	# 设置等待状态
+	_is_waiting = true
+	_wait_timer = 0.0
+	_wait_interval = randf_range(BASE_WAIT_INTERVAL_MIN, BASE_WAIT_INTERVAL_MAX)
 
 # 连续战斗复选框切换
 func on_continuous_toggled(_enabled: bool):
@@ -544,7 +676,7 @@ func on_battle_started(enemy_name: String, is_elite: bool, enemy_max_health: flo
 	var elite_tag = " [精英]" if is_elite else ""
 	
 	if enemy_name_label:
-		enemy_name_label.text = enemy_name + " Lv." + str(enemy_level) + elite_tag
+		enemy_name_label.text = enemy_name + " Lv." + str(int(enemy_level)) + elite_tag
 		enemy_name_label.modulate = Color.RED if is_elite else Color.WHITE
 	
 	if lianli_status_label:

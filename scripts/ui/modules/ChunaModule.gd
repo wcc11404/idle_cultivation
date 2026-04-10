@@ -264,13 +264,7 @@ func _select_slot(index: int):
 
 # 更新储纳UI
 func update_inventory_ui():
-	print("[ChunaModule] update_inventory_ui 调用")
-	print("[ChunaModule] inventory: ", inventory)
-	print("[ChunaModule] inventory_grid: ", inventory_grid)
-	print("[ChunaModule] item_data: ", item_data)
-	
 	if not inventory or not inventory_grid:
-		print("[ChunaModule] inventory 或 inventory_grid 为空，返回")
 		return
 	
 	# 更新容量显示
@@ -285,7 +279,6 @@ func update_inventory_ui():
 	
 	# 更新格子显示
 	var item_list = inventory.get_item_list() if inventory else []
-	print("[ChunaModule] item_list 数量: ", item_list.size())
 	
 	for child in inventory_grid.get_children():
 		var index = child.get_meta("index", -1)
@@ -304,7 +297,6 @@ func update_inventory_ui():
 				var count = int(item.get("count", 0))
 				var item_info = item_data.get_item_data(item_id) if item_data else {}
 				var item_name = item_info.get("name", "未知")
-				print("[ChunaModule] 物品 ", index, ": id=", item_id, " name=", item_name, " count=", count)
 				var quality = int(item_info.get("quality", 0))
 				
 				if name_label:
@@ -364,48 +356,36 @@ func _show_item_detail(index: int):
 	if detail_type:
 		var type_str = ""
 		match type:
-			0: type_str = "资源"
-			1: type_str = "材料"
-			2: type_str = "装备"
-			3: type_str = "凭证"
+			ItemData.ItemType.CURRENCY: type_str = "货币"
+			ItemData.ItemType.MATERIAL: type_str = "材料"
+			ItemData.ItemType.CONSUMABLE: type_str = "消耗品"
+			ItemData.ItemType.GIFT: type_str = "礼包"
+			ItemData.ItemType.UNLOCK_SPELL: type_str = "解锁术法"
+			ItemData.ItemType.UNLOCK_RECIPE: type_str = "解锁丹方"
+			ItemData.ItemType.UNLOCK_FURNACE: type_str = "解锁炼丹炉"
 		detail_type.text = "类型: " + type_str
 	if detail_count:
 		detail_count.text = "数量: " + str(int(count))
 	
-	# 装备属性显示
-	if type == 2:
-		var attack_val = item_info.get("attack", 0)
-		var defense_val = item_info.get("defense", 0)
-		var level_req = item_info.get("level_required", 1)
-		
-		if detail_stats:
-			var stats_text = ""
-			if attack_val > 0:
-				stats_text += "攻击: +" + str(attack_val) + "\n"
-			if defense_val > 0:
-				stats_text += "防御: +" + str(defense_val) + "\n"
-			stats_text += "需求等级: " + str(level_req)
-			detail_stats.text = stats_text
-			detail_stats.visible = true
-	else:
-		if detail_stats:
-			detail_stats.visible = false
+	# 隐藏装备属性显示（暂无装备类物品）
+	if detail_stats:
+		detail_stats.visible = false
 	
 	# 按钮可见性控制（根据新的物品类型系统）
 	# 查看按钮已移除，详情直接显示在面板中
 	
-	# type=3 的一定有打开按钮
-	# type=2 和 type=4 且有 effect 字段的，才有使用按钮
+	# type=3 (GIFT) 的一定有打开按钮
+	# type=2 (CONSUMABLE)、type=4 (UNLOCK_SPELL)、type=5 (UNLOCK_RECIPE)、type=6 (UNLOCK_FURNACE) 且有 effect 字段的，才有使用按钮
 	var item_type = item_info.get("type", 0)
 	var has_effect = item_info.has("effect") and not item_info.get("effect", {}).is_empty()
 	
 	if use_button:
-		if item_type == 3:
+		if item_type == ItemData.ItemType.GIFT:
 			# 礼包类，显示打开按钮
 			use_button.visible = true
 			use_button.text = "打开"
-		elif (item_type == 2 or item_type == 4) and has_effect:
-			# 装备类或功能解锁类，且有effect，显示使用按钮
+		elif (item_type == ItemData.ItemType.CONSUMABLE or item_type == ItemData.ItemType.UNLOCK_SPELL or item_type == ItemData.ItemType.UNLOCK_RECIPE or item_type == ItemData.ItemType.UNLOCK_FURNACE) and has_effect:
+			# 消耗品类或解锁类，且有effect，显示使用按钮
 			use_button.visible = true
 			use_button.text = "使用"
 		else:

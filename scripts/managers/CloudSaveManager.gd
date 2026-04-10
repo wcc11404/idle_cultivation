@@ -1,6 +1,6 @@
 extends Node
 
-const GameServerAPI = preload("res://scripts/api/GameServerAPI.gd")
+const GameServerAPI = preload("res://scripts/network/GameServerAPI.gd")
 
 const AUTO_SAVE_INTERVAL = 300  # 5分钟
 const MAX_SAVE_FAILURES = 3

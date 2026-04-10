@@ -107,6 +107,12 @@ func _process(delta: float):
 		return
 
 	_runtime_timer += delta
+	
+	# 实时更新进度条
+	var progress = (_runtime_timer / _runtime_craft_time) * 100.0
+	progress = min(progress, 100.0)
+	_on_alchemy_crafting_progress(_runtime_index + 1, _runtime_total_count, progress)
+	
 	if _runtime_timer < _runtime_craft_time:
 		return
 

@@ -30,17 +30,13 @@ func _ready():
 	create_player()
 
 func init_systems():
-	print("[GameManager] init_systems 开始")
-	
 	item_data = load("res://scripts/core/inventory/ItemData.gd").new()
 	item_data.name = "ItemData"
 	add_child(item_data)
-	print("[GameManager] item_data 创建完成: ", item_data)
 	
 	lianli_area_data = load("res://scripts/core/lianli/LianliAreaData.gd").new()
 	lianli_area_data.name = "LianliAreaData"
 	add_child(lianli_area_data)
-	print("[GameManager] lianli_area_data 创建完成: ", lianli_area_data)
 	
 	enemy_data = load("res://scripts/core/lianli/EnemyData.gd").new()
 	enemy_data.name = "EnemyData"
@@ -71,14 +67,12 @@ func init_systems():
 	spell_data = load("res://scripts/core/spell/SpellData.gd").new()
 	spell_data.name = "SpellData"
 	add_child(spell_data)
-	print("[GameManager] spell_data 创建完成: ", spell_data)
 	
 	spell_system = load("res://scripts/core/spell/SpellSystem.gd").new()
 	spell_system.name = "SpellSystem"
 	add_child(spell_system)
 	spell_system.set_spell_data(spell_data)
 	spell_system.set_lianli_system(lianli_system)
-	print("[GameManager] spell_system 创建完成: ", spell_system)
 	
 	recipe_data = load("res://scripts/core/alchemy/AlchemyRecipeData.gd").new()
 	recipe_data.name = "AlchemyRecipeData"
@@ -90,11 +84,9 @@ func init_systems():
 	alchemy_system.set_recipe_data(recipe_data)
 	alchemy_system.set_inventory(inventory)
 	alchemy_system.set_spell_system(spell_system)
-	
-	print("[GameManager] init_systems 完成")
 
 func create_player():
-	player = load("res://scripts/models/PlayerModel.gd").new()
+	player = load("res://scripts/core/PlayerData.gd").new()
 	player.name = "Player"
 	add_child(player)
 	

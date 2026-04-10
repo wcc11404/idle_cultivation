@@ -83,10 +83,14 @@ func _format_message(message: String, log_type: LogType) -> String:
 		result = result.replace("离线总计时间", "[color=#B8860B]离线总计时间[/color]")  # 深金色
 	# 战斗消息高亮（使用柔和的颜色）
 	else:
-		result = result.replace("造成了", "[color=#CD5C5C]造成了[/color]")  # 柔和红色
-		result = result.replace("点伤害", "[color=#CD5C5C]点伤害[/color]")  # 柔和红色
-		result = result.replace("成功", "[color=#6B8E23]成功[/color]")  # 柔和绿色
-		result = result.replace("失败", "[color=#CD5C5C]失败[/color]")  # 柔和红色
+		# 高亮玩家和敌人
+		result = result.replace("玩家使用", "[color=#4169E1]玩家[/color]使用")
+		result = result.replace("对玩家造成", "对[color=#4169E1]玩家[/color]造成")
+		# 高亮战斗关键词
+		result = result.replace("造成", "[color=#CD5C5C]造成[/color]")
+		result = result.replace("点伤害", "[color=#CD5C5C]点伤害[/color]")
+		result = result.replace("成功", "[color=#6B8E23]成功[/color]")
+		result = result.replace("失败", "[color=#CD5C5C]失败[/color]")
 	
 	return result
 

@@ -8,7 +8,6 @@ signal upgrade_requested
 signal charge_requested
 signal multiplier_changed
 signal close_requested
-signal equip_requested
 
 # UI节点引用
 var background: ColorRect = null
@@ -18,7 +17,6 @@ var vbox: VBoxContainer = null
 var charge_button: Button = null
 var multiplier_button: Button = null
 var upgrade_button: Button = null
-var equip_button: Button = null
 
 # 常量
 const MULTIPLIER_LABELS = ["x10", "x100", "Max"]
@@ -31,15 +29,15 @@ func _init():
 
 func setup(parent_node: Node):
 	"""初始化弹窗，创建所有UI元素"""
-	_create_background(parent_node)
+	_create_background()
 	_create_popup_content()
 
-func _create_background(parent_node: Node):
+func _create_background():
 	"""创建背景遮罩层"""
 	background = ColorRect.new()
 	background.name = "SpellPopupBackground"
 	background.visible = false
-	background.z_index = 99
+	background.z_index = -1  # 设置为-1，确保在弹窗内容之下
 	background.color = Color(0, 0, 0, 0.5)
 	background.layout_mode = 1
 	background.anchors_preset = 15
@@ -50,8 +48,7 @@ func _create_background(parent_node: Node):
 	background.mouse_filter = Control.MOUSE_FILTER_STOP
 	background.gui_input.connect(_on_background_clicked)
 	
-	if parent_node:
-		parent_node.add_child(background)
+	add_child(background)
 
 func _create_popup_content():
 	"""创建弹窗内容"""
@@ -67,6 +64,7 @@ func _create_popup_content():
 	offset_bottom = 275.0
 	grow_horizontal = 2
 	grow_vertical = 2
+	mouse_filter = Control.MOUSE_FILTER_STOP  # 阻止事件传递到背景
 	
 	vbox = VBoxContainer.new()
 	vbox.name = "VBoxContainer"
@@ -187,13 +185,6 @@ func _create_popup_content():
 	button_container.add_theme_constant_override("separation", 10)
 	vbox.add_child(button_container)
 	
-	# 装备按钮
-	equip_button = Button.new()
-	equip_button.name = "EquipButton"
-	equip_button.text = "装备"
-	equip_button.pressed.connect(func(): equip_requested.emit())
-	button_container.add_child(equip_button)
-	
 	# 升级按钮
 	upgrade_button = Button.new()
 	upgrade_button.name = "UpgradeButton"
@@ -245,7 +236,7 @@ func update_content(spell_info: Dictionary, spell_config: Dictionary,
 	# 更新等级
 	var level_label = vbox.get_node_or_null("LevelLabel")
 	if level_label:
-		level_label.text = "等级：" + str(spell_info.get("level", 0)) + "/" + str(spell_config.get("max_level", 3))
+		level_label.text = "等级：" + str(int(spell_info.get("level", 0))) + "/" + str(int(spell_config.get("max_level", 3)))
 	
 	# 获取当前等级数据
 	var current_level = spell_info.get("level", 0)
@@ -261,11 +252,6 @@ func update_content(spell_info: Dictionary, spell_config: Dictionary,
 	
 	# 更新升级条件
 	_update_upgrade_conditions(spell_info, spell_config, spell_data, multiplier_index, multipliers)
-	
-	# 更新装备按钮文字
-	if equip_button and spell_system:
-		var is_equipped = spell_system.is_spell_equipped(spell_info.get("id", ""))
-		equip_button.text = "卸载" if is_equipped else "装备"
 
 func _update_attribute_value(level_data: Dictionary):
 	"""更新属性加成显示"""
@@ -301,7 +287,7 @@ func _update_upgrade_conditions(spell_info: Dictionary, spell_config: Dictionary
 	var spirit_charge_container = vbox.get_node_or_null("SpiritChargeContainer")
 	
 	var current_level = spell_info.get("level", 0)
-	var max_level = spell_config.get("max_level", 3)
+	var max_level = int(spell_config.get("max_level", 3))
 	
 	if current_level <= 0:
 		if max_level_label:
@@ -332,9 +318,9 @@ func _update_upgrade_conditions(spell_info: Dictionary, spell_config: Dictionary
 			spirit_charge_container.visible = true
 		
 		var current_level_data = spell_data.get_spell_level_data(spell_info.get("id", ""), current_level) if spell_data else {}
-		var use_count_required = current_level_data.get("use_count_required", 0)
-		var spirit_cost = current_level_data.get("spirit_cost", 0)
-		var charged_spirit = spell_info.get("charged_spirit", 0)
+		var use_count_required = int(current_level_data.get("use_count_required", 0))
+		var spirit_cost = int(current_level_data.get("spirit_cost", 0))
+		var charged_spirit = int(spell_info.get("charged_spirit", 0))
 		
 		if use_count_label:
 			use_count_label.text = "使用次数：" + str(spell_info.get("use_count", 0)) + "/" + str(use_count_required)
@@ -354,8 +340,6 @@ func _set_buttons_enabled(enabled: bool, multiplier_index: int):
 		multiplier_button.text = MULTIPLIER_LABELS[multiplier_index] if multiplier_index < MULTIPLIER_LABELS.size() else "x10"
 	if upgrade_button:
 		upgrade_button.disabled = not enabled
-	if equip_button:
-		equip_button.disabled = false
 
 func update_use_count_only(spell_info: Dictionary, spell_config: Dictionary, spell_data: Node):
 	"""只更新使用次数（用于实时更新）"""
@@ -365,7 +349,7 @@ func update_use_count_only(spell_info: Dictionary, spell_config: Dictionary, spe
 		return
 	
 	var current_level = spell_info.get("level", 0)
-	var max_level = spell_config.get("max_level", 3)
+	var max_level = int(spell_config.get("max_level", 3))
 	
 	if current_level <= 0:
 		if max_level_label:
@@ -381,8 +365,8 @@ func update_use_count_only(spell_info: Dictionary, spell_config: Dictionary, spe
 			max_level_label.visible = false
 		use_count_label.visible = true
 		var current_level_data = spell_data.get_spell_level_data(spell_info.get("id", ""), current_level) if spell_data else {}
-		var use_count_required = current_level_data.get("use_count_required", 0)
-		use_count_label.text = "使用次数：" + str(spell_info.get("use_count", 0)) + "/" + str(use_count_required)
+		var use_count_required = int(current_level_data.get("use_count_required", 0))
+		use_count_label.text = "使用次数：" + str(int(spell_info.get("use_count", 0))) + "/" + str(use_count_required)
 	
 	use_count_label.queue_redraw()
 	
@@ -392,7 +376,11 @@ func update_use_count_only(spell_info: Dictionary, spell_config: Dictionary, spe
 func _on_background_clicked(event: InputEvent):
 	"""点击背景关闭弹窗"""
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		close_requested.emit()
+		# 检查点击位置是否在弹窗内容区域内
+		var popup_rect = get_global_rect()
+		if not popup_rect.has_point(event.global_position):
+			close_requested.emit()
+			accept_event()  # 接受事件，防止继续传播
 
 func cleanup():
 	"""清理资源"""

@@ -1,6 +1,6 @@
 extends Control
 
-const GameServerAPI = preload("res://scripts/api/GameServerAPI.gd")
+const GameServerAPI = preload("res://scripts/network/GameServerAPI.gd")
 const CloudSaveManager = preload("res://scripts/managers/CloudSaveManager.gd")
 const ServerConfig = preload("res://scripts/network/ServerConfig.gd")
 

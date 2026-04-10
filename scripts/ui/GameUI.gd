@@ -9,7 +9,7 @@ const SpellModule = preload("res://scripts/ui/modules/SpellModule.gd")
 const NeishiModule = preload("res://scripts/ui/modules/NeishiModule.gd")
 const CultivationModule = preload("res://scripts/ui/modules/CultivationModule.gd")
 const LianliModule = preload("res://scripts/ui/modules/LianliModule.gd")
-const GameServerAPI = preload("res://scripts/api/GameServerAPI.gd")
+const GameServerAPI = preload("res://scripts/network/GameServerAPI.gd")
 
 var player: Node = null
 var inventory: Node = null
@@ -547,7 +547,7 @@ func setup_lianli_module():
 	lianli_module.lianli_speed_button = lianli_speed_button
 	lianli_module.exit_lianli_button = exit_lianli_button
 	
-	lianli_module.initialize(self, player, lianli_system, lianli_area_data, item_data_ref, inventory, chuna_module, log_manager, alchemy_module, api)
+	lianli_module.initialize(self, player, lianli_system, lianli_area_data, item_data_ref, inventory, chuna_module, log_manager, alchemy_module, api, spell_data_ref, spell_system)
 	
 	lianli_module.log_message.connect(_on_module_log)
 
@@ -577,6 +577,8 @@ func load_game_data():
 			lianli_module.lianli_system = lianli_system
 			lianli_module.lianli_area_data = lianli_area_data
 			lianli_module.item_data_ref = item_data_ref
+			lianli_module.spell_data = spell_data_ref
+			lianli_module.spell_system = spell_system
 		
 		if spell_module:
 			spell_module.spell_system = spell_system
@@ -757,6 +759,8 @@ func refresh_all_player_data():
 			lianli_module.on_player_data_refreshed(data["lianli_system"])
 		# 刷新历练区域按钮（可能涉及次数刷新）
 		update_lianli_area_buttons_display()
+		# 从服务器刷新副本信息缓存
+		_refresh_lianli_info_from_server()
 
 	if inventory and not inventory.item_added.is_connected(_on_item_added):
 		inventory.item_added.connect(_on_item_added)

@@ -52,6 +52,8 @@ func _setup_signals():
 		return
 	if spell_tab and not spell_tab.pressed.is_connected(_on_spell_tab_pressed):
 		spell_tab.pressed.connect(_on_spell_tab_pressed)
+	if spell_system and not spell_system.spell_used.is_connected(on_spell_used):
+		spell_system.spell_used.connect(on_spell_used)
 	_signals_connected = true
 
 func cleanup():
@@ -323,7 +325,6 @@ func _create_spell_detail_popup():
 	add_child(spell_detail_popup)
 	spell_detail_popup.setup(self)
 	spell_detail_popup.close_requested.connect(_on_spell_detail_close_pressed)
-	spell_detail_popup.equip_requested.connect(_on_spell_equip_toggle)
 	spell_detail_popup.upgrade_requested.connect(_on_spell_upgrade_pressed)
 	spell_detail_popup.charge_requested.connect(_on_spell_charge_pressed)
 	spell_detail_popup.multiplier_changed.connect(_on_multiplier_changed)
@@ -472,8 +473,10 @@ func refresh_spell_ui():
 	update_spell_ui()
 
 func on_spell_used(spell_id: String):
+	update_spell_ui()
 	if current_viewing_spell == spell_id:
 		_update_use_count_label_only()
+		_update_spell_detail_popup()
 
 func _begin_action_lock(action: String) -> bool:
 	return _action_lock.try_begin(action)
