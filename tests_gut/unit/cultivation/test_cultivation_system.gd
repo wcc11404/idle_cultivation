@@ -99,6 +99,18 @@ func test_cultivation_gains_spirit_energy():
 	cultivation_system.do_cultivate()
 	assert_eq(player.spirit_energy, 1.0, "修炼获得灵气")
 
+func test_do_cultivate_uses_player_final_spirit_gain_speed():
+	player.spirit_energy = 0.0
+	player.static_spirit_gain_speed = 2.5
+	cultivation_system.do_cultivate()
+	assert_eq(player.spirit_energy, 2.5, "修炼应按玩家最终灵气获取速度增加灵气")
+
+func test_do_cultivate_uses_base_health_regen():
+	player.base_health_regen = 3.0
+	player.health = player.get_final_max_health() - 10.0
+	cultivation_system.do_cultivate()
+	assert_eq(player.health, player.get_final_max_health() - 7.0, "修炼应按基础回血速度恢复气血")
+
 #endregion
 
 #region 信号测试

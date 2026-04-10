@@ -12,6 +12,14 @@ var spell_data: Node = null
 var player_spells: Dictionary = {}
 
 var equipped_spells: Dictionary = {}
+var _cached_bonuses: Dictionary = {
+	"attack": 1.0,
+	"defense": 1.0,
+	"health": 1.0,
+	"spirit_gain": 1.0,
+	"max_spirit": 1.0,
+	"speed": 0.0
+}
 
 var lianli_system: Node = null
 
@@ -22,6 +30,7 @@ func _ready():
 
 func set_player(player_node: Node):
 	player = player_node
+	_notify_player_attributes_changed()
 
 func set_spell_data(spell_data_node: Node):
 	spell_data = spell_data_node
@@ -47,6 +56,41 @@ func _init_player_spells():
 			"opening": [],
 			"production": []
 		}
+		recalculate_bonuses()
+
+func recalculate_bonuses():
+	_cached_bonuses = {
+		"attack": 1.0,
+		"defense": 1.0,
+		"health": 1.0,
+		"spirit_gain": 1.0,
+		"max_spirit": 1.0,
+		"speed": 0.0
+	}
+	
+	if not spell_data:
+		_notify_player_attributes_changed()
+		return
+	
+	for spell_id in player_spells.keys():
+		var spell_info = player_spells[spell_id]
+		if not spell_info.obtained or spell_info.level <= 0:
+			continue
+		
+		var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
+		var attribute_bonus = level_data.get("attribute_bonus", {})
+		
+		for attr in attribute_bonus.keys():
+			if attr == "speed":
+				_cached_bonuses[attr] += attribute_bonus[attr]
+			else:
+				_cached_bonuses[attr] *= attribute_bonus[attr]
+	
+	_notify_player_attributes_changed()
+
+func _notify_player_attributes_changed():
+	if player and is_instance_valid(player) and player.has_method("reload_attributes"):
+		player.reload_attributes()
 
 func _is_in_battle() -> bool:
 	if lianli_system:
@@ -62,6 +106,7 @@ func obtain_spell(spell_id: String) -> bool:
 	
 	player_spells[spell_id].obtained = true
 	player_spells[spell_id].level = 1
+	recalculate_bonuses()
 	spell_obtained.emit(spell_id)
 	return true
 
@@ -182,6 +227,7 @@ func upgrade_spell(spell_id: String) -> Dictionary:
 	spell_info.charged_spirit -= spirit_cost
 	spell_info.level = next_level
 	spell_info.use_count = 0
+	recalculate_bonuses()
 	spell_upgraded.emit(spell_id, next_level)
 	
 	result.success = true
@@ -243,33 +289,7 @@ func get_all_spells_by_type() -> Dictionary:
 	return result
 
 func get_attribute_bonuses() -> Dictionary:
-	var bonuses = {
-		"attack": 1.0,
-		"defense": 1.0,
-		"health": 1.0,
-		"spirit_gain": 1.0,
-		"max_spirit": 1.0,
-		"speed": 0.0
-	}
-	
-	if not spell_data:
-		return bonuses
-	
-	for spell_id in player_spells.keys():
-		var spell_info = player_spells[spell_id]
-		if not spell_info.obtained or spell_info.level <= 0:
-			continue
-		
-		var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
-		var attribute_bonus = level_data.get("attribute_bonus", {})
-		
-		for attr in attribute_bonus.keys():
-			if attr == "speed":
-				bonuses.speed += attribute_bonus[attr]
-			else:
-				bonuses[attr] *= attribute_bonus[attr]
-	
-	return bonuses
+	return _cached_bonuses.duplicate(true)
 
 func get_equipped_breathing_heal_effect() -> Dictionary:
 	if not spell_data:
@@ -581,6 +601,7 @@ func apply_save_data(data: Dictionary):
 	equipped_spells["production"] = []
 
 	if loaded_equipped.is_empty():
+		recalculate_bonuses()
 		return
 
 	for spell_id in _get_equipped_list_by_keys(loaded_equipped, ["breathing", "production"]):
@@ -594,6 +615,8 @@ func apply_save_data(data: Dictionary):
 	for spell_id in _get_equipped_list_by_keys(loaded_equipped, ["opening", "passive"]):
 		if player_spells.has(spell_id) and player_spells[spell_id].obtained:
 			equipped_spells["opening"].append(spell_id)
+	
+	recalculate_bonuses()
 
 func _get_equipped_list_by_keys(source: Dictionary, keys: Array) -> Array:
 	for key in keys:

@@ -1,6 +1,6 @@
 class_name CultivationSystem extends Node
 
-const AttributeCalculator = preload("res://scripts/calculator/AttributeCalculator.gd")
+const AttributeCalculator = preload("res://scripts/core/AttributeCalculator.gd")
 
 signal cultivation_progress(current: int, max: int)
 signal cultivation_complete()
@@ -13,6 +13,46 @@ var cultivation_interval: float = 1.0
 var player: Node = null
 
 const BASE_HEAL_PER_SECOND: float = 1.0
+
+static func calculate_spirit_gain_per_second(player_node: Node) -> float:
+	if not player_node:
+		return 0.0
+	
+	if player_node.has_method("get_final_spirit_gain_speed"):
+		return float(player_node.get_final_spirit_gain_speed())
+	
+	var base_spirit_gain = player_node.get("base_spirit_gain")
+	if base_spirit_gain != null:
+		return float(base_spirit_gain)
+	
+	return 1.0
+
+static func calculate_health_regen_per_second(player_node: Node, spell_system: Node = null) -> float:
+	if not player_node:
+		return 0.0
+	
+	var base_regen := BASE_HEAL_PER_SECOND
+	if player_node.has_method("get_base_health_regen_per_second"):
+		base_regen = float(player_node.get_base_health_regen_per_second())
+	else:
+		var player_base_regen = player_node.get("base_health_regen")
+		if player_base_regen != null:
+			base_regen = float(player_base_regen)
+	
+	if spell_system and spell_system.has_method("get_equipped_breathing_heal_effect"):
+		var breathing_effect = spell_system.get_equipped_breathing_heal_effect()
+		var heal_percent = float(breathing_effect.get("heal_amount", 0.0))
+		if heal_percent > 0.0 and player_node.has_method("get_final_max_health"):
+			base_regen += player_node.get_final_max_health() * heal_percent
+	
+	return base_regen
+
+static func calculate_health_gain_for_interval(player_node: Node, delta_seconds: float, spell_system: Node = null) -> float:
+	if not player_node or delta_seconds <= 0.0:
+		return 0.0
+	
+	var total_regen = calculate_health_regen_per_second(player_node, spell_system) * delta_seconds
+	return float(int(total_regen))
 
 func _ready():
 	pass
@@ -61,29 +101,21 @@ func do_cultivate():
 		return
 	
 	var final_max_health = AttributeCalculator.calculate_final_max_health(player)
-	var total_heal = BASE_HEAL_PER_SECOND
-	
 	var spell_system = _get_spell_system()
+	var total_heal = calculate_health_gain_for_interval(player, cultivation_interval, spell_system)
 	if spell_system:
 		var breathing_effect = spell_system.get_equipped_breathing_heal_effect()
-		if breathing_effect.heal_amount > 0:
-			total_heal += final_max_health * breathing_effect.heal_amount
-		
 		for spell_id in breathing_effect.get("spell_ids", []):
 			spell_system.add_spell_use_count(spell_id)
 	
-	if player.health < final_max_health:
+	if total_heal > 0.0 and player.health < final_max_health:
 		player.heal(total_heal)
 	
 	if player.spirit_energy >= player.get_final_max_spirit_energy():
 		cultivation_complete.emit()
 		return
 	
-	var game_manager = get_node_or_null("/root/GameManager")
-	var realm_system = game_manager.get_realm_system() if game_manager else null
-	var spirit_gain = 1.0
-	if realm_system:
-		spirit_gain = realm_system.get_spirit_gain_speed(player.realm)
+	var spirit_gain = calculate_spirit_gain_per_second(player)
 	
 	player.add_spirit_energy(spirit_gain)
 	

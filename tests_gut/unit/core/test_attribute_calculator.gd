@@ -128,6 +128,13 @@ func test_calculate_final_spirit_gain_speed_null_player():
 	var speed = AttributeCalculator.calculate_final_spirit_gain_speed(null)
 	assert_eq(speed, 1.0, "空玩家灵气获取速度应为1.0")
 
+func test_calculate_final_spirit_gain_speed_uses_player_base_speed():
+	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
+	player.base_spirit_gain = 2.5
+	var speed = AttributeCalculator.calculate_final_spirit_gain_speed(player)
+	assert_eq(speed, 2.5, "应优先使用玩家当前基础灵气获取速度")
+	player.queue_free()
+
 #endregion
 
 #region 战斗属性计算测试 - 使用模拟对象

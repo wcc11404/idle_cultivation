@@ -1,7 +1,8 @@
 class_name CultivationModule extends Node
 
-const AttributeCalculator = preload("res://scripts/calculator/AttributeCalculator.gd")
+const AttributeCalculator = preload("res://scripts/core/AttributeCalculator.gd")
 const ActionLockManager = preload("res://scripts/managers/ActionLockManager.gd")
+const CultivationLogic = preload("res://scripts/core/cultivation/CultivationSystem.gd")
 
 signal cultivation_started
 signal cultivation_stopped
@@ -40,6 +41,7 @@ var _accumulated_seconds: float = 0.0
 var _pending_count: int = 0
 var _flush_in_flight: bool = false
 var _report_failure_count: int = 0
+var _optimistic_health_regen_accumulator: float = 0.0
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
@@ -71,7 +73,7 @@ func _optimistic_tick_once():
 		return
 	
 	# 灵气乐观更新
-	var spirit_gain = player.get_final_spirit_gain_speed() if player.has_method("get_final_spirit_gain_speed") else 0.0
+	var spirit_gain = CultivationLogic.calculate_spirit_gain_per_second(player)
 	if spirit_gain > 0:
 		player.add_spirit(spirit_gain)
 	
@@ -82,31 +84,25 @@ func _optimistic_tick_once():
 	_optimistic_spell_use_once()
 	
 	_pending_count += 1
+	
+	if game_ui and game_ui.has_method("update_ui"):
+		game_ui.update_ui()
 
 func _optimistic_heal_once():
-	var spell_system = _get_spell_system()
-	if not spell_system or not spell_system.has_method("get_equipped_breathing_heal_effect"):
-		return
-	
-	var heal_effect = spell_system.get_equipped_breathing_heal_effect()
-	var heal_percent = heal_effect.get("heal_amount", 0.0)
-	if heal_percent > 0:
-		var max_health = player.get_final_max_health()
-		player.heal(max_health * heal_percent)
+	var exact_regen = CultivationLogic.calculate_health_regen_per_second(player, _get_spell_system())
+	var before_whole = int(_optimistic_health_regen_accumulator)
+	_optimistic_health_regen_accumulator += exact_regen
+	var after_whole = int(_optimistic_health_regen_accumulator)
+	var heal_gain = float(maxi(0, after_whole - before_whole))
+	if heal_gain > 0.0:
+		player.heal(heal_gain)
 
 func _optimistic_spell_use_once():
 	var spell_system = _get_spell_system()
 	if not spell_system:
 		return
 	
-	var breathing_type = -1
-	if spell_system.get("spell_data"):
-		breathing_type = int(spell_system.spell_data.SpellType.BREATHING)
-	
-	if breathing_type < 0:
-		return
-		
-	var breathing_spells = spell_system.equipped_spells.get(breathing_type, []) if spell_system.get("equipped_spells") else []
+	var breathing_spells = spell_system.equipped_spells.get("breathing", []) if spell_system.get("equipped_spells") else []
 	if not breathing_spells.is_empty():
 		var spell_id = str(breathing_spells[0])
 		if spell_system.has_method("add_spell_use_count"):
@@ -120,6 +116,161 @@ func _get_spell_system() -> Node:
 		var game_manager = get_node_or_null("/root/GameManager")
 		spell_system = game_manager.get_spell_system() if game_manager and game_manager.has_method("get_spell_system") else null
 	return spell_system
+
+func _get_realm_system() -> Node:
+	var game_manager = get_node_or_null("/root/GameManager")
+	if game_manager and game_manager.has_method("get_realm_system"):
+		return game_manager.get_realm_system()
+	return null
+
+func _get_breakthrough_preview() -> Dictionary:
+	if not player:
+		return {}
+
+	var realm_system = _get_realm_system()
+	if not realm_system or not realm_system.has_method("can_breakthrough"):
+		return {}
+
+	var realm_name = str(player.get("realm"))
+	var realm_level = int(player.get("realm_level"))
+	var spirit_energy_current = float(player.get("spirit_energy"))
+	var spirit_stone_current = inventory.get_item_count("spirit_stone") if inventory and inventory.has_method("get_item_count") else 0
+
+	var realm_info = realm_system.get_realm_info(realm_name) if realm_system.has_method("get_realm_info") else {}
+	var max_level = int(realm_info.get("max_level", 0))
+	var is_realm_breakthrough = max_level > 0 and realm_level >= max_level
+
+	var required_materials: Dictionary = {}
+	if realm_system.has_method("get_breakthrough_materials"):
+		required_materials = realm_system.get_breakthrough_materials(realm_name, realm_level, is_realm_breakthrough)
+
+	var inventory_items := {}
+	for material_id in required_materials.keys():
+		var current_count = inventory.get_item_count(str(material_id)) if inventory and inventory.has_method("get_item_count") else 0
+		inventory_items[str(material_id)] = current_count
+
+	var preview = realm_system.can_breakthrough(
+		realm_name,
+		realm_level,
+		spirit_stone_current,
+		int(spirit_energy_current),
+		inventory_items
+	)
+	preview["spirit_energy_current"] = spirit_energy_current
+	preview["spirit_stone_current"] = spirit_stone_current
+	preview["required_materials"] = required_materials
+	preview["inventory_items"] = inventory_items
+	return preview
+
+func _get_preview_item_name(item_id: String) -> String:
+	if item_data and item_data.has_method("get_item_name"):
+		return item_data.get_item_name(item_id)
+	return item_id
+
+func _join_text_parts(parts: Array, separator: String) -> String:
+	var result := ""
+	for i in range(parts.size()):
+		if i > 0:
+			result += separator
+		result += str(parts[i])
+	return result
+
+func _format_breakthrough_amount(value: float) -> String:
+	if is_equal_approx(value, round(value)):
+		return str(int(round(value)))
+	return str(snapped(value, 0.1))
+
+func _get_breakthrough_missing_parts(preview: Dictionary) -> Array:
+	var missing_parts: Array = []
+	var energy_cost = float(preview.get("energy_cost", 0.0))
+	var energy_current = float(preview.get("spirit_energy_current", 0.0))
+	var missing_energy = int(ceil(max(0.0, energy_cost - energy_current)))
+	if missing_energy > 0:
+		missing_parts.append("灵气%d" % missing_energy)
+
+	var stone_cost = int(preview.get("stone_cost", 0))
+	var stone_current = int(preview.get("stone_current", preview.get("spirit_stone_current", 0)))
+	var missing_stone = maxi(0, stone_cost - stone_current)
+	if missing_stone > 0:
+		missing_parts.append("灵石%d" % missing_stone)
+
+	var materials = preview.get("materials", {})
+	for raw_material_id in materials.keys():
+		var material_id = str(raw_material_id)
+		var material_info = materials[raw_material_id]
+		if not (material_info is Dictionary):
+			continue
+		var required = int(material_info.get("required", 0))
+		var current = int(material_info.get("current", 0))
+		var missing_count = maxi(0, required - current)
+		if missing_count > 0:
+			missing_parts.append("%s x%d" % [_get_preview_item_name(material_id), missing_count])
+
+	return missing_parts
+
+func _build_breakthrough_preview_text(preview: Dictionary) -> String:
+	if preview.is_empty():
+		return ""
+
+	if bool(preview.get("can", false)):
+		return "可破境" if str(preview.get("type", "")) == "realm" else "可突破"
+
+	var reason = str(preview.get("reason", ""))
+	var materials = preview.get("materials", {})
+	for raw_material_id in materials.keys():
+		var material_id = str(raw_material_id)
+		var material_info = materials[raw_material_id]
+		if not (material_info is Dictionary):
+			continue
+		var required = int(material_info.get("required", 0))
+		var current = int(material_info.get("current", 0))
+		if current < required:
+			return "%s不足（%d/%d）" % [_get_preview_item_name(material_id), current, required]
+
+	if reason == "灵气不足":
+		var current_energy = float(preview.get("energy_current", preview.get("spirit_energy_current", 0.0)))
+		var required_energy = float(preview.get("energy_cost", 0.0))
+		return "灵气不足（%s/%s）" % [_format_breakthrough_amount(current_energy), _format_breakthrough_amount(required_energy)]
+
+	if reason == "灵石不足":
+		var current_stone = float(preview.get("stone_current", preview.get("spirit_stone_current", 0.0)))
+		var required_stone = float(preview.get("stone_cost", 0.0))
+		return "灵石不足（%s/%s）" % [_format_breakthrough_amount(current_stone), _format_breakthrough_amount(required_stone)]
+
+	if not reason.is_empty():
+		return reason
+
+	var missing_parts = _get_breakthrough_missing_parts(preview)
+	if not missing_parts.is_empty():
+		return "缺少" + _join_text_parts(missing_parts, "、")
+
+	return "暂不可突破"
+
+func _resolve_breakthrough_failure_message(result: Dictionary) -> String:
+	var err_msg = api.network_manager.get_api_error_text_for_ui(result, "突破失败")
+	if err_msg.is_empty():
+		var reason = str(result.get("reason", ""))
+		var message = str(result.get("message", ""))
+		if not reason.is_empty():
+			err_msg = reason
+		elif not message.is_empty() and message != "请求失败" and message != "请检查网络连接":
+			err_msg = message
+
+	if err_msg == "资源不足" or err_msg == "突破失败":
+		var preview = _get_breakthrough_preview()
+		var preview_text = _build_breakthrough_preview_text(preview)
+		if not preview_text.is_empty() and preview_text != "暂不可突破" and preview_text != "可突破" and preview_text != "可破境":
+			err_msg = preview_text
+
+	return err_msg
+
+func _get_local_breakthrough_block_message() -> String:
+	var preview = _get_breakthrough_preview()
+	if preview.is_empty():
+		return ""
+	if bool(preview.get("can", false)):
+		return ""
+	return _build_breakthrough_preview_text(preview)
 
 func _auto_flush_report():
 	await _flush_pending_report(5)
@@ -140,6 +291,10 @@ func _flush_pending_report(max_batch: int = -1) -> bool:
 	if result.get("success", false):
 		_pending_count = maxi(0, _pending_count - report_count)
 		_report_failure_count = 0
+		if _pending_count == 0:
+			# 服务端按单次上报批次独立结算回血取整，当前批次结算完成后，
+			# 下一批乐观回血不能继续沿用上一批的小数尾数。
+			_optimistic_health_regen_accumulator = 0.0
 		_apply_report_result(result, report_count)
 		return true
 
@@ -177,13 +332,7 @@ func _sync_breathing_spell_use_count(used_count_gained: int):
 	if not spell_system or not spell_system.has_method("add_spell_use_count"):
 		return
 
-	var breathing_type = -1
-	if spell_system.get("spell_data"):
-		breathing_type = int(spell_system.spell_data.SpellType.BREATHING)
-	if breathing_type < 0:
-		return
-
-	var breathing_spells = spell_system.equipped_spells.get(breathing_type, []) if spell_system.get("equipped_spells") else []
+	var breathing_spells = spell_system.equipped_spells.get("breathing", []) if spell_system.get("equipped_spells") else []
 	if breathing_spells.is_empty():
 		return
 
@@ -247,6 +396,7 @@ func on_cultivate_button_pressed():
 		_pending_count = 0
 		_accumulated_seconds = 0.0
 		_report_failure_count = 0
+		_optimistic_health_regen_accumulator = 0.0
 		if game_ui and game_ui.has_method("set_active_mode"):
 			game_ui.set_active_mode("cultivation")
 		cultivate_button.text = "停止修炼"
@@ -274,6 +424,7 @@ func _stop_cultivation_internal(by_failure: bool):
 		player.cultivation_active = false
 		_pending_count = 0
 		_accumulated_seconds = 0.0
+		_optimistic_health_regen_accumulator = 0.0
 		if game_ui and game_ui.has_method("clear_active_mode"):
 			game_ui.clear_active_mode("cultivation")
 		if cultivate_button:
@@ -288,6 +439,12 @@ func on_breakthrough_button_pressed():
 	if not player or not api:
 		return
 	if not _begin_action_lock("breakthrough"):
+		return
+
+	var local_block_msg = _get_local_breakthrough_block_message()
+	if not local_block_msg.is_empty():
+		log_message.emit(local_block_msg)
+		_end_action_lock("breakthrough")
 		return
 
 	var settled = await flush_pending_and_then(func(): pass)
@@ -309,7 +466,7 @@ func on_breakthrough_button_pressed():
 		breakthrough_succeeded.emit(result)
 	else:
 		# 突破异常，按要求技术性报错由 NetworkManager 处理并在控制台打印，业务逻辑失败才反馈 UI
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "突破失败")
+		var err_msg = _resolve_breakthrough_failure_message(result)
 		if not err_msg.is_empty():
 			log_message.emit(err_msg)
 		breakthrough_failed.emit(result)
@@ -371,6 +528,7 @@ func update_display(status: Dictionary = {}):
 			breakthrough_button.text = "破境"
 		else:
 			breakthrough_button.text = "突破"
+		breakthrough_button.tooltip_text = _build_breakthrough_preview_text(_get_breakthrough_preview())
 
 func cleanup():
 	pass

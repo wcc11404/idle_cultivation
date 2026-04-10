@@ -117,7 +117,7 @@ func _request_once(method: String, endpoint: String, body: Dictionary = {}) -> D
 
 func parse_response(response: Array) -> Dictionary:
 	var request_success = response[0] == HTTPRequest.RESULT_SUCCESS
-	var response_code = response[2]
+	var response_code = response[1]
 	var body = response[3]
 
 	var status_code = 0
@@ -171,6 +171,23 @@ func _should_retry(result: Dictionary) -> bool:
 		return false
 	return is_technical_error(result)
 
+func _has_business_feedback(result: Dictionary) -> bool:
+	var reason := str(result.get("reason", ""))
+	if not reason.is_empty():
+		return true
+
+	var message := str(result.get("message", ""))
+	if message.is_empty():
+		return false
+
+	var technical_messages := [
+		"请求失败",
+		"请检查网络连接",
+		"网络请求初始化失败",
+		"服务器响应格式错误"
+	]
+	return not technical_messages.has(message)
+
 func is_technical_error(result: Dictionary) -> bool:
 	if result.get("success", false):
 		return false
@@ -178,11 +195,19 @@ func is_technical_error(result: Dictionary) -> bool:
 	var code := str(result.get("error_code", ""))
 	if code.begins_with("NET_"):
 		return true
-	
+
 	var response_code = int(result.get("response_code", 0))
 	# response_code 为 0 通常意味着网络层面的错误 (如超时、无法连接)
 	# >= 500 表示服务器内部错误，也属于技术性错误
-	if response_code == 0 or response_code >= 500:
+	if response_code >= 500:
+		return true
+
+	# 如果已经拿到了明确的业务失败原因，则按业务失败处理，
+	# 不再继续按 response_code/is_http_ok 兜底成技术性错误。
+	if _has_business_feedback(result):
+		return false
+
+	if response_code == 0:
 		return true
 	
 	# 如果没有 success 且没有显式的业务错误码，但也属于 HTTP 错误（如 404），

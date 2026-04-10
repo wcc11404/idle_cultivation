@@ -1,6 +1,6 @@
 class_name PlayerData extends Node
 
-const AttributeCalculator = preload("res://scripts/calculator/AttributeCalculator.gd")
+const AttributeCalculator = preload("res://scripts/core/AttributeCalculator.gd")
 
 var realm: String = "炼气期"
 var realm_level: int = 1
@@ -18,7 +18,17 @@ var base_max_spirit: float = 5.0
 var base_attack: float = 5.0
 var base_defense: float = 2.0
 var base_speed: float = 5.0
+var base_health_regen: float = 1.0
 var base_spirit_gain: float = 1.0
+
+# 静态最终属性（基础属性 + 术法等永久加成）
+var static_max_health: float = 50.0
+var static_max_spirit_energy: float = 5.0
+var static_attack: float = 5.0
+var static_defense: float = 2.0
+var static_speed: float = 5.0
+var static_health_regen_per_second: float = 1.0
+var static_spirit_gain_speed: float = 1.0
 
 var cultivation_active: bool = false
 
@@ -30,9 +40,9 @@ func _ready():
 	# 初始化默认值
 	health = 50.0
 	base_max_health = 50.0
-	apply_realm_stats()
+	reload_attributes()
 
-func apply_realm_stats():
+func _load_base_attributes():
 	var realm_system = get_node_or_null("/root/GameManager").get_realm_system() if get_node_or_null("/root/GameManager") else null
 	
 	if realm_system:
@@ -41,6 +51,7 @@ func apply_realm_stats():
 		base_attack = float(level_info.get("attack", 5))
 		base_defense = float(level_info.get("defense", 2))
 		base_max_spirit = float(level_info.get("max_spirit_energy", 5))
+		base_health_regen = float(level_info.get("health_regen", 1.0))
 		max_spirit_energy = base_max_spirit
 		# 从境界配置获取速度
 		var realm_info = realm_system.get_realm_info(realm)
@@ -53,18 +64,28 @@ func apply_realm_stats():
 		base_attack = float(realm_info.get("attack", 5))
 		base_defense = float(realm_info.get("defense", 2))
 		base_max_spirit = 5.0
+		base_health_regen = 1.0
 		max_spirit_energy = base_max_spirit
 		base_speed = 5.0
 		base_spirit_gain = 1.0
+
+func _load_static_attributes():
+	static_max_health = AttributeCalculator.calculate_final_max_health(self)
+	static_max_spirit_energy = AttributeCalculator.calculate_final_max_spirit_energy(self)
+	static_attack = AttributeCalculator.calculate_final_attack(self)
+	static_defense = AttributeCalculator.calculate_final_defense(self)
+	static_speed = AttributeCalculator.calculate_final_speed(self)
+	static_health_regen_per_second = base_health_regen
+	static_spirit_gain_speed = AttributeCalculator.calculate_final_spirit_gain_speed(self)
 	
-	# 保持当前生命值不变，只更新最大生命值
-	
-	# 确保当前气血不超过最终上限（包含术法加成）
-	var final_max_health = get_final_max_health()
-	health = min(health, final_max_health)
-	
-	# 突破时不限制灵气，让超过上限的灵气保留
-	# spirit_energy = min(spirit_energy, max_spirit_energy)
+	health = min(health, static_max_health)
+
+func apply_realm_stats():
+	reload_attributes()
+
+func reload_attributes():
+	_load_base_attributes()
+	_load_static_attributes()
 
 func get_default_realm_info() -> Dictionary:
 	return {"health": 50, "attack": 5, "defense": 2}
@@ -86,14 +107,16 @@ func get_display_dict() -> Dictionary:
 		"base_attack": base_attack,
 		"base_defense": base_defense,
 		"base_speed": base_speed,
+		"base_health_regen": base_health_regen,
 		"base_spirit_gain": base_spirit_gain,
 		# 最终属性（供UI显示使用）
-		"final_max_health": get_final_max_health(),
-		"final_max_spirit": get_final_max_spirit_energy(),
-		"final_attack": get_final_attack(),
-		"final_defense": get_final_defense(),
-		"final_speed": get_final_speed(),
-		"final_spirit_gain": get_final_spirit_gain_speed(),
+		"final_max_health": static_max_health,
+		"final_max_spirit": static_max_spirit_energy,
+		"final_attack": static_attack,
+		"final_defense": static_defense,
+		"final_speed": static_speed,
+		"final_health_regen": static_health_regen_per_second,
+		"final_spirit_gain": static_spirit_gain_speed,
 		"spirit_stone": actual_spirit_stone
 	}
 
@@ -134,22 +157,31 @@ func get_spell_bonuses() -> Dictionary:
 # 静态最终能力值 = 基础值 + 境界加成 + 术法加成 + 装备加成 + 功法加成 + 丹药加成
 
 func get_final_attack() -> float:
-	return AttributeCalculator.calculate_final_attack(self)
+	return static_attack
 
 func get_final_defense() -> float:
-	return AttributeCalculator.calculate_final_defense(self)
+	return static_defense
 
 func get_final_speed() -> float:
-	return AttributeCalculator.calculate_final_speed(self)
+	return static_speed
 
 func get_final_max_health() -> float:
-	return AttributeCalculator.calculate_final_max_health(self)
+	return static_max_health
 
 func get_final_max_spirit_energy() -> float:
-	return AttributeCalculator.calculate_final_max_spirit_energy(self)
+	return static_max_spirit_energy
 
 func get_final_spirit_gain_speed() -> float:
-	return AttributeCalculator.calculate_final_spirit_gain_speed(self)
+	return static_spirit_gain_speed
+
+func get_base_health_regen_per_second() -> float:
+	return base_health_regen
+
+func get_base_spirit_gain_speed() -> float:
+	return base_spirit_gain
+
+func get_static_health_regen_per_second() -> float:
+	return static_health_regen_per_second
 
 # ==================== 战斗最终能力值计算 ====================
 # 战斗最终能力值 = 静态最终能力值 + 战斗临时Buff

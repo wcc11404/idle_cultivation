@@ -285,13 +285,22 @@ static func _get_spell_bonuses(player: Node) -> Dictionary:
 static func _get_base_spirit_gain_speed(player: Node) -> float:
 	if not player:
 		return 1.0
+
+	if player.has_method("get_base_spirit_gain_speed"):
+		return float(player.get_base_spirit_gain_speed())
+
+	var base_spirit_gain = player.get("base_spirit_gain")
+	if base_spirit_gain != null:
+		return float(base_spirit_gain)
 	
 	# 从 RealmSystem 获取灵气获取速度
 	var game_manager = _get_game_manager()
 	if game_manager:
 		var realm_system = game_manager.get_realm_system() if game_manager.has_method("get_realm_system") else null
-		if realm_system and player.has_method("get_realm"):
-			return realm_system.get_spirit_gain_speed(player.get_realm())
+		if realm_system:
+			var realm_name = player.get("realm")
+			if realm_name != null:
+				return float(realm_system.get_spirit_gain_speed(str(realm_name)))
 	
 	return 1.0
 
