@@ -20,20 +20,6 @@ func start_auto_save():
 func _auto_save_loop():
 	return
 
-func save_game() -> bool:
-	# 客户端瘦身后不再调用 /game/save，保留接口仅为兼容历史调用。
-	last_save_time = Time.get_unix_time_from_system()
-	save_failure_count = 0
-	return true
-
-func save_partial(fields: Array) -> bool:
-	# 客户端瘦身后不再调用 /game/save，保留接口仅为兼容历史调用。
-	if fields.is_empty():
-		return false
-	last_save_time = Time.get_unix_time_from_system()
-	save_failure_count = 0
-	return true
-
 func load_game() -> bool:
 	var result = await api.load_game()
 	if result.get("success", false):
@@ -108,5 +94,4 @@ func stop_auto_save():
 	is_autosave_running = false
 
 func on_game_exit():
-	# 客户端瘦身后退出时不再调用 /game/save。
 	stop_auto_save()

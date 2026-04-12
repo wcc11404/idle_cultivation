@@ -18,7 +18,9 @@ func before_each():
 
 func after_each():
 	if realm_system:
-		realm_system.queue_free()
+		realm_system.free()
+		realm_system = null
+	await get_tree().process_frame
 
 func _setup_mock_data():
 	realm_system.REALM_ORDER = ["炼气期", "筑基期", "金丹期", "元婴期"]

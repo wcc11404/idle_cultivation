@@ -14,7 +14,8 @@ const GameServerAPI = preload("res://scripts/network/GameServerAPI.gd")
 var player: Node = null
 var inventory: Node = null
 var spell_system: Node = null
-var api: GameServerAPI = null
+var api: Node = null
+var _silent_item_added_log_depth: int = 0
 
 # 炼丹系统引用
 var alchemy_system: Node = null
@@ -194,6 +195,7 @@ var current_lianli_area_id: String = ""
 var current_lianli_speed_index: int = 0
 const LIANLI_SPEEDS = [1.0, 1.5, 2.0]
 var active_mode: String = "none"
+var allow_background_server_refresh: bool = true
 
 func _ready():
 	# 安全获取可选节点
@@ -432,7 +434,7 @@ func setup_chuna_module():
 	chuna_module.sort_button = sort_button
 	
 	# 初始化模块
-	chuna_module.initialize(self, player, inventory, item_data_ref, spell_system, spell_data_ref, alchemy_system, api)
+	chuna_module.initialize(self, player, inventory, item_data_ref, spell_system, spell_data_ref, alchemy_system, api, recipe_data)
 	
 	# 连接信号
 	chuna_module.log_message.connect(_on_module_log)
@@ -484,7 +486,7 @@ func setup_neishi_module():
 	var game_manager = get_node("/root/GameManager")
 	cultivation_system = game_manager.get_cultivation_system() if game_manager else null
 	lianli_system = game_manager.get_lianli_system() if game_manager else null
-	cultivation_module.initialize(self, player, cultivation_system, lianli_system, item_data_ref, alchemy_module, api)
+	cultivation_module.initialize(self, player, cultivation_system, lianli_system, item_data_ref, alchemy_module, api, spell_system, get_node_or_null("/root/GameManager").get_realm_system() if get_node_or_null("/root/GameManager") else null)
 	
 	# 连接信号
 	cultivation_module.log_message.connect(_on_module_log)
@@ -716,10 +718,8 @@ func refresh_all_player_data():
 	if not result.get("success", false):
 		_on_module_log("玩家数据同步失败，请检查网络连接")
 		return
-		
+
 	var data = result.get("data", {})
-	if data.is_empty():
-		data = result
 	
 	# 3. 分发并应用数据到各个核心系统
 	if data.has("player") and player:
@@ -760,7 +760,8 @@ func refresh_all_player_data():
 		# 刷新历练区域按钮（可能涉及次数刷新）
 		update_lianli_area_buttons_display()
 		# 从服务器刷新副本信息缓存
-		_refresh_lianli_info_from_server()
+		if allow_background_server_refresh:
+			call_deferred("_refresh_lianli_info_from_server")
 
 	if inventory and not inventory.item_added.is_connected(_on_item_added):
 		inventory.item_added.connect(_on_item_added)
@@ -769,8 +770,16 @@ func _on_item_added(item_id: String, count: int):
 	if chuna_module:
 		chuna_module.update_inventory_ui()
 	update_ui()  # 更新灵石数量显示
+	if _silent_item_added_log_depth > 0:
+		return
 	if log_manager:
 		log_manager.add_system_log("获得物品: " + item_data_ref.get_item_name(item_id) + " x" + str(count))
+
+func begin_silent_item_added_logs():
+	_silent_item_added_log_depth += 1
+
+func end_silent_item_added_logs():
+	_silent_item_added_log_depth = max(0, _silent_item_added_log_depth - 1)
 
 func show_neishi_tab():
 	neishi_panel.visible = true
@@ -860,7 +869,8 @@ func show_lianli_tab():
 	update_lianli_area_buttons_display()
 	if endless_tower_button and lianli_module:
 		lianli_module.update_endless_tower_button_text(endless_tower_button)
-	_refresh_lianli_info_from_server()
+	if allow_background_server_refresh:
+		call_deferred("_refresh_lianli_info_from_server")
 
 	# 检查是否处于历练中
 	if lianli_module:
@@ -1053,27 +1063,24 @@ func _refresh_lianli_info_from_server():
 
 	var cave_result = await api.lianli_foundation_herb_cave()
 	if cave_result.get("success", false):
-		var cave_body: Dictionary = cave_result
-		if cave_result.has("data") and cave_result["data"] is Dictionary:
-			cave_body = cave_result["data"]
 		dungeon_info_cache["foundation_herb_cave"] = {
-			"remaining_count": int(cave_body.get("remaining_count", 0)),
-			"max_count": int(cave_body.get("max_count", 3))
+			"remaining_count": int(cave_result.get("remaining_count", 0)),
+			"max_count": int(cave_result.get("max_count", 3))
 		}
 
 	var tower_result = await api.lianli_tower()
 	if tower_result.get("success", false):
-		var tower_body: Dictionary = tower_result
-		if tower_result.has("data") and tower_result["data"] is Dictionary:
-			tower_body = tower_result["data"]
 		if lianli_system:
-			lianli_system.tower_highest_floor = int(tower_body.get("highest_floor", lianli_system.tower_highest_floor))
+			lianli_system.tower_highest_floor = int(tower_result.get("highest_floor", lianli_system.tower_highest_floor))
 		if lianli_module and lianli_module.lianli_system:
-			lianli_module.lianli_system.tower_highest_floor = int(tower_body.get("highest_floor", lianli_module.lianli_system.tower_highest_floor))
+			lianli_module.lianli_system.tower_highest_floor = int(tower_result.get("highest_floor", lianli_module.lianli_system.tower_highest_floor))
 
 	update_lianli_area_buttons_display()
 	if endless_tower_button and lianli_module:
 		lianli_module.update_endless_tower_button_text(endless_tower_button)
+
+func set_background_server_refresh_enabled(enabled: bool) -> void:
+	allow_background_server_refresh = enabled
 
 # 更新历练区域按钮显示（用于刷新每日次数等）
 func update_lianli_area_buttons_display():
@@ -1289,6 +1296,20 @@ func claim_offline_reward():
 		else:
 			# 获取离线奖励失败
 			if log_manager:
-				log_manager.add_system_log("获取离线奖励失败")
+				var err_msg = _get_offline_reward_result_message(result, "获取离线奖励失败")
+				if err_msg.is_empty():
+					log_manager.add_system_log("获取离线奖励失败")
+				else:
+					log_manager.add_system_log(err_msg)
+
+func _get_offline_reward_result_message(result: Dictionary, fallback: String = "") -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	match reason_code:
+		"GAME_OFFLINE_REWARD_GRANTED":
+			return ""
+		"GAME_OFFLINE_REWARD_SKIPPED_SHORT_OFFLINE":
+			return ""
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
 
 # 内视子Tab处理已迁移到 NeishiModule

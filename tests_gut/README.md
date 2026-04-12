@@ -1,112 +1,101 @@
-# GUT 测试框架使用指南
+# 客户端 GUT API 测试说明
 
-## 安装完成
+## 测试定位
 
-GUT (Godot Unit Test) 已安装到 `addons/gut` 目录。
+`tests_gut/` 现在默认采用“真实客户端模块 + 固定测试账号 + 服务端 `/api/test/*` 状态构造”的模式。
 
-## 运行测试
+- 业务真值来自服务端 API，不再直接拿本地 `scripts/core/*` 旧逻辑当断言依据
+- `/api/test/*` 只允许出现在 `tests_gut/support/*`
+- 模块测试重点校验客户端状态同步、按钮行为、富文本日志和文案翻译
 
-### 方式1：命令行运行
+## 前置条件
+
+运行客户端 GUT 之前，需要先启动本地服务端，并保证：
+
+- API 地址默认是 `http://127.0.0.1:8444/api`
+- 固定测试账号可用：`test / test123`
+- 服务端已经包含 `/api/test/*` 测试支持接口
+
+如果服务端地址不是默认值，可以在运行脚本前覆盖：
+
 ```bash
-# 运行所有 GUT 测试
-godot --headless --script res://addons/gut/gut_cmdln.gd -gdir=res://tests_gut -ginclude_subdirs -gexit
+export GODOT_BIN=/Applications/Godot.app/Contents/MacOS/godot
+export GODOT_TEST_HOME="$(pwd)/.godot_test_home"
+```
 
-# 或使用脚本
+客户端测试会在每条用例开始前：
+
+1. 清理本地 token 和服务器地址缓存
+2. 登录测试账号
+3. 调用 `/api/test/reset_account`
+4. 视需要调用 `/api/test/apply_preset`
+5. 同步真实 `game/data`
+
+## 目录结构
+
+```text
+tests_gut/
+├── fixtures/
+│   └── fixture_helper.gd        # 通用断言/日志/背包辅助
+├── support/
+│   ├── module_harness.gd        # 主界面与模块测试基座
+│   ├── server_state_adapter.gd  # 服务端状态同步辅助
+│   ├── server_client.gd         # 测试账号与 /api/test/* 调用封装
+│   └── session_helper.gd        # 本地 token / server_config 清理
+├── integration/
+│   └── test_module_api_smoke.gd # 跨模块 smoke
+└── unit/
+    └── ui/                      # 模块级 API 集成测试
+```
+
+## 运行命令
+
+在客户端项目根目录执行统一入口：
+
+```bash
+GODOT_BIN=/Applications/Godot.app/Contents/MacOS/godot ./run_tests.sh
+```
+
+这个脚本同时兼容 macOS 和 WSL/Linux：
+
+- macOS：可直接使用 `/Applications/Godot.app/Contents/MacOS/godot`
+- WSL/Linux：优先使用 `godot4`，其次使用 `godot`
+
+或直接调用 GUT：
+
+```bash
+HOME="$(pwd)/.godot_test_home" \
+"/Applications/Godot.app/Contents/MacOS/godot" \
+  --headless \
+  --path . \
+  --script res://addons/gut/gut_cmdln.gd \
+  -gdir=res://tests_gut \
+  -ginclude_subdirs \
+  -gexit
+```
+
+兼容入口 `tests_gut/run_gut_tests.sh` 仍保留，但只是转发到统一脚本：
+
+```bash
 ./tests_gut/run_gut_tests.sh
 ```
 
-### 方式2：在 Godot 编辑器中运行
-1. 打开项目
-2. 菜单：Project → Project Settings → Plugins
-3. 确保 GUT 插件已启用
-4. 菜单：GUT → Run All Tests
+## 当前覆盖范围
 
-## 测试文件结构
+- 修炼与突破
+- 储纳与物品使用
+- 术法装备互斥与战斗锁定
+- 炼丹开炉、上报、停火文案
+- 历练进入、返回页定位、结算失败收敛
+- 设置中的改昵称与排行榜静默加载
+- 跨模块 smoke
 
-```
-tests_gut/
-├── gut_config.gd          # GUT 配置
-├── GutTestRunner.tscn     # 测试运行场景
-├── run_gut_tests.sh       # 命令行运行脚本
-├── test_lianli_flow.gd    # 历练系统测试
-└── test_ui_automation.gd  # UI 自动化测试
-```
+## 保留的本地测试
 
-## GUT 常用断言
+纯工具类和静态数据类测试仍保留，例如：
 
-```gdscript
-# 基本断言
-assert_true(condition, "描述")
-assert_false(condition, "描述")
-assert_eq(actual, expected, "描述")
-assert_ne(actual, expected, "描述")
-assert_gt(value, compare, "描述")
-assert_lt(value, compare, "描述")
-assert_near(actual, expected, tolerance, "描述")
+- `unit/core/test_log_manager.gd`
+- `unit/core/test_attribute_calculator.gd`
+- `unit/data/*`
 
-# 空值断言
-assert_null(value, "描述")
-assert_not_null(value, "描述")
-
-# 类型断言
-assert_is(value, type, "描述")
-
-# 字符串断言
-assert_string_contains(string, substring, "描述")
-assert_string_starts_with(string, prefix, "描述")
-
-# 待定测试
-pending("待实现的功能")
-```
-
-## 生命周期方法
-
-```gdscript
-func before_all():
-    # 所有测试前执行一次
-    pass
-
-func after_all():
-    # 所有测试后执行一次
-    pass
-
-func before_each():
-    # 每个测试前执行
-    pass
-
-func after_each():
-    # 每个测试后执行
-    pass
-```
-
-## 参数化测试
-
-```gdscript
-func test_player_damage(params = use_parameters([
-    [100, 90],   # damage, expected_health
-    [50, 50],
-    [200, 0]
-])):
-    var damage = params[0]
-    var expected = params[1]
-    player.take_damage(damage)
-    assert_eq(player.health, expected)
-```
-
-## 模拟对象 (Mock)
-
-```gdscript
-func test_with_mock():
-    var mock_player = double(Player).new()
-    stub(mock_player, 'take_damage').to_return(10)
-    
-    mock_player.take_damage(100)
-    
-    assert_called(mock_player, 'take_damage', [100])
-```
-
-## 参考资料
-
-- [GUT 官方文档](https://github.com/bitwes/Gut/wiki)
-- [GUT 断言参考](https://github.com/bitwes/Gut/wiki/Assertions)
-- [GUT 命令行参数](https://github.com/bitwes/Gut/wiki/Command-Line)
+这些测试只用于验证客户端内部工具或静态配置，不承担业务真值判定。

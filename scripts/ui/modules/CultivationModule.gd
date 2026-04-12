@@ -18,6 +18,8 @@ var item_data: Node = null
 var alchemy_module: Node = null
 var inventory: Node = null
 var api: Node = null
+var spell_system_ref: Node = null
+var realm_system_ref: Node = null
 
 var cultivation_panel: Control = null
 var cultivate_button: Button = null
@@ -46,7 +48,17 @@ var _optimistic_health_regen_accumulator: float = 0.0
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
 
-func initialize(ui: Node, player_node: Node, cult_sys: Node, lianli_sys: Node = null, item_data_ref: Node = null, alchemy_mod: Node = null, game_api: Node = null):
+func initialize(
+	ui: Node,
+	player_node: Node,
+	cult_sys: Node,
+	lianli_sys: Node = null,
+	item_data_ref: Node = null,
+	alchemy_mod: Node = null,
+	game_api: Node = null,
+	spell_sys_ref: Node = null,
+	realm_sys_ref: Node = null
+):
 	game_ui = ui
 	player = player_node
 	cultivation_system = cult_sys
@@ -54,6 +66,8 @@ func initialize(ui: Node, player_node: Node, cult_sys: Node, lianli_sys: Node = 
 	item_data = item_data_ref
 	alchemy_module = alchemy_mod
 	api = game_api
+	spell_system_ref = spell_sys_ref
+	realm_system_ref = realm_sys_ref
 	set_process(true)
 
 func _process(delta: float):
@@ -110,6 +124,8 @@ func _optimistic_spell_use_once():
 
 func _get_spell_system() -> Node:
 	var spell_system = null
+	if spell_system_ref and is_instance_valid(spell_system_ref):
+		return spell_system_ref
 	if game_ui and game_ui.get("spell_system"):
 		spell_system = game_ui.spell_system
 	if not spell_system:
@@ -118,6 +134,8 @@ func _get_spell_system() -> Node:
 	return spell_system
 
 func _get_realm_system() -> Node:
+	if realm_system_ref and is_instance_valid(realm_system_ref):
+		return realm_system_ref
 	var game_manager = get_node_or_null("/root/GameManager")
 	if game_manager and game_manager.has_method("get_realm_system"):
 		return game_manager.get_realm_system()
@@ -179,6 +197,56 @@ func _format_breakthrough_amount(value: float) -> String:
 	if is_equal_approx(value, round(value)):
 		return str(int(round(value)))
 	return str(snapped(value, 0.1))
+
+func _get_breakthrough_cost_name(cost_id: String) -> String:
+	match cost_id:
+		"spirit_energy":
+			return "灵气"
+		"spirit_stone":
+			return "灵石"
+		_:
+			return _get_preview_item_name(cost_id)
+
+func _format_breakthrough_cost_entry(cost_id: String, amount: Variant) -> String:
+	var numeric_amount = float(amount)
+	var formatted_amount = _format_breakthrough_amount(numeric_amount)
+	if cost_id == "spirit_energy" or cost_id == "spirit_stone":
+		return _get_breakthrough_cost_name(cost_id) + formatted_amount
+	return "%s x%s" % [_get_breakthrough_cost_name(cost_id), formatted_amount]
+
+func _get_ordered_resource_ids(resources: Dictionary) -> Array:
+	var ordered_ids: Array = []
+	for special_id in ["spirit_energy", "spirit_stone"]:
+		if resources.has(special_id):
+			ordered_ids.append(special_id)
+	var other_ids: Array = []
+	for raw_id in resources.keys():
+		var resource_id = str(raw_id)
+		if resource_id == "spirit_energy" or resource_id == "spirit_stone":
+			continue
+		other_ids.append(resource_id)
+	other_ids.sort()
+	for resource_id in other_ids:
+		ordered_ids.append(resource_id)
+	return ordered_ids
+
+func _build_breakthrough_resource_text(resources: Dictionary) -> String:
+	if resources.is_empty():
+		return ""
+	var parts: Array = []
+	for resource_id in _get_ordered_resource_ids(resources):
+		parts.append(_format_breakthrough_cost_entry(resource_id, resources[resource_id]))
+	return _join_text_parts(parts, "、")
+
+func _build_breakthrough_success_message(result: Dictionary) -> String:
+	var reason_data = result.get("reason_data", {})
+	var consumed_resources = reason_data.get("consumed_resources", {})
+	if not (consumed_resources is Dictionary):
+		consumed_resources = {}
+	var resource_text = _build_breakthrough_resource_text(consumed_resources)
+	if resource_text.is_empty():
+		return "突破成功"
+	return "突破成功，消耗了" + resource_text
 
 func _get_breakthrough_missing_parts(preview: Dictionary) -> Array:
 	var missing_parts: Array = []
@@ -247,22 +315,44 @@ func _build_breakthrough_preview_text(preview: Dictionary) -> String:
 	return "暂不可突破"
 
 func _resolve_breakthrough_failure_message(result: Dictionary) -> String:
-	var err_msg = api.network_manager.get_api_error_text_for_ui(result, "突破失败")
-	if err_msg.is_empty():
-		var reason = str(result.get("reason", ""))
-		var message = str(result.get("message", ""))
-		if not reason.is_empty():
-			err_msg = reason
-		elif not message.is_empty() and message != "请求失败" and message != "请检查网络连接":
-			err_msg = message
+	var reason_code = str(result.get("reason_code", ""))
+	var reason_data = result.get("reason_data", {})
+	match reason_code:
+		"CULTIVATION_BREAKTHROUGH_INSUFFICIENT_RESOURCES":
+			var missing_resources = reason_data.get("missing_resources", {})
+			if missing_resources is Dictionary and not missing_resources.is_empty():
+				return "突破失败，缺少" + _build_breakthrough_resource_text(missing_resources)
+			return "突破失败，资源不足"
+		"CULTIVATION_BREAKTHROUGH_NOT_AVAILABLE":
+			return "当前境界已无法继续突破"
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, "突破失败")
 
-	if err_msg == "资源不足" or err_msg == "突破失败":
-		var preview = _get_breakthrough_preview()
-		var preview_text = _build_breakthrough_preview_text(preview)
-		if not preview_text.is_empty() and preview_text != "暂不可突破" and preview_text != "可突破" and preview_text != "可破境":
-			err_msg = preview_text
-
-	return err_msg
+func _resolve_cultivation_result_message(result: Dictionary, fallback: String = "") -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	match reason_code:
+		"CULTIVATION_START_SUCCEEDED":
+			return "开始修炼"
+		"CULTIVATION_START_ALREADY_ACTIVE":
+			return "已在修炼状态"
+		"CULTIVATION_START_BLOCKED_BY_BATTLE":
+			return "正在战斗中，无法开始修炼"
+		"CULTIVATION_START_BLOCKED_BY_ALCHEMY":
+			return "正在炼丹中，无法开始修炼"
+		"CULTIVATION_REPORT_NOT_ACTIVE":
+			return "当前未在修炼状态"
+		"CULTIVATION_REPORT_TIME_INVALID":
+			return "修炼同步异常，请稍后重试"
+		"CULTIVATION_STOP_SUCCEEDED":
+			return "停止修炼"
+		"CULTIVATION_STOP_NOT_ACTIVE":
+			return "当前未在修炼状态"
+		"CULTIVATION_BREAKTHROUGH_SUCCEEDED":
+			return _build_breakthrough_success_message(result)
+		"CULTIVATION_BREAKTHROUGH_INSUFFICIENT_RESOURCES", "CULTIVATION_BREAKTHROUGH_NOT_AVAILABLE":
+			return _resolve_breakthrough_failure_message(result)
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
 
 func _get_local_breakthrough_block_message() -> String:
 	var preview = _get_breakthrough_preview()
@@ -299,7 +389,7 @@ func _flush_pending_report(max_batch: int = -1) -> bool:
 		return true
 
 	_report_failure_count += 1
-	var err_msg = api.network_manager.get_api_error_text_for_ui(result, "修炼同步失败")
+	var err_msg = _resolve_cultivation_result_message(result, "修炼同步失败")
 	if not err_msg.is_empty():
 		log_message.emit(err_msg)
 	
@@ -323,12 +413,7 @@ func _sync_breathing_spell_use_count(used_count_gained: int):
 	if used_count_gained <= 0:
 		return
 
-	var spell_system = null
-	if game_ui:
-		spell_system = game_ui.get("spell_system")
-	if not spell_system:
-		var game_manager = get_node_or_null("/root/GameManager")
-		spell_system = game_manager.get_spell_system() if game_manager and game_manager.has_method("get_spell_system") else null
+	var spell_system = _get_spell_system()
 	if not spell_system or not spell_system.has_method("add_spell_use_count"):
 		return
 
@@ -400,10 +485,10 @@ func on_cultivate_button_pressed():
 		if game_ui and game_ui.has_method("set_active_mode"):
 			game_ui.set_active_mode("cultivation")
 		cultivate_button.text = "停止修炼"
-		log_message.emit(result.get("message", "开始修炼"))
+		log_message.emit(_resolve_cultivation_result_message(result, "开始修炼"))
 		cultivation_started.emit()
 	else:
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "开始修炼失败")
+		var err_msg = _resolve_cultivation_result_message(result, "开始修炼失败")
 		if not err_msg.is_empty():
 			log_message.emit(err_msg)
 
@@ -429,11 +514,11 @@ func _stop_cultivation_internal(by_failure: bool):
 			game_ui.clear_active_mode("cultivation")
 		if cultivate_button:
 			cultivate_button.text = "修炼"
-		if game_ui and game_ui.has_method("refresh_all_player_data"):
-			await game_ui.refresh_all_player_data()
-		cultivation_stopped.emit()
-		if not by_failure:
-			log_message.emit(result.get("message", "停止修炼"))
+			if game_ui and game_ui.has_method("refresh_all_player_data"):
+				await game_ui.refresh_all_player_data()
+			cultivation_stopped.emit()
+			if not by_failure:
+				log_message.emit(_resolve_cultivation_result_message(result, "停止修炼"))
 
 func on_breakthrough_button_pressed():
 	if not player or not api:
@@ -455,9 +540,7 @@ func on_breakthrough_button_pressed():
 
 	var result = await api.player_breakthrough()
 	if result.get("success", false):
-		var msg = "突破成功"
-		if result.has("new_realm") and result.has("new_level"):
-			msg = "突破成功，当前境界：%s 第%d层" % [str(result.new_realm), int(result.new_level)]
+		var msg = _resolve_cultivation_result_message(result, "突破成功")
 		log_message.emit(msg)
 		
 		if game_ui and game_ui.has_method("refresh_all_player_data"):
@@ -465,8 +548,7 @@ func on_breakthrough_button_pressed():
 		
 		breakthrough_succeeded.emit(result)
 	else:
-		# 突破异常，按要求技术性报错由 NetworkManager 处理并在控制台打印，业务逻辑失败才反馈 UI
-		var err_msg = _resolve_breakthrough_failure_message(result)
+		var err_msg = _resolve_cultivation_result_message(result, "突破失败")
 		if not err_msg.is_empty():
 			log_message.emit(err_msg)
 		breakthrough_failed.emit(result)

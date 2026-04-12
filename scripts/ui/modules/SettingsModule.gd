@@ -1,5 +1,8 @@
 class_name SettingsModule extends Node
 
+const RANK_BACK_FONT_SIZE := 20
+const RANK_BACK_TEXT_COLOR := Color(0.25, 0.22, 0.18, 1.0)
+
 signal save_requested
 signal load_requested
 signal log_message(message: String)
@@ -18,13 +21,70 @@ var rank_panel: Control = null
 var rank_list: VBoxContainer = null
 var back_button: Button = null
 
+func _get_nickname_result_text(result: Dictionary, fallback: String = "昵称修改失败") -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	match reason_code:
+		"ACCOUNT_NICKNAME_CHANGE_SUCCEEDED":
+			return "昵称修改成功"
+		"ACCOUNT_NICKNAME_EMPTY":
+			return "昵称不能为空"
+		"ACCOUNT_NICKNAME_LENGTH_INVALID":
+			return "昵称长度应在4-10位之间"
+		"ACCOUNT_NICKNAME_CONTAINS_SPACE":
+			return "昵称不能包含空格"
+		"ACCOUNT_NICKNAME_INVALID_CHARACTER":
+			return "昵称包含非法字符"
+		"ACCOUNT_NICKNAME_ALL_DIGITS":
+			return "昵称不能全是数字"
+		"ACCOUNT_NICKNAME_SENSITIVE":
+			return "昵称包含敏感词汇"
+		"ACCOUNT_NICKNAME_PLAYER_NOT_FOUND":
+			return "角色数据异常，请重新登录后再试"
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
+
+func _get_logout_result_text(result: Dictionary, fallback: String = "登出失败") -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	match reason_code:
+		"ACCOUNT_LOGOUT_SUCCEEDED":
+			return ""
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
+
 func initialize(ui: Node, player_node: Node, game_api: Node = null):
 	game_ui = ui
 	player = player_node
 	api = game_api
 	_setup_signals()
+	_style_rank_back_button()
 	if save_button:
 		save_button.visible = false
+
+func _style_rank_back_button():
+	if not back_button:
+		return
+	back_button.custom_minimum_size = Vector2(60, 40)
+	back_button.add_theme_font_size_override("font_size", RANK_BACK_FONT_SIZE)
+	back_button.add_theme_color_override("font_color", RANK_BACK_TEXT_COLOR)
+
+	var normal_style = StyleBoxFlat.new()
+	normal_style.set_border_width_all(2)
+	normal_style.set_corner_radius_all(4)
+	normal_style.bg_color = Color(0.82, 0.78, 0.72, 1.0)
+	normal_style.border_color = Color(0.55, 0.50, 0.45, 1.0)
+	back_button.add_theme_stylebox_override("normal", normal_style)
+
+	var hover_style = normal_style.duplicate()
+	hover_style.bg_color = Color(0.75, 0.71, 0.65, 1.0)
+	back_button.add_theme_stylebox_override("hover", hover_style)
+
+	var pressed_style = normal_style.duplicate()
+	pressed_style.bg_color = Color(0.68, 0.64, 0.58, 1.0)
+	back_button.add_theme_stylebox_override("pressed", pressed_style)
+
+	var disabled_style = normal_style.duplicate()
+	disabled_style.bg_color = Color(0.88, 0.85, 0.80, 0.5)
+	back_button.add_theme_stylebox_override("disabled", disabled_style)
 
 func _setup_signals():
 	if logout_button:
@@ -52,7 +112,7 @@ func _on_logout_pressed():
 	if api:
 		var result = await api.logout()
 		if not result.get("success", false):
-			var err_msg = api.network_manager.get_api_error_text_for_ui(result, "登出失败")
+			var err_msg = _get_logout_result_text(result, "登出失败")
 			if not err_msg.is_empty():
 				log_message.emit(err_msg + "，已执行本地退出")
 
@@ -71,13 +131,19 @@ func _on_confirm_nickname_pressed():
 	if new_nickname.is_empty():
 		log_message.emit("昵称不能为空")
 		return
-	if new_nickname.length() > 12:
-		log_message.emit("昵称长度不能超过12个字符")
+	if new_nickname.length() < 4 or new_nickname.length() > 10:
+		log_message.emit("昵称长度应在4-10位之间")
+		return
+	if " " in new_nickname:
+		log_message.emit("昵称不能包含空格")
+		return
+	if new_nickname.is_valid_int():
+		log_message.emit("昵称不能全是数字")
 		return
 
 	var result = await api.change_nickname(new_nickname)
 	if result.get("success", false):
-		log_message.emit(result.get("message", "昵称修改成功"))
+		log_message.emit(_get_nickname_result_text(result, "昵称修改成功"))
 		var game_manager = get_node_or_null("/root/GameManager")
 		if game_manager:
 			var account_info = game_manager.get_account_info()
@@ -87,7 +153,7 @@ func _on_confirm_nickname_pressed():
 			game_ui.update_account_ui()
 		nickname_input.text = ""
 	else:
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "昵称修改失败")
+		var err_msg = _get_nickname_result_text(result, "昵称修改失败")
 		if not err_msg.is_empty():
 			log_message.emit(err_msg)
 
@@ -115,7 +181,6 @@ func _load_rank_data():
 		log_message.emit("API未初始化，请稍后再试")
 		return
 
-	log_message.emit("正在加载排行榜...")
 	var result = await api.get_rank()
 	if result.get("success", false):
 		var ranks = result.get("ranks", [])
@@ -130,7 +195,6 @@ func _load_rank_data():
 		for rank_data in ranks:
 			var rank_item = _create_rank_item(rank_data)
 			rank_list.add_child(rank_item)
-		log_message.emit("排行榜加载成功")
 	else:
 		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "排行榜加载失败")
 		if not err_msg.is_empty():

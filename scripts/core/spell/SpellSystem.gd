@@ -39,7 +39,8 @@ func set_spell_data(spell_data_node: Node):
 func set_lianli_system(lianli_sys: Node):
 	lianli_system = lianli_sys
 
-func _init_player_spells():
+func _init_player_spells(should_recalculate: bool = true):
+	player_spells.clear()
 	if spell_data:
 		var all_spell_ids = spell_data.get_all_spell_ids()
 		
@@ -56,7 +57,8 @@ func _init_player_spells():
 			"opening": [],
 			"production": []
 		}
-		recalculate_bonuses()
+		if should_recalculate:
+			recalculate_bonuses()
 
 func recalculate_bonuses():
 	_cached_bonuses = {
@@ -563,16 +565,15 @@ func get_save_data() -> Dictionary:
 	}
 
 func apply_save_data(data: Dictionary):
-	_init_player_spells()
+	_init_player_spells(false)
 	
 	if data == null:
+		recalculate_bonuses()
 		return
 
 	var loaded_spells: Dictionary = {}
 	if data.has("player_spells") and data["player_spells"] is Dictionary:
 		loaded_spells = data["player_spells"]
-	elif data.has("spells") and data["spells"] is Dictionary:
-		loaded_spells = data["spells"]
 
 	if not loaded_spells.is_empty():
 		for raw_spell_id in loaded_spells.keys():
@@ -612,7 +613,7 @@ func apply_save_data(data: Dictionary):
 		if player_spells.has(spell_id) and player_spells[spell_id].obtained:
 			equipped_spells["active"].append(spell_id)
 
-	for spell_id in _get_equipped_list_by_keys(loaded_equipped, ["opening", "passive"]):
+	for spell_id in _get_equipped_list_by_keys(loaded_equipped, ["opening"]):
 		if player_spells.has(spell_id) and player_spells[spell_id].obtained:
 			equipped_spells["opening"].append(spell_id)
 	

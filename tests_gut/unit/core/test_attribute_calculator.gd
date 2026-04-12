@@ -133,7 +133,7 @@ func test_calculate_final_spirit_gain_speed_uses_player_base_speed():
 	player.base_spirit_gain = 2.5
 	var speed = AttributeCalculator.calculate_final_spirit_gain_speed(player)
 	assert_eq(speed, 2.5, "应优先使用玩家当前基础灵气获取速度")
-	player.queue_free()
+	player.free()
 
 #endregion
 
@@ -143,47 +143,47 @@ func test_calculate_combat_attack_empty_buffs():
 	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
 	var attack = AttributeCalculator.calculate_combat_attack(player, {})
 	assert_eq(attack, 100.0, "无Buff时攻击力等于基础值")
-	player.queue_free()
+	player.free()
 
 func test_calculate_combat_attack_with_buff():
 	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
 	var buffs = {"attack_percent": 0.2}
 	var attack = AttributeCalculator.calculate_combat_attack(player, buffs)
 	assert_eq(attack, 120.0, "20%攻击加成应正确计算")
-	player.queue_free()
+	player.free()
 
 func test_calculate_combat_defense_empty_buffs():
 	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
 	var defense = AttributeCalculator.calculate_combat_defense(player, {})
 	assert_eq(defense, 50.0, "无Buff时防御力等于基础值")
-	player.queue_free()
+	player.free()
 
 func test_calculate_combat_defense_with_buff():
 	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
 	var buffs = {"defense_percent": 0.3}
 	var defense = AttributeCalculator.calculate_combat_defense(player, buffs)
 	assert_eq(defense, 65.0, "30%防御加成应正确计算")
-	player.queue_free()
+	player.free()
 
 func test_calculate_combat_speed_empty_buffs():
 	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
 	var speed = AttributeCalculator.calculate_combat_speed(player, {})
 	assert_eq(speed, 5.0, "无Buff时速度等于基础值")
-	player.queue_free()
+	player.free()
 
 func test_calculate_combat_speed_with_buff():
 	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
 	var buffs = {"speed_bonus": 3.0}
 	var speed = AttributeCalculator.calculate_combat_speed(player, buffs)
 	assert_eq(speed, 8.0, "速度加成应为加法")
-	player.queue_free()
+	player.free()
 
 func test_calculate_combat_max_health_empty_buffs():
 	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
 	player.base_max_health = 500.0
 	var health = AttributeCalculator.calculate_combat_max_health(player, {})
 	assert_eq(health, 500.0, "无Buff时最大气血等于基础值")
-	player.queue_free()
+	player.free()
 
 func test_calculate_combat_max_health_with_buff():
 	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
@@ -191,7 +191,7 @@ func test_calculate_combat_max_health_with_buff():
 	var buffs = {"health_bonus": 100.0}
 	var health = AttributeCalculator.calculate_combat_max_health(player, buffs)
 	assert_eq(health, 600.0, "气血加成应为加法")
-	player.queue_free()
+	player.free()
 
 #endregion
 

@@ -39,6 +39,80 @@ const TYPE_NAMES = {
 	"production": "生产术法"
 }
 
+func _get_spell_name(spell_id: String) -> String:
+	if spell_data and spell_data.has_method("get_spell_name"):
+		return spell_data.get_spell_name(spell_id)
+	return spell_id
+
+func _get_slot_display_name(slot_type: String) -> String:
+	return TYPE_NAMES.get(slot_type, slot_type)
+
+func _get_spell_action_display_name(action: String) -> String:
+	match action:
+		"equip":
+			return "装备"
+		"unequip":
+			return "卸下"
+		"upgrade":
+			return "升级"
+		"charge":
+			return "充灵"
+		_:
+			return ""
+
+func _get_spell_result_text(result: Dictionary, fallback: String) -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	var reason_data = result.get("reason_data", {})
+	var spell_id = str(reason_data.get("spell_id", current_viewing_spell))
+	var spell_name = _get_spell_name(spell_id) if not spell_id.is_empty() else "术法"
+	match reason_code:
+		"SPELL_EQUIP_SUCCEEDED":
+			return spell_name + "装备成功"
+		"SPELL_UNEQUIP_SUCCEEDED":
+			return spell_name + "卸下成功"
+		"SPELL_UPGRADE_SUCCEEDED":
+			return "%s升级成功，达到Lv.%d" % [spell_name, int(reason_data.get("new_level", 0))]
+		"SPELL_CHARGE_SUCCEEDED":
+			return "%s充灵成功，注入灵气%d" % [spell_name, int(reason_data.get("charged_amount", 0))]
+		"SPELL_SLOT_LIMIT_REACHED":
+			var slot_type = str(reason_data.get("slot_type", reason_data.get("spell_type", "")))
+			return _get_slot_display_name(slot_type) + "槽位已达上限，请先卸下任意术法"
+		"SPELL_ACTION_BATTLE_LOCKED":
+			var action_name = _get_spell_action_display_name(str(reason_data.get("action", "")))
+			if action_name.is_empty():
+				return "战斗中无法进行术法操作"
+			return "战斗中无法" + action_name + "术法"
+		"SPELL_EQUIP_NOT_FOUND", "SPELL_UNEQUIP_NOT_FOUND":
+			return "术法不存在"
+		"SPELL_EQUIP_NOT_OWNED", "SPELL_UPGRADE_NOT_OWNED", "SPELL_CHARGE_NOT_OWNED":
+			return "未获取术法【%s】" % spell_name
+		"SPELL_EQUIP_ALREADY_EQUIPPED":
+			return "术法【%s】已装备" % spell_name
+		"SPELL_EQUIP_PRODUCTION_FORBIDDEN":
+			return "杂学术法无法装备"
+		"SPELL_UNEQUIP_NOT_EQUIPPED":
+			return "术法【%s】未装备" % spell_name
+		"SPELL_UPGRADE_AT_MAX_LEVEL", "SPELL_CHARGE_AT_MAX_LEVEL":
+			return "术法【%s】已达到最高等级" % spell_name
+		"SPELL_UPGRADE_USE_COUNT_INSUFFICIENT":
+			return "术法【%s】使用次数不足（%d/%d）" % [
+				spell_name,
+				int(reason_data.get("current_use_count", 0)),
+				int(reason_data.get("required_use_count", 0))
+			]
+		"SPELL_UPGRADE_CHARGED_SPIRIT_INSUFFICIENT":
+			return "术法【%s】充灵不足（%d/%d）" % [
+				spell_name,
+				int(reason_data.get("current_charged_spirit", 0)),
+				int(reason_data.get("required_charged_spirit", 0))
+			]
+		"SPELL_CHARGE_ALREADY_FULL":
+			return "术法【%s】灵气已充足" % spell_name
+		"SPELL_CHARGE_PLAYER_SPIRIT_INSUFFICIENT":
+			return "自身灵气不足，无法为术法【%s】充灵" % spell_name
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
+
 func initialize(ui: Node, player_node: Node, spell_sys: Node, spell_dt: Node, game_api: Node = null):
 	game_ui = ui
 	player = player_node
@@ -373,7 +447,7 @@ func _on_spell_equip_toggle():
 		result = await api.spell_equip(current_viewing_spell, slot_type)
 		
 	if not result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "术法操作失败")
+		var err_msg = _get_spell_result_text(result, "术法操作失败")
 		if not err_msg.is_empty():
 			_add_log(err_msg)
 		_end_action_lock("spell_equip_toggle")
@@ -381,13 +455,13 @@ func _on_spell_equip_toggle():
 	
 	if is_currently_equipped:
 		spell_system.unequip_spell(current_viewing_spell)
-		_add_log("术法卸载成功")
+		_add_log(_get_spell_result_text(result, "卸下成功"))
 		spell_unequipped.emit(current_viewing_spell)
 	else:
 		spell_system.equip_spell(current_viewing_spell)
-		_add_log("术法装备成功")
+		_add_log(_get_spell_result_text(result, "装备成功"))
 		spell_equipped.emit(current_viewing_spell)
-		
+
 	update_spell_ui()
 	_update_spell_detail_popup()
 	_end_action_lock("spell_equip_toggle")
@@ -396,12 +470,12 @@ func _on_spell_upgrade_pressed():
 	if current_viewing_spell.is_empty(): return
 	var result = await api.spell_upgrade(current_viewing_spell)
 	if result.get("success", false):
-		_add_log("术法升级成功")
+		_add_log(_get_spell_result_text(result, "术法升级成功"))
 		await _refresh_after_spell_action()
 		_update_spell_detail_popup()
 		spell_upgraded.emit(current_viewing_spell)
 	else:
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "升级失败")
+		var err_msg = _get_spell_result_text(result, "升级失败")
 		if not err_msg.is_empty():
 			_add_log(err_msg)
 
@@ -410,10 +484,11 @@ func _on_spell_charge_pressed():
 	var multiplier = MULTIPLIERS[current_multiplier_index]
 	var result = await api.spell_charge(current_viewing_spell, multiplier)
 	if result.get("success", false):
+		_add_log(_get_spell_result_text(result, "充灵成功"))
 		await _refresh_after_spell_action()
 		_update_spell_detail_popup()
 	else:
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "充灵失败")
+		var err_msg = _get_spell_result_text(result, "充灵失败")
 		if not err_msg.is_empty():
 			_add_log(err_msg)
 
@@ -431,20 +506,18 @@ func _refresh_spell_from_server():
 			_add_log(err_msg)
 		return
 
-	var body: Dictionary = result
-	if result.has("data") and result["data"] is Dictionary:
-		body = result["data"]
-	
 	if spell_data and spell_data.has_method("apply_remote_config"):
-		var remote_spell_config = body.get("spells_config", {})
+		var remote_spell_config = result.get("spells_config", {})
 		if remote_spell_config is Dictionary and not remote_spell_config.is_empty():
 			spell_data.apply_remote_config({"spells": remote_spell_config})
 
 	var payload = {
-		"player_spells": body.get("player_spells", body.get("spells", {})),
-		"equipped_spells": body.get("equipped_spells", {})
+		"player_spells": result.get("player_spells", {}),
+		"equipped_spells": result.get("equipped_spells", {})
 	}
 	spell_system.apply_save_data(payload)
+	if game_ui and game_ui.has_method("update_ui"):
+		game_ui.update_ui()
 	update_spell_ui()
 
 func _get_slot_type_by_spell(spell_id: String) -> String:

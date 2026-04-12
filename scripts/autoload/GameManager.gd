@@ -154,10 +154,6 @@ func _handle_game_exit():
 	# 退出游戏
 	get_tree().quit()
 
-func save_game() -> bool:
-	# 客户端瘦身后不再主动调用 /game/save，保留兼容接口。
-	return true
-
 func load_game() -> bool:
 	if cloud_save_manager:
 		var success = await cloud_save_manager.load_game()

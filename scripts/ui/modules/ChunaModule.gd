@@ -19,6 +19,7 @@ var spell_system: Node = null
 var spell_data: Node = null
 var alchemy_system: Node = null
 var api: Node = null
+var recipe_data_ref: Node = null
 
 # UI节点引用
 var chuna_panel: Control = null
@@ -45,7 +46,17 @@ var _signals_connected: bool = false
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
 
-func initialize(ui: Node, player_node: Node, inv: Node, item_data_node: Node, spell_sys: Node = null, spell_dt: Node = null, alchemy_sys: Node = null, game_api: Node = null):
+func initialize(
+	ui: Node,
+	player_node: Node,
+	inv: Node,
+	item_data_node: Node,
+	spell_sys: Node = null,
+	spell_dt: Node = null,
+	alchemy_sys: Node = null,
+	game_api: Node = null,
+	recipe_data_node: Node = null
+):
 	game_ui = ui
 	player = player_node
 	inventory = inv
@@ -54,6 +65,7 @@ func initialize(ui: Node, player_node: Node, inv: Node, item_data_node: Node, sp
 	spell_data = spell_dt
 	alchemy_system = alchemy_sys
 	api = game_api
+	recipe_data_ref = recipe_data_node
 	
 	# 检查必需节点
 	_check_required_nodes()
@@ -61,6 +73,119 @@ func initialize(ui: Node, player_node: Node, inv: Node, item_data_node: Node, sp
 	_setup_signals()
 	_setup_viewport_listener()
 	setup_inventory_grid()
+
+func _get_game_manager() -> Node:
+	return get_node_or_null("/root/GameManager")
+
+func _get_recipe_data() -> Node:
+	if recipe_data_ref and is_instance_valid(recipe_data_ref):
+		return recipe_data_ref
+	var game_manager = _get_game_manager()
+	if game_manager and game_manager.has_method("get_recipe_data"):
+		return game_manager.get_recipe_data()
+	return null
+
+func _get_item_name(item_id: String) -> String:
+	if item_data and item_data.has_method("get_item_name"):
+		return item_data.get_item_name(item_id)
+	return item_id
+
+func _get_spell_name(spell_id: String) -> String:
+	if spell_data and spell_data.has_method("get_spell_name"):
+		return spell_data.get_spell_name(spell_id)
+	return spell_id
+
+func _get_recipe_name(recipe_id: String) -> String:
+	var recipe_data = _get_recipe_data()
+	if recipe_data and recipe_data.has_method("get_recipe_name"):
+		return recipe_data.get_recipe_name(recipe_id)
+	return recipe_id
+
+func _format_inventory_contents(contents: Dictionary) -> String:
+	if contents.is_empty():
+		return ""
+	var item_ids: Array = []
+	for raw_item_id in contents.keys():
+		item_ids.append(str(raw_item_id))
+	item_ids.sort()
+	var parts: Array = []
+	for item_id in item_ids:
+		parts.append("%s x%d" % [_get_item_name(item_id), int(contents[item_id])])
+	return "、".join(parts)
+
+func _get_inventory_result_message(result: Dictionary, fallback: String = "") -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	var reason_data = result.get("reason_data", {})
+	var item_id = str(reason_data.get("item_id", ""))
+	var item_name = _get_item_name(item_id) if not item_id.is_empty() else "该物品"
+	var effect = reason_data.get("effect", {})
+	if not (effect is Dictionary):
+		effect = {}
+	var contents = reason_data.get("contents", {})
+	if not (contents is Dictionary):
+		contents = {}
+	match reason_code:
+		"INVENTORY_USE_CONSUMABLE_SUCCEEDED":
+			match str(effect.get("type", "")):
+				"add_spirit_energy":
+					return "%s使用成功，获得灵气%d" % [item_name, int(effect.get("spirit_energy_added", 0))]
+				"add_health":
+					return "%s使用成功，恢复气血%d" % [item_name, int(effect.get("health_added", 0))]
+				"add_spirit_and_health":
+					return "%s使用成功，获得灵气%d，恢复气血%d" % [
+						item_name,
+						int(effect.get("spirit_energy_added", 0)),
+						int(effect.get("health_added", 0))
+					]
+				_:
+					return item_name + "使用成功"
+		"INVENTORY_USE_GIFT_SUCCEEDED":
+			var content_text = _format_inventory_contents(contents)
+			if content_text.is_empty():
+				return item_name + "打开成功"
+			return item_name + "打开成功，获得" + content_text
+		"INVENTORY_USE_UNLOCK_SPELL_SUCCEEDED":
+			return "学会术法【%s】" % _get_spell_name(str(effect.get("spell_id", "")))
+		"INVENTORY_USE_UNLOCK_RECIPE_SUCCEEDED":
+			return "学会丹方【%s】" % _get_recipe_name(str(effect.get("recipe_id", "")))
+		"INVENTORY_USE_UNLOCK_FURNACE_SUCCEEDED":
+			return "获得丹炉【%s】" % _get_item_name(str(effect.get("furnace_id", item_id)))
+		"INVENTORY_USE_ITEM_NOT_FOUND":
+			return "物品不存在"
+		"INVENTORY_USE_ITEM_NOT_ENOUGH":
+			return item_name + "数量不足"
+		"INVENTORY_USE_ITEM_NOT_USABLE":
+			return item_name + "无法使用"
+		"INVENTORY_USE_EFFECT_INVALID":
+			return item_name + "效果异常"
+		"INVENTORY_USE_GIFT_EMPTY":
+			return item_name + "暂无可领取内容"
+		"INVENTORY_USE_SPELL_SYSTEM_UNAVAILABLE":
+			return "术法系统未初始化"
+		"INVENTORY_USE_UNLOCK_SPELL_INVALID":
+			return item_name + "无效"
+		"INVENTORY_USE_SPELL_ALREADY_UNLOCKED":
+			return "已学会术法【%s】" % _get_spell_name(str(effect.get("spell_id", "")))
+		"INVENTORY_USE_ALCHEMY_SYSTEM_UNAVAILABLE":
+			return "炼丹系统未初始化"
+		"INVENTORY_USE_RECIPE_ALREADY_UNLOCKED":
+			return "已学会丹方【%s】" % _get_recipe_name(str(effect.get("recipe_id", "")))
+		"INVENTORY_USE_UNLOCK_RECIPE_INVALID":
+			return item_name + "无效"
+		"INVENTORY_USE_FURNACE_ALREADY_OWNED":
+			return "已拥有丹炉【%s】" % _get_item_name(str(effect.get("furnace_id", item_id)))
+		"INVENTORY_DISCARD_SUCCEEDED":
+			return item_name + "丢弃成功"
+		"INVENTORY_DISCARD_ITEM_NOT_ENOUGH":
+			return item_name + "数量不足"
+		"INVENTORY_EXPAND_SUCCEEDED":
+			return "纳戒扩容成功，当前容量%d格" % int(reason_data.get("new_capacity", 0))
+		"INVENTORY_EXPAND_CAPACITY_MAX":
+			return "纳戒已达到最大容量"
+		"INVENTORY_ORGANIZE_SUCCEEDED":
+			return "纳戒已整理"
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
 
 func _check_required_nodes():
 	"""检查必需的UI节点是否存在"""
@@ -129,8 +254,8 @@ func show_tab():
 	_clear_item_detail_panel()
 	update_inventory_ui()
 	# 初始化时，确保数据是最新的
-	if game_ui and game_ui.has_method("refresh_all_player_data"):
-		game_ui.refresh_all_player_data()
+	if game_ui and bool(game_ui.get("allow_background_server_refresh")):
+		game_ui.call_deferred("refresh_all_player_data")
 
 # 隐藏储纳Tab
 func hide_tab():
@@ -472,7 +597,7 @@ func _on_use_button_pressed():
 	var item_id = current_selected_item_id
 	var result = await api.inventory_use(item_id)
 	if not result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "使用失败")
+		var err_msg = _get_inventory_result_message(result, "使用失败")
 		if not err_msg.is_empty():
 			_add_log(err_msg)
 		_end_action_lock("inventory_use")
@@ -482,13 +607,7 @@ func _on_use_button_pressed():
 	_clear_item_detail_panel()
 	
 	await _refresh_after_inventory_action()
-
-	var effect = result.get("effect", {})
-	var contents = result.get("contents", null)
-	if effect is Dictionary and not effect.is_empty():
-		_add_log("使用成功")
-	if contents is Dictionary and not contents.is_empty():
-		_add_log("打开成功，奖励已入包")
+	_add_log(_get_inventory_result_message(result, "使用成功"))
 
 	_end_action_lock("inventory_use")
 
@@ -533,14 +652,14 @@ func _perform_discard():
 
 	var result = await api.inventory_discard(current_selected_item_id, 1)
 	if not result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "丢弃失败")
+		var err_msg = _get_inventory_result_message(result, "丢弃失败")
 		if not err_msg.is_empty():
 			_add_log(err_msg)
 		_end_action_lock("inventory_discard")
 		return
 
 	item_discarded.emit(current_selected_item_id, 1)
-	_add_log("丢弃成功")
+	_add_log(_get_inventory_result_message(result, "丢弃成功"))
 	_clear_item_detail_panel()
 	
 	await _refresh_after_inventory_action()
@@ -555,13 +674,13 @@ func _on_expand_button_pressed():
 
 	var result = await api.inventory_expand()
 	if not result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "扩容失败")
+		var err_msg = _get_inventory_result_message(result, "扩容失败")
 		if not err_msg.is_empty():
 			_add_log(err_msg)
 		_end_action_lock("inventory_expand")
 		return
 
-	_add_log(result.get("message", "扩容成功"))
+	_add_log(_get_inventory_result_message(result, "扩容成功"))
 	
 	await _refresh_after_inventory_action()
 
@@ -575,7 +694,7 @@ func _on_sort_button_pressed():
 
 	var result = await api.inventory_organize()
 	if not result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(result, "整理失败")
+		var err_msg = _get_inventory_result_message(result, "整理失败")
 		if not err_msg.is_empty():
 			_add_log(err_msg)
 		_end_action_lock("inventory_sort")
@@ -583,7 +702,7 @@ func _on_sort_button_pressed():
 
 	_clear_item_detail_panel()
 	await _refresh_after_inventory_action()
-	_add_log("纳戒已整理")
+	_add_log(_get_inventory_result_message(result, "整理成功"))
 	_end_action_lock("inventory_sort")
 
 func _refresh_inventory_from_server():
@@ -591,11 +710,8 @@ func _refresh_inventory_from_server():
 		return
 	var list_result = await api.inventory_list()
 	if list_result.get("success", false):
-		var body: Dictionary = list_result
-		if list_result.has("data") and list_result["data"] is Dictionary:
-			body = list_result["data"]
-		if body.has("inventory") and body["inventory"] is Dictionary:
-			inventory.apply_save_data(body.get("inventory", {}))
+		if list_result.has("inventory") and list_result["inventory"] is Dictionary:
+			inventory.apply_save_data(list_result.get("inventory", {}))
 			setup_inventory_grid()
 			update_inventory_ui()
 			return

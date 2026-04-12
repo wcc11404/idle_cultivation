@@ -125,27 +125,23 @@ func get_system_name():
 
 ### 3.2 测试目录结构
 ```
-tests/
-├── gut.config.json              # GUT配置文件
-├── test_helper.gd              # 测试辅助基类
-├── unit/                        # 单元测试目录
-│   ├── test_item_data.gd       # ItemData 模块测试
-│   ├── test_inventory.gd       # Inventory 模块测试
-│   ├── test_player_data.gd     # PlayerData 模块测试
-│   ├── test_realm_system.gd    # RealmSystem 模块测试
-│   ├── test_cultivation_system.gd  # CultivationSystem 模块测试
-│   ├── test_offline_reward.gd  # OfflineReward 模块测试
-│   └── test_save_manager.gd    # SaveManager 模块测试
-└── integration/                 # 集成测试目录
-    └── test_all_systems.gd     # GameManager 集成环境下的全系统测试
+tests_gut/
+├── support/                     # API 测试基座与测试账号辅助
+├── fixtures/                    # 通用断言/日志/背包辅助
+├── unit/
+│   ├── ui/                      # UI 模块 API 集成测试
+│   ├── core/                    # 纯工具与基础能力测试
+│   └── data/                    # 静态配置与数据测试
+└── integration/
+    └── test_module_api_smoke.gd # 轻量跨模块 smoke
 ```
 
 ### 3.3 测试框架使用原则
 
 #### 原则1：按系统组织测试
-- 每个核心系统有独立的测试文件
-- 单元测试和集成测试明确分离
-- 避免重复测试用例
+- 模块 API 集成测试优先放在 `tests_gut/unit/ui/`
+- 纯工具与静态配置测试继续保留在 `core/`、`data/`
+- 明显过时的本地权威测试应迁移或删除，避免同一功能维护两套真值
 
 #### 原则2：使用GUT框架
 - 所有测试继承自 `GutTest`
@@ -162,8 +158,9 @@ tests/
 #### 新功能开发流程
 1. **功能实现**：完成新功能的代码编写
 2. **测试用例编写**：
-   - 在 `tests/unit/` 下创建对应系统的测试文件
-   - 如需要集成测试，在 `tests/integration/` 下添加
+   - UI/业务链路优先在 `tests_gut/unit/ui/` 下新增真实 API 驱动测试
+   - 跨模块串联场景在 `tests_gut/integration/` 下补 smoke
+   - 只有纯工具类逻辑才直接放到 `tests_gut/unit/core/`
 3. **测试执行**：使用GUT运行测试验证功能正确性
 4. **动静态检查**：执行静态检查和动态检查
 5. **测试完善**：修复测试中发现的问题，确保测试覆盖所有场景
@@ -180,53 +177,63 @@ tests/
 
 **通过命令行运行**：
 ```bash
-# 运行所有测试
-../../Godot_v4.6-stable_linux.x86_64 --headless --path . --script addons/gut/gut_cmdln.gd -gdir=res://tests_gut -gexit
+# 运行完整客户端测试套件
+GODOT_BIN=/Applications/Godot.app/Contents/MacOS/godot ./run_tests.sh
 
-# 运行特定目录的测试
-../../Godot_v4.6-stable_linux.x86_64 --headless --path . --script addons/gut/gut_cmdln.gd -gdir=res://tests_gut/integration -gexit
-
-# 运行单个测试文件
-../../Godot_v4.6-stable_linux.x86_64 --headless --path . --script addons/gut/gut_cmdln.gd -gtest=res://tests_gut/integration/test_cultivation_integration.gd -gexit
+# 直接调用 GUT
+HOME="$(pwd)/.godot_test_home" \
+"/Applications/Godot.app/Contents/MacOS/godot" \
+  --headless \
+  --path . \
+  --script res://addons/gut/gut_cmdln.gd \
+  -gdir=res://tests_gut \
+  -ginclude_subdirs \
+  -gexit
 ```
+
+运行前需要保证本地服务端已启动，并提供：
+
+- `http://127.0.0.1:8444/api`
+- 固定测试账号 `test / test123`
+- `/api/test/*` 测试接口
 
 #### 3.5.2 编写新测试用例
 
-**单元测试模板**（`tests/unit/test_yourmodule.gd`）：
+**模块 API 测试模板**（`tests_gut/unit/ui/test_yourmodule_api.gd`）：
 
 ```gdscript
-# 新系统测试文件示例
 extends GutTest
 
-var your_module: Node = null
+const ModuleHarness = preload("res://tests_gut/support/module_harness.gd")
 
-func before_all():
-	# 初始化测试对象
-	your_module = load("res://scripts/core/YourModule.gd").new()
+var harness: ModuleHarness = null
 
-func test_initialization():
-	a.assert_not_null(your_module, "模块初始化")
+func before_each():
+	harness = ModuleHarness.new()
+	add_child(harness)
+	await harness.bootstrap()
 
-func test_functionality():
-	# 测试核心功能
-	var result = your_module.some_function()
-	a.assert_eq(result, expected_value, "功能测试")
+func after_each():
+	if harness:
+		await harness.cleanup()
+		harness.free()
+	await get_tree().process_frame
 
-func test_edge_cases():
-	# 测试边界情况
-	a.assert_eq(your_module.handle_edge_case(), expected_result, "边界情况测试")
+func test_module_action():
+	var module = harness.game_ui.your_module
+	harness.clear_logs()
 
-func test_error_handling():
-	# 测试错误处理
-	a.assert_eq(your_module.handle_error(), expected_error_result, "错误处理测试")
+	await module.some_button_handler()
+
+	assert_true(harness.last_log().contains("期望文案"), "应输出客户端翻译后的提示")
 ```
 
 ### 3.6 测试覆盖率要求
 
 **单元测试覆盖率**：
-- 核心功能：100%
-- 边界情况：至少80%
-- 错误处理：至少90%
+- 高频改动模块优先
+- 用户可见文案、状态同步、互斥逻辑必须覆盖
+- 允许分期补全，不要求一轮达到 100%
 
 **集成测试覆盖率**：
 - 系统间交互：至少90%
@@ -261,40 +268,27 @@ func test_error_handling():
 
 #### 4.1.1 自动化测试命令
 
-使用项目根目录下的 `run_test.sh` 脚本可以一键执行所有测试：
+使用项目根目录下的统一入口 `run_tests.sh` 执行：
 
 ```bash
-# 执行完整测试流程（推荐）
-bash run_test.sh
+# 运行完整客户端 GUT 套件
+GODOT_BIN=/Applications/Godot.app/Contents/MacOS/godot ./run_tests.sh
 ```
+
+兼容入口 `tests_gut/run_gut_tests.sh` 会转发到同一脚本；`windows_test.sh` 已移除，不再保留第二套入口。
 
 #### 4.1.2 手动测试命令
 
-**静态检查**：
-```bash
-# 使用Godot静态检查
-"/Applications/Godot.app/Contents/MacOS/godot" --check-only --path . --quit-after 100
-```
-
-**动态检查**：
-```bash
-# 使用Godot headless模式测试
-"/Applications/Godot.app/Contents/MacOS/godot" --headless --path . --quit-after 100
-```
-
 **运行所有测试**：
 ```bash
-# 运行完整测试套件
-"/Applications/Godot.app/Contents/MacOS/godot" --headless --path . --scene res://tests/TestRunner.tscn --quit-after 100
-```
-
-**运行指定场景**：
-```bash
-# 运行主场景
-"/Applications/Godot.app/Contents/MacOS/godot" --path . --scene res://scenes/main/Main.tscn --quit-after 100
-
-# 运行测试场景
-"/Applications/Godot.app/Contents/MacOS/godot" --path . --scene res://tests/TestRunner.tscn --quit-after 100
+HOME="$(pwd)/.godot_test_home" \
+"/Applications/Godot.app/Contents/MacOS/godot" \
+  --headless \
+  --path . \
+  --script res://addons/gut/gut_cmdln.gd \
+  -gdir=res://tests_gut \
+  -ginclude_subdirs \
+  -gexit
 ```
 
 #### 4.1.3 开发辅助命令

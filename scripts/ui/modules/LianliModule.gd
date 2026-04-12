@@ -70,6 +70,7 @@ var _simulate_loot: Array = []
 var _current_enemy_data: Dictionary = {}
 var _finish_in_flight: bool = false
 var _simulated_player_health_after: float = 0.0
+var _simulated_player_max_health: float = 0.0
 var _enemy_hp_tween: Tween = null
 var _player_hp_tween: Tween = null
 
@@ -88,6 +89,49 @@ func _begin_action_lock(action_key: String) -> bool:
 
 func _end_action_lock(action_key: String):
 	_action_lock.end(action_key, ACTION_COOLDOWN_SECONDS)
+
+func _set_local_lianli_state(active: bool, in_battle: bool = false, waiting: bool = false, area_id: String = current_lianli_area_id):
+	if not lianli_system:
+		return
+	lianli_system.is_in_lianli = active
+	lianli_system.is_in_battle = in_battle
+	lianli_system.is_waiting = waiting
+	if active:
+		lianli_system.current_area_id = area_id
+		if lianli_area_data:
+			lianli_system.is_in_tower = lianli_area_data.is_tower_area(area_id)
+			if lianli_system.is_in_tower and lianli_system.current_tower_floor <= 0:
+				lianli_system.current_tower_floor = max(1, int(lianli_system.tower_highest_floor) + 1)
+		else:
+			lianli_system.is_in_tower = false
+	else:
+		lianli_system.current_area_id = ""
+		lianli_system.is_in_tower = false
+		lianli_system.current_tower_floor = 0
+
+func _get_lianli_result_message(result: Dictionary, fallback: String = "") -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	match reason_code:
+		"LIANLI_SIMULATE_BLOCKED_BY_CULTIVATION":
+			return "正在修炼中，无法开始历练"
+		"LIANLI_SIMULATE_BLOCKED_BY_ALCHEMY":
+			return "正在炼丹中，无法开始历练"
+		"LIANLI_SIMULATE_HEALTH_INSUFFICIENT":
+			return "气血不足，无法进入历练区域"
+		"LIANLI_SIMULATE_TOWER_CLEARED":
+			return "已达无尽塔最高层"
+		"LIANLI_SIMULATE_DAILY_LIMIT_REACHED":
+			return "今日副本次数已用完"
+		"LIANLI_SIMULATE_SUCCEEDED":
+			return ""
+		"LIANLI_FINISH_NOT_ACTIVE":
+			return "当前未在历练战斗中"
+		"LIANLI_FINISH_TIME_INVALID":
+			return "历练结算同步异常，请稍后重试"
+		"LIANLI_FINISH_FULLY_SETTLED", "LIANLI_FINISH_PARTIALLY_SETTLED":
+			return ""
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
 
 func _ready():
 	set_process(true)
@@ -167,6 +211,10 @@ func _process_battle_event(event: Dictionary, duration: float) -> void:
 			_animate_health_bar(enemy_health_bar, enemy_health_value, max(0.0, enemy_health_after), duration, true)
 		elif info.has("self_health_after") and player_health_bar_lianli:
 			_simulated_player_health_after = enemy_health_after
+			_simulated_player_max_health = float(info.get("self_max_health_after", _simulated_player_max_health))
+			player_health_bar_lianli.max_value = _simulated_player_max_health
+			if player_health_value_lianli:
+				player_health_value_lianli.text = AttributeCalculator.format_integer(max(0.0, enemy_health_after)) + "/" + AttributeCalculator.format_default(_simulated_player_max_health)
 			_animate_health_bar(player_health_bar_lianli, player_health_value_lianli, max(0.0, enemy_health_after), duration, false)
 		
 		_update_spell_proficiency(spell_id)
@@ -255,12 +303,14 @@ func _start_timeline_from_simulation(sim_result: Dictionary, area_id: String):
 	_simulate_loot = sim_result.get("loot", [])
 	_current_enemy_data = sim_result.get("enemy_data", {})
 	_simulated_player_health_after = float(sim_result.get("player_health_after", player.health if player else 0.0))
+	_simulated_player_max_health = player.get_combat_max_health() if player else 0.0
 	current_lianli_area_id = area_id
 	# 初始化本次战斗的最大速度
 	current_battle_max_speed = LIANLI_SPEEDS[current_lianli_speed_index]
 
 	if game_ui and game_ui.has_method("set_active_mode"):
 		game_ui.set_active_mode("lianli")
+	_set_local_lianli_state(true, true, false, area_id)
 	show_lianli_scene_panel()
 
 	if enemy_name_label:
@@ -274,6 +324,7 @@ func _start_timeline_from_simulation(sim_result: Dictionary, area_id: String):
 
 	if player and player_health_bar_lianli:
 		var player_max_hp = player.get_combat_max_health()
+		_simulated_player_max_health = player_max_hp
 		player_health_bar_lianli.max_value = player_max_hp
 		player_health_bar_lianli.value = player.health
 	if player_health_value_lianli and player_health_bar_lianli:
@@ -298,7 +349,7 @@ func _finish_current_battle(full_settle: bool):
 	# 使用本次战斗的最大速度
 	var finish_result = await api.lianli_finish(current_battle_max_speed, settle_index)
 	if not finish_result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(finish_result, "历练结算失败")
+		var err_msg = _get_lianli_result_message(finish_result, "历练结算失败")
 		if not err_msg.is_empty():
 			log_message.emit(err_msg + "，已退出历练")
 		_on_force_exit_lianli()
@@ -353,6 +404,7 @@ func _finish_current_battle(full_settle: bool):
 			_is_waiting = true
 			_wait_timer = 0.0
 			_wait_interval = randf_range(BASE_WAIT_INTERVAL_MIN, BASE_WAIT_INTERVAL_MAX)
+			_set_local_lianli_state(true, false, true, current_lianli_area_id)
 			return
 		if not battle_victory:
 			_on_force_exit_lianli()
@@ -369,7 +421,7 @@ func _simulate_next_battle():
 
 	var sim_result = await api.lianli_simulate(current_lianli_area_id)
 	if not sim_result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(sim_result, "连续历练启动失败")
+		var err_msg = _get_lianli_result_message(sim_result, "连续历练启动失败")
 		if not err_msg.is_empty():
 			log_message.emit(err_msg)
 		_on_force_exit_lianli()
@@ -387,6 +439,7 @@ func _on_force_exit_lianli():
 	_simulate_loot = []
 	_is_waiting = false
 	_wait_timer = 0.0
+	_set_local_lianli_state(false, false, false, "")
 	if game_ui and game_ui.has_method("clear_active_mode"):
 		game_ui.clear_active_mode("lianli")
 	show_lianli_select_panel()
@@ -462,7 +515,7 @@ func start_lianli_in_area(area_id: String):
 
 	var sim_result = await api.lianli_simulate(area_id)
 	if not sim_result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(sim_result, "历练开始失败")
+		var err_msg = _get_lianli_result_message(sim_result, "历练开始失败")
 		if not err_msg.is_empty():
 			log_message.emit(err_msg)
 		_end_action_lock("lianli_simulate_start")
@@ -511,6 +564,7 @@ func on_continue_pressed():
 	_is_waiting = true
 	_wait_timer = 0.0
 	_wait_interval = randf_range(BASE_WAIT_INTERVAL_MIN, BASE_WAIT_INTERVAL_MAX)
+	_set_local_lianli_state(true, false, true, current_lianli_area_id)
 
 # 连续战斗复选框切换
 func on_continuous_toggled(_enabled: bool):
@@ -693,6 +747,7 @@ func on_battle_started(enemy_name: String, is_elite: bool, enemy_max_health: flo
 	# 初始化玩家血条
 	if player:
 		var combat_max_health = player_max_health if player_max_health > 0 else player.get_combat_max_health()
+		_simulated_player_max_health = combat_max_health
 		if player_health_bar_lianli:
 			player_health_bar_lianli.max_value = combat_max_health
 			player_health_bar_lianli.value = player.health

@@ -48,11 +48,6 @@ func change_nickname(new_nickname: String) -> Dictionary:
 func load_game() -> Dictionary:
 	return await network_manager.request("GET", "/game/data", {}, _critical_options())
 
-func save_game(data: Dictionary) -> Dictionary:
-	return await network_manager.request("POST", "/game/save", {
-		"data": data
-	}, _critical_options())
-
 func claim_offline_reward() -> Dictionary:
 	return await network_manager.request("POST", "/game/claim_offline_reward", {}, _critical_options())
 

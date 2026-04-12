@@ -65,9 +65,10 @@ func request(method: String, endpoint: String, body: Dictionary = {}, options: D
 		if track_failure and is_technical_error(result):
 			_track_network_failure_and_maybe_logout()
 
-		if result.get("error_code", "") == "AUTH_KICKED_OUT":
+		var error_code := str(result.get("error_code", ""))
+		if error_code == "AUTH_KICKED_OUT":
 			_handle_kicked_out()
-		elif result.get("error_code", "") == "AUTH_TOKEN_INVALID":
+		elif error_code == "AUTH_TOKEN_INVALID":
 			_handle_invalid_token()
 
 		return result
@@ -172,21 +173,8 @@ func _should_retry(result: Dictionary) -> bool:
 	return is_technical_error(result)
 
 func _has_business_feedback(result: Dictionary) -> bool:
-	var reason := str(result.get("reason", ""))
-	if not reason.is_empty():
-		return true
-
-	var message := str(result.get("message", ""))
-	if message.is_empty():
-		return false
-
-	var technical_messages := [
-		"请求失败",
-		"请检查网络连接",
-		"网络请求初始化失败",
-		"服务器响应格式错误"
-	]
-	return not technical_messages.has(message)
+	var reason_code := str(result.get("reason_code", ""))
+	return not reason_code.is_empty()
 
 func is_technical_error(result: Dictionary) -> bool:
 	if result.get("success", false):
@@ -228,16 +216,13 @@ func get_api_error_text_for_ui(result: Dictionary, fallback: String = "请求失
 	if code.begins_with("AUTH_"):
 		return ""
 
+	# 新业务接口由各模块基于 reason_code / reason_data 自行翻译，这里不再承担业务文案映射。
+	var reason_code := str(result.get("reason_code", ""))
+	if not reason_code.is_empty():
+		return fallback
+
 	if not code.is_empty():
-		return fallback + "(" + code + ")"
-	
-	var reason := str(result.get("reason", ""))
-	if not reason.is_empty():
-		return reason
-		
-	var message := str(result.get("message", ""))
-	if not message.is_empty() and message != "请求失败":
-		return message
+		return fallback
 
 	return fallback
 

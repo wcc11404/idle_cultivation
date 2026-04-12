@@ -18,7 +18,9 @@ func before_each():
 
 func after_each():
 	if enemy_data:
-		enemy_data.queue_free()
+		enemy_data.free()
+		enemy_data = null
+	await get_tree().process_frame
 
 func _setup_mock_data():
 	enemy_data.ENEMY_TEMPLATES = {

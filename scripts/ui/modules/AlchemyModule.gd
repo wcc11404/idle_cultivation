@@ -66,8 +66,7 @@ var _runtime_fail_count: int = 0
 var _runtime_timer: float = 0.0
 var _runtime_craft_time: float = 0.0
 var _runtime_tick_in_flight: bool = false
-var _runtime_consumed: Dictionary = {}
-var _runtime_pre_deduct: Dictionary = {}
+var _runtime_pending_cost: Dictionary = {}
 
 # === 缓存 ===
 var _recipe_cards: Dictionary = {}
@@ -78,6 +77,64 @@ var _signals_connected: bool = false
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
+
+func _get_item_name(item_id: String) -> String:
+	if item_id == "spirit_energy":
+		return "灵气"
+	if item_data and item_data.has_method("get_item_name"):
+		return item_data.get_item_name(item_id)
+	return item_id
+
+func _format_alchemy_items(items: Dictionary) -> String:
+	if items.is_empty():
+		return ""
+	var item_ids: Array = []
+	for raw_item_id in items.keys():
+		item_ids.append(str(raw_item_id))
+	item_ids.sort()
+	var parts: Array = []
+	for item_id in item_ids:
+		parts.append("%s x%d" % [_get_item_name(item_id), int(items[item_id])])
+	return "、".join(parts)
+
+func _get_alchemy_result_message(result: Dictionary, fallback: String = "") -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	var reason_data = result.get("reason_data", {})
+	match reason_code:
+		"ALCHEMY_START_SUCCEEDED":
+			return "开炉炼丹"
+		"ALCHEMY_START_ALREADY_ACTIVE":
+			return "已在炼丹状态"
+		"ALCHEMY_START_BLOCKED_BY_CULTIVATION":
+			return "正在修炼中，无法开始炼丹"
+		"ALCHEMY_START_BLOCKED_BY_BATTLE":
+			return "正在战斗中，无法开始炼丹"
+		"ALCHEMY_REPORT_SUCCEEDED":
+			return ""
+		"ALCHEMY_REPORT_NOT_ACTIVE":
+			return "当前未在炼丹状态"
+		"ALCHEMY_REPORT_RECIPE_NOT_FOUND", "ALCHEMY_REPORT_RECIPE_NOT_LEARNED":
+			return "丹方不存在或未学会"
+		"ALCHEMY_REPORT_TIME_INVALID":
+			return "炼丹同步异常，请稍后重试"
+		"ALCHEMY_REPORT_INVENTORY_UNAVAILABLE":
+			return "储纳系统未初始化"
+		"ALCHEMY_REPORT_MATERIALS_INSUFFICIENT":
+			var missing_materials = reason_data.get("missing_materials", {})
+			if missing_materials is Dictionary and not missing_materials.is_empty():
+				return "材料不足，缺少" + _format_alchemy_items(missing_materials)
+			return "材料不足"
+		"ALCHEMY_REPORT_SPIRIT_INSUFFICIENT":
+			return "灵气不足"
+		"ALCHEMY_STOP_NOT_ACTIVE":
+			return "当前未在炼丹状态"
+		"ALCHEMY_STOP_SUCCEEDED":
+			return ""
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
+
+func _build_alchemy_summary_message(success_count: int, fail_count: int) -> String:
+	return "收丹停火：成丹%d枚，废丹%d枚" % [success_count, fail_count]
 
 # === 初始化 ===
 func _begin_action_lock(action_key: String) -> bool:
@@ -130,7 +187,8 @@ func _run_alchemy_tick():
 
 	var report_result = await api.alchemy_report(_runtime_recipe_id, 1)
 	if not report_result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(report_result, "炼丹上报失败")
+		_restore_pending_cost()
+		var err_msg = _get_alchemy_result_message(report_result, "炼丹上报失败")
 		if not err_msg.is_empty():
 			log_message.emit(err_msg)
 		await _finish_alchemy_session(false)
@@ -140,65 +198,125 @@ func _run_alchemy_tick():
 	_runtime_success_count += int(report_result.get("success_count", 0))
 	_runtime_fail_count += int(report_result.get("fail_count", 0))
 	_apply_report_result(report_result)
+	var report_msg = _get_alchemy_tick_message(report_result)
+	if not report_msg.is_empty():
+		log_message.emit(report_msg)
 
 	_on_alchemy_crafting_progress(_runtime_index, _runtime_total_count, 100.0 * float(_runtime_index) / float(max(1, _runtime_total_count)))
 	_on_alchemy_single_craft_completed(int(report_result.get("success_count", 0)) > 0, recipe_data.get_recipe_name(_runtime_recipe_id) if recipe_data else "")
 
 	if _runtime_index >= _runtime_total_count:
 		await _finish_alchemy_session(true)
+		return
+
+	if not _apply_single_pre_deduct(_runtime_recipe_id):
+		log_message.emit("灵材或灵气不足，无法继续炼丹")
+		await _finish_alchemy_session(false)
 
 func _apply_report_result(report_result: Dictionary):
+	var returned_materials = report_result.get("returned_materials", {})
+	if returned_materials is Dictionary and not returned_materials.is_empty():
+		_add_items_silently(returned_materials)
+
 	if inventory and report_result.has("products"):
 		for item_id in report_result.products.keys():
 			var count = int(report_result.products[item_id])
 			if count > 0:
 				inventory.add_item(item_id, count)
 
-	var materials_consumed = report_result.get("materials_consumed", {})
-	for key in materials_consumed.keys():
-		_runtime_consumed[key] = int(_runtime_consumed.get(key, 0)) + int(materials_consumed[key])
+	_runtime_pending_cost.clear()
+	_update_materials_display()
+	if game_ui and game_ui.has_method("update_ui"):
+		game_ui.update_ui()
 
-func _apply_pre_deduct(recipe_id: String, count: int) -> bool:
+func _can_start_batch(recipe_id: String, count: int) -> bool:
 	if not recipe_data or not inventory or not player:
 		return false
-
-	_runtime_pre_deduct.clear()
-	_runtime_consumed.clear()
 
 	var materials = recipe_data.get_recipe_materials(recipe_id)
 	for material_id in materials.keys():
 		var need = int(materials[material_id]) * count
 		if inventory.get_item_count(material_id) < need:
 			return false
-		_runtime_pre_deduct[material_id] = need
 
 	var spirit_need = int(recipe_data.get_recipe_spirit_energy(recipe_id)) * count
 	if player.spirit_energy < spirit_need:
 		return false
-	if spirit_need > 0:
-		_runtime_pre_deduct["spirit_energy"] = spirit_need
-
-	for material_id in materials.keys():
-		inventory.remove_item(material_id, int(materials[material_id]) * count)
-	if spirit_need > 0:
-		player.consume_spirit(spirit_need)
 
 	return true
 
-func _refund_unconsumed_resources():
-	if not inventory or not player:
-		return
+func _apply_single_pre_deduct(recipe_id: String) -> bool:
+	if not recipe_data or not inventory or not player:
+		return false
 
-	for key in _runtime_pre_deduct.keys():
-		var pre = int(_runtime_pre_deduct.get(key, 0))
-		var consumed = int(_runtime_consumed.get(key, 0))
-		var refund = max(0, pre - consumed)
-		if refund <= 0:
+	var pending_cost: Dictionary = {}
+	var materials = recipe_data.get_recipe_materials(recipe_id)
+	for material_id in materials.keys():
+		var need = int(materials[material_id])
+		if inventory.get_item_count(material_id) < need:
+			return false
+		pending_cost[material_id] = need
+
+	var spirit_need = int(recipe_data.get_recipe_spirit_energy(recipe_id))
+	if player.spirit_energy < spirit_need:
+		return false
+	if spirit_need > 0:
+		pending_cost["spirit_energy"] = spirit_need
+
+	for material_id in materials.keys():
+		inventory.remove_item(material_id, int(materials[material_id]))
+	if spirit_need > 0:
+		player.consume_spirit(spirit_need)
+
+	_runtime_pending_cost = pending_cost
+	_update_materials_display()
+	if game_ui and game_ui.has_method("update_ui"):
+		game_ui.update_ui()
+	return true
+
+func _restore_pending_cost() -> Dictionary:
+	var restored_resources: Dictionary = {}
+	if not inventory or not player:
+		return restored_resources
+	if _runtime_pending_cost.is_empty():
+		return restored_resources
+
+	for key in _runtime_pending_cost.keys():
+		var amount = int(_runtime_pending_cost.get(key, 0))
+		if amount <= 0:
 			continue
 		if key == "spirit_energy":
-			player.add_spirit(refund)
+			player.add_spirit(amount)
 		else:
-			inventory.add_item(key, refund)
+			_add_item_silently(key, amount)
+		restored_resources[key] = amount
+
+	_runtime_pending_cost.clear()
+	_update_materials_display()
+	if game_ui and game_ui.has_method("update_ui"):
+		game_ui.update_ui()
+	return restored_resources
+
+func _get_alchemy_tick_message(report_result: Dictionary) -> String:
+	if int(report_result.get("success_count", 0)) > 0:
+		return ""
+	var returned_materials = report_result.get("returned_materials", {})
+	if returned_materials is Dictionary and not returned_materials.is_empty():
+		return "返还材料：" + _format_alchemy_items(returned_materials)
+	return ""
+
+func _add_items_silently(items: Dictionary):
+	for item_id in items.keys():
+		_add_item_silently(str(item_id), int(items[item_id]))
+
+func _add_item_silently(item_id: String, count: int):
+	if count <= 0 or not inventory:
+		return
+	if game_ui and game_ui.has_method("begin_silent_item_added_logs"):
+		game_ui.begin_silent_item_added_logs()
+	inventory.add_item(item_id, count)
+	if game_ui and game_ui.has_method("end_silent_item_added_logs"):
+		game_ui.end_silent_item_added_logs()
 
 func setup_styles():
 	_setup_ui_style()
@@ -533,19 +651,15 @@ func _refresh_recipe_config_from_server():
 			log_message.emit(err_msg)
 		return
 
-	var body: Dictionary = result
-	if result.has("data") and result["data"] is Dictionary:
-		body = result["data"]
-
 	if recipe_data and recipe_data.has_method("apply_remote_config"):
-		var remote_recipes = body.get("recipes_config", {})
+		var remote_recipes = result.get("recipes_config", {})
 		if remote_recipes is Dictionary and not remote_recipes.is_empty():
 			recipe_data.apply_remote_config({"recipes": remote_recipes})
 
-	if alchemy_system and body.has("learned_recipes") and body["learned_recipes"] is Array:
+	if alchemy_system and result.has("learned_recipes") and result["learned_recipes"] is Array:
 		alchemy_system.apply_save_data({
 			"equipped_furnace_id": str(alchemy_system.equipped_furnace_id),
-			"learned_recipes": body["learned_recipes"]
+			"learned_recipes": result["learned_recipes"]
 		})
 
 	refresh_ui()
@@ -878,15 +992,14 @@ func _on_craft_pressed():
 		_end_action_lock("alchemy_start")
 		return
 
-	if not _apply_pre_deduct(selected_recipe, selected_count):
+	if not _can_start_batch(selected_recipe, selected_count):
 		log_message.emit("灵材或灵气不足，无法开炉炼丹")
 		_end_action_lock("alchemy_start")
 		return
 
 	var start_result = await api.alchemy_start()
 	if not start_result.get("success", false):
-		_refund_unconsumed_resources()
-		var err_msg = api.network_manager.get_api_error_text_for_ui(start_result, "开始炼丹失败")
+		var err_msg = _get_alchemy_result_message(start_result, "开始炼丹失败")
 		if not err_msg.is_empty():
 			log_message.emit(err_msg)
 		_end_action_lock("alchemy_start")
@@ -900,6 +1013,14 @@ func _on_craft_pressed():
 	_runtime_timer = 0.0
 	_runtime_craft_time = alchemy_system.calculate_craft_time(selected_recipe)
 	_is_alchemizing = true
+	_runtime_pending_cost.clear()
+	if not _apply_single_pre_deduct(_runtime_recipe_id):
+		log_message.emit("灵材或灵气不足，无法开炉炼丹")
+		_restore_pending_cost()
+		_is_alchemizing = false
+		await api.alchemy_stop()
+		_end_action_lock("alchemy_start")
+		return
 	_on_alchemy_crafting_started(_runtime_recipe_id, _runtime_total_count)
 	_end_action_lock("alchemy_start")
 
@@ -917,14 +1038,13 @@ func _finish_alchemy_session(natural_finished: bool):
 
 	var stop_result = await api.alchemy_stop()
 	if not stop_result.get("success", false):
-		var err_msg = api.network_manager.get_api_error_text_for_ui(stop_result, "停止炼丹失败")
+		var err_msg = _get_alchemy_result_message(stop_result, "停止炼丹失败")
 		if not err_msg.is_empty():
 			log_message.emit(err_msg)
 
-	_refund_unconsumed_resources()
+	if not natural_finished:
+		_restore_pending_cost()
 
-	var completed = _runtime_index
-	var remaining = max(_runtime_total_count - _runtime_index, 0)
 	var success_count = _runtime_success_count
 	var fail_count = _runtime_fail_count
 
@@ -937,8 +1057,7 @@ func _finish_alchemy_session(natural_finished: bool):
 	_runtime_timer = 0.0
 	_runtime_craft_time = 0.0
 	_runtime_tick_in_flight = false
-	_runtime_pre_deduct.clear()
-	_runtime_consumed.clear()
+	_runtime_pending_cost.clear()
 
 	if game_ui and game_ui.has_method("clear_active_mode"):
 		game_ui.clear_active_mode("alchemy")
@@ -946,7 +1065,7 @@ func _finish_alchemy_session(natural_finished: bool):
 	if natural_finished:
 		_on_alchemy_crafting_finished(selected_recipe, success_count, fail_count)
 	else:
-		_on_alchemy_crafting_stopped(completed, remaining)
+		_on_alchemy_crafting_stopped(success_count, fail_count)
 	
 	if game_ui and game_ui.has_method("refresh_all_player_data"):
 		await game_ui.refresh_all_player_data()
@@ -964,7 +1083,9 @@ func _on_alchemy_crafting_started(recipe_id: String, count: int):
 		craft_progress_bar.visible = true
 		craft_progress_bar.value = 0
 	_update_craft_count_label()
-	log_message.emit("开炉炼丹，开始炼制 [" + recipe_data.get_recipe_name(recipe_id) + "]")
+	var start_msg = _get_alchemy_result_message({"reason_code": "ALCHEMY_START_SUCCEEDED"}, "开炉炼丹")
+	if not start_msg.is_empty():
+		log_message.emit(start_msg + "，开始炼制[" + recipe_data.get_recipe_name(recipe_id) + "]")
 
 func _on_alchemy_crafting_progress(current: int, total: int, progress: float):
 	if craft_progress_bar:
@@ -988,9 +1109,9 @@ func _on_alchemy_crafting_finished(recipe_id: String, success_count: int, fail_c
 	_update_alchemy_info()
 	_update_materials_display()
 	_update_craft_count_label()
-	log_message.emit("此次炼丹结束，成丹%d枚，废丹%d枚" % [success_count, fail_count])
+	log_message.emit(_build_alchemy_summary_message(success_count, fail_count))
 
-func _on_alchemy_crafting_stopped(completed_count: int, remaining_count: int):
+func _on_alchemy_crafting_stopped(success_count: int, fail_count: int):
 	if craft_button:
 		craft_button.disabled = false
 		craft_button.text = "开始炼制"
@@ -1004,7 +1125,7 @@ func _on_alchemy_crafting_stopped(completed_count: int, remaining_count: int):
 	_update_alchemy_info()
 	_update_materials_display()
 	_update_craft_count_label()
-	log_message.emit("收丹停火：已完成%d颗，剩余%d颗" % [completed_count, remaining_count])
+	log_message.emit(_build_alchemy_summary_message(success_count, fail_count))
 
 
 func _on_alchemy_log_message(message: String):

@@ -19,9 +19,12 @@ func before_each():
 
 func after_each():
 	if log_manager:
-		log_manager.queue_free()
+		log_manager.free()
+		log_manager = null
 	if test_label:
-		test_label.queue_free()
+		test_label.free()
+		test_label = null
+	await get_tree().process_frame
 
 #region 初始化测试
 

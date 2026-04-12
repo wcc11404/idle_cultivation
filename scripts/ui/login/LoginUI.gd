@@ -15,6 +15,40 @@ var cloud_save: CloudSaveManager = null
 @onready var register_button = $Panel/VBoxContainer/HBoxContainer/RegisterButton
 @onready var message_label = $Panel/MessageLabel
 
+func _get_login_result_text(result: Dictionary, fallback: String = "登录失败") -> String:
+	var reason_code := str(result.get("reason_code", ""))
+	match reason_code:
+		"ACCOUNT_LOGIN_USERNAME_NOT_FOUND":
+			return "用户名未注册"
+		"ACCOUNT_LOGIN_PASSWORD_INCORRECT":
+			return "密码错误"
+		"ACCOUNT_LOGIN_ACCOUNT_BANNED":
+			return "账号已被封禁"
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
+
+func _get_register_result_text(result: Dictionary, fallback: String = "注册失败") -> String:
+	var reason_code := str(result.get("reason_code", ""))
+	match reason_code:
+		"ACCOUNT_REGISTER_USERNAME_EMPTY":
+			return "用户名不能为空"
+		"ACCOUNT_REGISTER_USERNAME_LENGTH_INVALID":
+			return "用户名长度应在4-20位之间"
+		"ACCOUNT_REGISTER_USERNAME_INVALID_CHARACTER":
+			return "用户名只能包含英文、数字和下划线"
+		"ACCOUNT_REGISTER_PASSWORD_EMPTY":
+			return "密码不能为空"
+		"ACCOUNT_REGISTER_PASSWORD_LENGTH_INVALID":
+			return "密码长度应在6-20位之间"
+		"ACCOUNT_REGISTER_PASSWORD_INVALID_CHARACTER":
+			return "密码只能包含英文、数字和英文标点符号"
+		"ACCOUNT_REGISTER_USERNAME_PASSWORD_SAME":
+			return "用户名和密码不能相同"
+		"ACCOUNT_REGISTER_USERNAME_EXISTS":
+			return "用户名已存在"
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
+
 func _ready():
 	api = GameServerAPI.new()
 	add_child(api)
@@ -100,13 +134,12 @@ func _on_login_pressed():
 		enter_game()
 	else:
 		# 登录异常，按要求技术性报错仅打印在控制台，业务逻辑失败才反馈 UI
-		var err_msg = api.network_manager.get_api_error_text_for_ui(login_result, "登录失败")
+		var err_msg = _get_login_result_text(login_result, "登录失败")
 		if not err_msg.is_empty():
 			show_message(err_msg)
 		else:
 			# 这里是技术性报错，不显示详细原因，仅提示常规性异常
 			show_message("登录异常，请检查网络或稍后重试")
-			print("[Login Technical Error] " + str(login_result))
 
 func _on_register_pressed():
 	var username = username_input.text.strip_edges()
@@ -131,12 +164,11 @@ func _on_register_pressed():
 		show_message("注册成功，请登录")
 	else:
 		# 注册异常处理
-		var err_msg = api.network_manager.get_api_error_text_for_ui(register_result, "注册失败")
+		var err_msg = _get_register_result_text(register_result, "注册失败")
 		if not err_msg.is_empty():
 			show_message(err_msg)
 		else:
 			show_message("注册异常，请稍后重试")
-			print("[Register Technical Error] " + str(register_result))
 
 func load_game_data():
 	show_message("加载游戏数据...")
