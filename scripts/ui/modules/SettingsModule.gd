@@ -118,7 +118,7 @@ func _on_logout_pressed():
 
 	if api and api.network_manager and api.network_manager.has_method("clear_token"):
 		api.network_manager.clear_token()
-	get_tree().change_scene_to_file("res://scenes/login/Login.tscn")
+	get_tree().change_scene_to_file("res://scenes/app/Login.tscn")
 
 func _on_confirm_nickname_pressed():
 	if not nickname_input:

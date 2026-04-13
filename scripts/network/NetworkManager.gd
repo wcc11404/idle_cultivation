@@ -7,9 +7,6 @@ const ServerConfig = preload("res://scripts/network/ServerConfig.gd")
 const NETWORK_FAILURE_LOGOUT_THRESHOLD := 3
 
 var current_token: String = ""
-var loading_popup: AcceptDialog = null
-var error_popup: AcceptDialog = null
-var is_requesting: bool = false
 var consecutive_network_failures: int = 0
 
 func _ready():
@@ -238,60 +235,16 @@ func _reset_network_failure_counter() -> void:
 func _handle_kicked_out():
 	clear_token()
 	show_error("账号在其他设备登录，请重新登录")
-	get_tree().change_scene_to_file("res://scenes/login/Login.tscn")
+	get_tree().change_scene_to_file("res://scenes/app/Login.tscn")
 
 func _handle_invalid_token():
 	clear_token()
 	show_error("登录已过期，请重新登录")
-	get_tree().change_scene_to_file("res://scenes/login/Login.tscn")
+	get_tree().change_scene_to_file("res://scenes/app/Login.tscn")
 
 func _force_logout_due_network():
 	clear_token()
-	is_requesting = false
-	_hide_loading_popup()
-	get_tree().change_scene_to_file("res://scenes/login/Login.tscn")
-
-func execute_critical_operation(api_path: String, body: Dictionary, on_success: Callable) -> void:
-	if is_requesting:
-		show_toast("请等待当前操作完成")
-		return
-
-	is_requesting = true
-
-	await get_tree().create_timer(ServerConfig.QUICK_THRESHOLD).timeout
-	if is_requesting:
-		_show_loading_popup()
-
-	var result = await request("POST", api_path, body, {
-		"retry_count": 1,
-		"track_network_failure": true,
-		"show_retry_toast": true
-	})
-
-	_hide_loading_popup()
-	is_requesting = false
-
-	if result.get("success", false):
-		on_success.call(result)
-	else:
-		var err_msg = get_api_error_text_for_ui(result)
-		if not err_msg.is_empty():
-			show_toast(err_msg)
-
-func _show_loading_popup():
-	if not loading_popup:
-		loading_popup = AcceptDialog.new()
-		loading_popup.title = "请稍候"
-		loading_popup.dialog_text = "网络环境不佳，正在等待..."
-		loading_popup.get_ok_button().disabled = true
-		loading_popup.set_size(Vector2(300, 150))
-		add_child(loading_popup)
-	loading_popup.popup_centered(Vector2(300, 150))
-
-func _hide_loading_popup():
-	if loading_popup and loading_popup.visible:
-		loading_popup.hide()
-
+	get_tree().change_scene_to_file("res://scenes/app/Login.tscn")
 
 func show_toast(message: String):
 	print("[Toast] " + message)

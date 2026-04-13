@@ -1,7 +1,7 @@
 class_name ChunaModule extends Node
 
 # 储纳模块 - 处理物品管理、物品详情等功能
-const ActionLockManager = preload("res://scripts/managers/ActionLockManager.gd")
+const ActionLockManager = preload("res://scripts/utils/flow/ActionLockManager.gd")
 
 # 信号
 signal item_selected(item_id: String, index: int)
@@ -48,22 +48,22 @@ var _action_lock := ActionLockManager.new()
 
 func initialize(
 	ui: Node,
-	player_node: Node,
+	_player_node: Node,
 	inv: Node,
 	item_data_node: Node,
-	spell_sys: Node = null,
+	_spell_sys: Node = null,
 	spell_dt: Node = null,
-	alchemy_sys: Node = null,
+	_alchemy_sys: Node = null,
 	game_api: Node = null,
 	recipe_data_node: Node = null
 ):
 	game_ui = ui
-	player = player_node
+	player = _player_node
 	inventory = inv
 	item_data = item_data_node
-	spell_system = spell_sys
+	spell_system = _spell_sys
 	spell_data = spell_dt
-	alchemy_system = alchemy_sys
+	alchemy_system = _alchemy_sys
 	api = game_api
 	recipe_data_ref = recipe_data_node
 	
@@ -158,22 +158,14 @@ func _get_inventory_result_message(result: Dictionary, fallback: String = "") ->
 			return item_name + "无法使用"
 		"INVENTORY_USE_EFFECT_INVALID":
 			return item_name + "效果异常"
-		"INVENTORY_USE_GIFT_EMPTY":
-			return item_name + "暂无可领取内容"
-		"INVENTORY_USE_SPELL_SYSTEM_UNAVAILABLE":
-			return "术法系统未初始化"
 		"INVENTORY_USE_UNLOCK_SPELL_INVALID":
 			return item_name + "无效"
-		"INVENTORY_USE_SPELL_ALREADY_UNLOCKED":
-			return "已学会术法【%s】" % _get_spell_name(str(effect.get("spell_id", "")))
-		"INVENTORY_USE_ALCHEMY_SYSTEM_UNAVAILABLE":
-			return "炼丹系统未初始化"
-		"INVENTORY_USE_RECIPE_ALREADY_UNLOCKED":
-			return "已学会丹方【%s】" % _get_recipe_name(str(effect.get("recipe_id", "")))
 		"INVENTORY_USE_UNLOCK_RECIPE_INVALID":
 			return item_name + "无效"
-		"INVENTORY_USE_FURNACE_ALREADY_OWNED":
-			return "已拥有丹炉【%s】" % _get_item_name(str(effect.get("furnace_id", item_id)))
+		"INVENTORY_USE_ALREADY_USED":
+			return item_name + "已经使用过了，无法重复使用"
+		"INVENTORY_USE_SYSTEM_ERROR":
+			return item_name + "使用失败，请稍后重试"
 		"INVENTORY_DISCARD_SUCCEEDED":
 			return item_name + "丢弃成功"
 		"INVENTORY_DISCARD_ITEM_NOT_ENOUGH":
@@ -291,9 +283,8 @@ func setup_inventory_grid():
 		var slot = _create_slot(i)
 		inventory_grid.add_child(slot)
 	
-	# 等待一帧让布局更新后再调整大小
-	await get_tree().process_frame
-	_update_slot_sizes()
+		# 延迟到当前帧结束后再调整大小，避免在测试释放节点时留下悬空协程
+		call_deferred("_update_slot_sizes")
 
 # 创建单个格子
 func _create_slot(index: int) -> Control:
@@ -723,16 +714,3 @@ func _refresh_inventory_from_server():
 
 func _add_log(message: String):
 	log_message.emit(message)
-
-# 公共接口
-## 获取当前选中的物品ID
-func get_selected_item_id() -> String:
-	return current_selected_item_id
-
-## 获取当前选中的物品索引
-func get_selected_index() -> int:
-	return current_selected_index
-
-## 清空当前选择
-func clear_selection():
-	_clear_item_detail_panel()

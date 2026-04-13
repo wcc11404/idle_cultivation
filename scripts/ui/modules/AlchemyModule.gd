@@ -1,7 +1,7 @@
 class_name AlchemyModule extends Node
 
 # 炼丹模块 - 处理炼丹房UI显示
-const ActionLockManager = preload("res://scripts/managers/ActionLockManager.gd")
+const ActionLockManager = preload("res://scripts/utils/flow/ActionLockManager.gd")
 
 # === 信号 ===
 signal recipe_selected(recipe_id: String)
@@ -67,6 +67,8 @@ var _runtime_timer: float = 0.0
 var _runtime_craft_time: float = 0.0
 var _runtime_tick_in_flight: bool = false
 var _runtime_pending_cost: Dictionary = {}
+var _pending_async_task_count: int = 0
+var _report_time_invalid_prompted: bool = false
 
 # === 缓存 ===
 var _recipe_cards: Dictionary = {}
@@ -179,19 +181,31 @@ func _process(delta: float):
 	_runtime_tick_in_flight = false
 
 func _run_alchemy_tick():
+	_pending_async_task_count += 1
 	if not _is_alchemizing:
+		_pending_async_task_count = maxi(0, _pending_async_task_count - 1)
 		return
 	if _runtime_index >= _runtime_total_count:
 		await _finish_alchemy_session(true)
+		_pending_async_task_count = maxi(0, _pending_async_task_count - 1)
 		return
 
 	var report_result = await api.alchemy_report(_runtime_recipe_id, 1)
 	if not report_result.get("success", false):
 		_restore_pending_cost()
-		var err_msg = _get_alchemy_result_message(report_result, "炼丹上报失败")
-		if not err_msg.is_empty():
-			log_message.emit(err_msg)
+		var reason_code = str(report_result.get("reason_code", ""))
+		if reason_code == "ALCHEMY_REPORT_TIME_INVALID":
+			if not _report_time_invalid_prompted:
+				var invalid_msg = _get_alchemy_result_message(report_result, "炼丹上报失败")
+				if not invalid_msg.is_empty():
+					log_message.emit(invalid_msg)
+				_report_time_invalid_prompted = true
+		else:
+			var err_msg = _get_alchemy_result_message(report_result, "炼丹上报失败")
+			if not err_msg.is_empty():
+				log_message.emit(err_msg)
 		await _finish_alchemy_session(false)
+		_pending_async_task_count = maxi(0, _pending_async_task_count - 1)
 		return
 
 	_runtime_index += 1
@@ -207,11 +221,13 @@ func _run_alchemy_tick():
 
 	if _runtime_index >= _runtime_total_count:
 		await _finish_alchemy_session(true)
+		_pending_async_task_count = maxi(0, _pending_async_task_count - 1)
 		return
 
 	if not _apply_single_pre_deduct(_runtime_recipe_id):
 		log_message.emit("灵材或灵气不足，无法继续炼丹")
 		await _finish_alchemy_session(false)
+	_pending_async_task_count = maxi(0, _pending_async_task_count - 1)
 
 func _apply_report_result(report_result: Dictionary):
 	var returned_materials = report_result.get("returned_materials", {})
@@ -1013,6 +1029,7 @@ func _on_craft_pressed():
 	_runtime_timer = 0.0
 	_runtime_craft_time = alchemy_system.calculate_craft_time(selected_recipe)
 	_is_alchemizing = true
+	_report_time_invalid_prompted = false
 	_runtime_pending_cost.clear()
 	if not _apply_single_pre_deduct(_runtime_recipe_id):
 		log_message.emit("灵材或灵气不足，无法开炉炼丹")
@@ -1032,8 +1049,10 @@ func _on_stop_pressed():
 	await _finish_alchemy_session(false)
 
 func _finish_alchemy_session(natural_finished: bool):
+	_pending_async_task_count += 1
 	if not api:
 		_end_action_lock("alchemy_stop")
+		_pending_async_task_count = maxi(0, _pending_async_task_count - 1)
 		return
 
 	var stop_result = await api.alchemy_stop()
@@ -1058,6 +1077,7 @@ func _finish_alchemy_session(natural_finished: bool):
 	_runtime_craft_time = 0.0
 	_runtime_tick_in_flight = false
 	_runtime_pending_cost.clear()
+	_report_time_invalid_prompted = false
 
 	if game_ui and game_ui.has_method("clear_active_mode"):
 		game_ui.clear_active_mode("alchemy")
@@ -1071,6 +1091,7 @@ func _finish_alchemy_session(natural_finished: bool):
 		await game_ui.refresh_all_player_data()
 
 	_end_action_lock("alchemy_stop")
+	_pending_async_task_count = maxi(0, _pending_async_task_count - 1)
 
 func _on_alchemy_crafting_started(recipe_id: String, count: int):
 	if game_ui and game_ui.has_method("set_active_mode"):
@@ -1127,10 +1148,6 @@ func _on_alchemy_crafting_stopped(success_count: int, fail_count: int):
 	_update_craft_count_label()
 	log_message.emit(_build_alchemy_summary_message(success_count, fail_count))
 
-
-func _on_alchemy_log_message(message: String):
-	log_message.emit(message)
-
 # === 公共方法 ===
 func set_craft_count(count: int):
 	if _is_alchemizing:
@@ -1142,6 +1159,9 @@ func set_craft_count(count: int):
 
 func is_crafting_active() -> bool:
 	return _is_alchemizing
+
+func has_pending_test_tasks() -> bool:
+	return _pending_async_task_count > 0 or _runtime_tick_in_flight
 
 func stop_crafting():
 	if _is_alchemizing:

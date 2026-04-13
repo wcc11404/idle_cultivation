@@ -2,19 +2,14 @@ class_name LianliModule extends Node
 
 ## 历练模块 - 管理历练和无尽塔功能
 ## 包括战斗UI更新、战斗控制、战斗日志等
-const ActionLockManager = preload("res://scripts/managers/ActionLockManager.gd")
+const ActionLockManager = preload("res://scripts/utils/flow/ActionLockManager.gd")
 const UIUtils = preload("res://scripts/utils/ui_utils.gd")
 
 # 信号
 signal log_message(message: String)
 signal battle_log_message(message: String)
-signal lianli_started(area_id: String)
-signal battle_started(enemy_name: String, is_elite: bool, enemy_max_health: float, enemy_level: int, player_max_health: float)
-signal battle_updated(player_atb: float, enemy_atb: float, player_health: float, enemy_health: float, player_max_health: float, enemy_max_health: float)
-signal lianli_ended(victory: bool)
 signal battle_ended(victory: bool, loot: Array, enemy_name: String)
 signal lianli_waiting(time_remaining: float)
-signal lianli_action_log(message: String)
 signal continue_button_enabled
 
 # 引用
@@ -73,6 +68,7 @@ var _simulated_player_health_after: float = 0.0
 var _simulated_player_max_health: float = 0.0
 var _enemy_hp_tween: Tween = null
 var _player_hp_tween: Tween = null
+var _finish_time_invalid_prompted: bool = false
 
 # 等待状态
 var _is_waiting: bool = false
@@ -305,6 +301,7 @@ func _start_timeline_from_simulation(sim_result: Dictionary, area_id: String):
 	_simulated_player_health_after = float(sim_result.get("player_health_after", player.health if player else 0.0))
 	_simulated_player_max_health = player.get_combat_max_health() if player else 0.0
 	current_lianli_area_id = area_id
+	_finish_time_invalid_prompted = false
 	# 初始化本次战斗的最大速度
 	current_battle_max_speed = LIANLI_SPEEDS[current_lianli_speed_index]
 
@@ -350,7 +347,12 @@ func _finish_current_battle(full_settle: bool):
 	var finish_result = await api.lianli_finish(current_battle_max_speed, settle_index)
 	if not finish_result.get("success", false):
 		var err_msg = _get_lianli_result_message(finish_result, "历练结算失败")
-		if not err_msg.is_empty():
+		var reason_code = str(finish_result.get("reason_code", ""))
+		var should_show_msg = true
+		if reason_code == "LIANLI_FINISH_TIME_INVALID":
+			should_show_msg = not _finish_time_invalid_prompted
+			_finish_time_invalid_prompted = true
+		if should_show_msg and not err_msg.is_empty():
 			log_message.emit(err_msg + "，已退出历练")
 		_on_force_exit_lianli()
 		return
@@ -439,19 +441,11 @@ func _on_force_exit_lianli():
 	_simulate_loot = []
 	_is_waiting = false
 	_wait_timer = 0.0
+	_finish_time_invalid_prompted = false
 	_set_local_lianli_state(false, false, false, "")
 	if game_ui and game_ui.has_method("clear_active_mode"):
 		game_ui.clear_active_mode("lianli")
 	show_lianli_select_panel()
-
-# 显示历练面板
-func show_lianli_panel():
-	if lianli_panel:
-		lianli_panel.visible = true
-
-func hide_lianli_panel():
-	if lianli_panel:
-		lianli_panel.visible = false
 
 # 显示历练场景面板（战斗中）
 func show_lianli_scene_panel():
@@ -601,10 +595,6 @@ func enable_continue_button():
 
 # ==================== UI更新功能 ====================
 
-# 更新战斗信息UI
-func update_battle_info():
-	_update_battle_info()
-
 func _update_battle_info():
 	if not lianli_system:
 		return
@@ -686,10 +676,6 @@ func _get_normal_area_reward_text() -> String:
 		return "掉落: " + str(min_amount) + "-" + str(max_amount) + " 灵石"
 	return ""
 
-# 更新按钮容器显示
-func update_button_container():
-	_update_button_container()
-
 func _update_button_container():
 	if continuous_checkbox:
 		continuous_checkbox.visible = true
@@ -706,96 +692,6 @@ func _set_continuous_default():
 		return
 	var area_id = current_lianli_area_id if not current_lianli_area_id.is_empty() else "qi_refining_outer"
 	continuous_checkbox.button_pressed = lianli_area_data.get_default_continuous(area_id)
-
-# ==================== 信号处理函数 ====================
-
-# 历练开始
-func on_lianli_started(area_id: String):
-	if game_ui and game_ui.has_method("set_active_mode"):
-		game_ui.set_active_mode("lianli")
-	var area_name = ""
-	if lianli_area_data:
-		area_name = lianli_area_data.get_area_name(area_id)
-	if area_name.is_empty():
-		area_name = "历练区域"
-	
-	if lianli_status_label:
-		lianli_status_label.text = "进入" + area_name + "..."
-		lianli_status_label.modulate = Color.YELLOW
-	
-	lianli_started.emit(area_id)
-
-# 战斗开始
-func on_battle_started(enemy_name: String, is_elite: bool, enemy_max_health: float, enemy_level: int, player_max_health: float = 0):
-	var elite_tag = " [精英]" if is_elite else ""
-	
-	if enemy_name_label:
-		enemy_name_label.text = enemy_name + " Lv." + str(int(enemy_level)) + elite_tag
-		enemy_name_label.modulate = Color.RED if is_elite else Color.WHITE
-	
-	if lianli_status_label:
-		lianli_status_label.text = "战斗中..."
-		lianli_status_label.modulate = Color.YELLOW
-	
-	# 初始化敌人血条
-	if enemy_health_bar:
-		enemy_health_bar.max_value = enemy_max_health
-		enemy_health_bar.value = enemy_max_health
-	if enemy_health_value:
-		enemy_health_value.text = AttributeCalculator.format_integer(enemy_max_health) + "/" + AttributeCalculator.format_integer(enemy_max_health)
-	
-	# 初始化玩家血条
-	if player:
-		var combat_max_health = player_max_health if player_max_health > 0 else player.get_combat_max_health()
-		_simulated_player_max_health = combat_max_health
-		if player_health_bar_lianli:
-			player_health_bar_lianli.max_value = combat_max_health
-			player_health_bar_lianli.value = player.health
-		if player_health_value_lianli:
-			player_health_value_lianli.text = AttributeCalculator.format_integer(player.health) + "/" + AttributeCalculator.format_integer(combat_max_health)
-	
-	# 更新UI
-	_update_battle_info()
-	_update_button_container()
-	
-	# 日志
-	var log_msg = "遭遇敌人: " + enemy_name + elite_tag
-	if log_manager:
-		log_manager.add_battle_log(log_msg)
-	else:
-		log_message.emit(log_msg)
-	
-	battle_started.emit(enemy_name, is_elite, enemy_max_health, enemy_level, player_max_health)
-
-# 战斗更新（ATB）
-func on_battle_updated(player_atb: float, enemy_atb: float, player_health: float, enemy_health: float, player_max_health: float, enemy_max_health: float):
-	# 更新敌人血条
-	if enemy_health_bar:
-		enemy_health_bar.max_value = enemy_max_health
-		enemy_health_bar.value = max(0.0, enemy_health)
-	if enemy_health_value:
-		enemy_health_value.text = AttributeCalculator.format_integer(max(0.0, enemy_health)) + "/" + AttributeCalculator.format_integer(enemy_max_health)
-	
-	# 更新玩家血条
-	if player_health_bar_lianli:
-		player_health_bar_lianli.max_value = player_max_health
-		player_health_bar_lianli.value = max(0.0, player_health)
-	if player_health_value_lianli:
-		player_health_value_lianli.text = AttributeCalculator.format_integer(max(0.0, player_health)) + "/" + AttributeCalculator.format_integer(player_max_health)
-	
-	battle_updated.emit(player_atb, enemy_atb, player_health, enemy_health, player_max_health, enemy_max_health)
-
-# 历练结束
-func on_lianli_ended(victory: bool):
-	if lianli_status_label:
-		if victory:
-			lianli_status_label.text = "历练完成"
-			lianli_status_label.modulate = Color.GREEN
-		else:
-			lianli_status_label.text = "历练结束"
-			lianli_status_label.modulate = Color.YELLOW
-	
-	lianli_ended.emit(victory)
 
 # 战斗结束
 func on_battle_ended(victory: bool, loot: Array, enemy_name: String):
@@ -815,27 +711,6 @@ func on_battle_ended(victory: bool, loot: Array, enemy_name: String):
 
 	battle_ended.emit(victory, loot, enemy_name)
 
-# 历练奖励
-func on_lianli_reward(item_id: String, amount: int, source: String):
-	var item_name = item_id
-	if item_data_ref and item_data_ref.has_method("get_item_name"):
-		item_name = item_data_ref.get_item_name(item_id)
-	var source_tag = source if not source.is_empty() else "lianli"
-
-	# 在线模式由服务端结算并在后续刷新中落地，避免本地写背包
-	if api:
-		log_message.emit("获得奖励(待结算)[" + source_tag + "]: " + item_name + " x" + str(amount))
-		return
-
-	# 离线容错：保留本地发奖路径
-	if inventory:
-		inventory.add_item(item_id, amount)
-		if chuna_module:
-			chuna_module.update_inventory_ui()
-		if game_ui and game_ui.has_method("update_ui"):
-			game_ui.update_ui()
-		log_message.emit("获得奖励[" + source_tag + "]: " + item_name + " x" + str(amount))
-
 # 等待中
 func on_lianli_waiting(time_remaining: float):
 	if lianli_status_label:
@@ -843,27 +718,6 @@ func on_lianli_waiting(time_remaining: float):
 		lianli_status_label.modulate = Color.GRAY
 	
 	lianli_waiting.emit(time_remaining)
-
-# 战斗日志（根据内容判断类型）
-func on_lianli_action_log(message: String):
-	# 系统消息关键词
-	var system_keywords = ["气血不足", "无法进入"]
-	var is_system = false
-	for keyword in system_keywords:
-		if keyword in message:
-			is_system = true
-			break
-	
-	if log_manager:
-		if is_system:
-			log_manager.add_system_log(message)
-		else:
-			log_manager.add_battle_log(message)
-	else:
-		log_message.emit(message)
-	
-	lianli_action_log.emit(message)
-
 
 # 清理
 func cleanup():

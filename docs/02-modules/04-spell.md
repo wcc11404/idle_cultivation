@@ -1,0 +1,95 @@
+# 术法
+
+## 职责与边界
+
+- 展示术法分类列表、术法详情、升级与充灵按钮状态。
+- 处理装备/卸下/升级/充灵请求，并将 reason_code 翻译成中文提示。
+
+## 关键状态
+
+- 当前查看术法：`current_viewing_spell`
+- 当前倍数策略：`current_multiplier_index`（升级/充灵）
+- 卡片池与信号状态：`_card_pool`、`_signals_connected`
+
+## API 交互
+
+- `GET /game/spell/list`
+- `POST /game/spell/equip`
+- `POST /game/spell/unequip`
+- `POST /game/spell/upgrade`
+- `POST /game/spell/charge`
+
+## 功能触发流转
+
+### 1) 打开术法页
+
+1. 显示术法面板。
+2. 根据当前 `spell_system` 构建分类卡片（吐纳/主动/开局/生产）。
+3. 延迟触发一次 `spell/list` 同步，避免展示旧状态。
+
+### 2) 点击术法卡片
+
+1. 记录 `current_viewing_spell`。
+2. 打开或刷新详情弹窗（等级、次数、充灵、需求）。
+3. 根据当前状态决定按钮可用性。
+
+### 3) 点击装备
+
+1. 调用 `spell/equip`。
+2. 成功：输出 `xxx装备成功`，刷新列表与详情。
+3. 失败：
+   - 槽位满：`吐纳心法/主动术法/开局术法槽位已达上限，请先卸下任意术法`
+   - 战斗锁定：`战斗中无法装备术法`
+   - 未获得/不存在等：按映射提示。
+
+### 4) 点击卸下
+
+1. 调 `spell/unequip`。
+2. 成功：输出 `xxx卸下成功`。
+3. 失败：按 reason_code 映射（未装备/战斗锁定等）。
+
+### 5) 点击升级
+
+1. 调 `spell/upgrade`。
+2. 成功：显示新等级并刷新卡片。
+3. 失败：提示“使用次数不足/充灵不足/已满级/战斗中锁定”。
+
+### 6) 点击充灵
+
+1. 按当前倍数计算请求量并调 `spell/charge`。
+2. 成功：更新充灵进度与详情文案。
+3. 失败：提示“灵气不足/已满/战斗中锁定”等。
+
+### 7) 服务端同步
+
+1. `spell/list` 成功后应用到 `spell_system`。
+2. 以 `update_spell_ui` 重建展示，保证装备位与次数一致。
+
+## reason_code 文案策略
+
+- 所有业务提示在模块内映射，不透传服务端 message。
+- 槽位类型统一中文名映射：
+  - breathing -> 吐纳心法
+  - active -> 主动术法
+  - opening -> 开局术法
+
+## 失败处理与回退
+
+- 失败后保持当前详情弹窗，便于用户直接改操作重试。
+- 同步失败仅提示，不清空当前 UI。
+
+## 测试覆盖点
+
+- 装备/卸下成功文案。
+- 槽位上限文案中文化。
+- 战斗中禁止装备/卸下/升级/充灵。
+
+## 典型触发链路（函数级）
+
+以“点击装备术法”为例：
+
+1. `SpellModule._on_equip_button_pressed` 触发 `api.spell_equip`。
+2. 返回成功时用 `reason_data.spell_id` 组装“xxx装备成功”，并触发 `refresh_spell_data`。
+3. `refresh_spell_data` 调 `api.spell_list`，回写 `spell_system.apply_save_data`，重建卡片与详情。
+4. 若失败码是 `SPELL_SLOT_LIMIT_REACHED`，按 `slot_type -> 吐纳心法/主动术法/开局术法` 生成上限提示。
+5. 若失败码是战斗锁定，统一输出“战斗中无法xxx术法”并保持详情弹窗上下文不丢失。

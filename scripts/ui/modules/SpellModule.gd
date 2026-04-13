@@ -1,6 +1,6 @@
 class_name SpellModule extends Node
 
-const ActionLockManager = preload("res://scripts/managers/ActionLockManager.gd")
+const ActionLockManager = preload("res://scripts/utils/flow/ActionLockManager.gd")
 
 signal spell_equipped(spell_id: String)
 signal spell_unequipped(spell_id: String)
@@ -113,9 +113,9 @@ func _get_spell_result_text(result: Dictionary, fallback: String) -> String:
 		_:
 			return api.network_manager.get_api_error_text_for_ui(result, fallback)
 
-func initialize(ui: Node, player_node: Node, spell_sys: Node, spell_dt: Node, game_api: Node = null):
+func initialize(ui: Node, _player_node: Node, spell_sys: Node, spell_dt: Node, game_api: Node = null):
 	game_ui = ui
-	player = player_node
+	player = _player_node
 	spell_system = spell_sys
 	spell_data = spell_dt
 	api = game_api
@@ -538,12 +538,6 @@ func _get_slot_type_by_spell(spell_id: String) -> String:
 
 func _add_log(message: String):
 	log_message.emit(message)
-
-func get_current_viewing_spell() -> String:
-	return current_viewing_spell
-
-func refresh_spell_ui():
-	update_spell_ui()
 
 func on_spell_used(spell_id: String):
 	update_spell_ui()

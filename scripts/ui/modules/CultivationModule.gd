@@ -1,7 +1,7 @@
 class_name CultivationModule extends Node
 
-const AttributeCalculator = preload("res://scripts/core/AttributeCalculator.gd")
-const ActionLockManager = preload("res://scripts/managers/ActionLockManager.gd")
+const AttributeCalculator = preload("res://scripts/core/shared/AttributeCalculator.gd")
+const ActionLockManager = preload("res://scripts/utils/flow/ActionLockManager.gd")
 const CultivationLogic = preload("res://scripts/core/cultivation/CultivationSystem.gd")
 
 signal cultivation_started
@@ -12,10 +12,7 @@ signal log_message(message: String)
 
 var game_ui: Node = null
 var player: Node = null
-var cultivation_system: Node = null
-var lianli_system: Node = null
 var item_data: Node = null
-var alchemy_module: Node = null
 var inventory: Node = null
 var api: Node = null
 var spell_system_ref: Node = null
@@ -44,6 +41,7 @@ var _pending_count: int = 0
 var _flush_in_flight: bool = false
 var _report_failure_count: int = 0
 var _optimistic_health_regen_accumulator: float = 0.0
+var _time_invalid_prompted_in_streak: bool = false
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
@@ -51,20 +49,17 @@ var _action_lock := ActionLockManager.new()
 func initialize(
 	ui: Node,
 	player_node: Node,
-	cult_sys: Node,
-	lianli_sys: Node = null,
+	_cult_sys: Node,
+	_lianli_sys: Node = null,
 	item_data_ref: Node = null,
-	alchemy_mod: Node = null,
+	_alchemy_mod: Node = null,
 	game_api: Node = null,
 	spell_sys_ref: Node = null,
 	realm_sys_ref: Node = null
 ):
 	game_ui = ui
 	player = player_node
-	cultivation_system = cult_sys
-	lianli_system = lianli_sys
 	item_data = item_data_ref
-	alchemy_module = alchemy_mod
 	api = game_api
 	spell_system_ref = spell_sys_ref
 	realm_system_ref = realm_sys_ref
@@ -381,6 +376,7 @@ func _flush_pending_report(max_batch: int = -1) -> bool:
 	if result.get("success", false):
 		_pending_count = maxi(0, _pending_count - report_count)
 		_report_failure_count = 0
+		_time_invalid_prompted_in_streak = false
 		if _pending_count == 0:
 			# 服务端按单次上报批次独立结算回血取整，当前批次结算完成后，
 			# 下一批乐观回血不能继续沿用上一批的小数尾数。
@@ -389,13 +385,17 @@ func _flush_pending_report(max_batch: int = -1) -> bool:
 		return true
 
 	_report_failure_count += 1
-	var err_msg = _resolve_cultivation_result_message(result, "修炼同步失败")
-	if not err_msg.is_empty():
-		log_message.emit(err_msg)
-	
-	if _report_failure_count >= 3:
-		log_message.emit("同步异常，已停止修炼")
-		await _stop_cultivation_internal(true)
+	var reason_code = str(result.get("reason_code", ""))
+	if reason_code == "CULTIVATION_REPORT_TIME_INVALID":
+		if not _time_invalid_prompted_in_streak:
+			var invalid_msg = _resolve_cultivation_result_message(result, "修炼同步失败")
+			if not invalid_msg.is_empty():
+				log_message.emit(invalid_msg)
+			_time_invalid_prompted_in_streak = true
+	else:
+		var err_msg = _resolve_cultivation_result_message(result, "修炼同步失败")
+		if not err_msg.is_empty():
+			log_message.emit(err_msg)
 	return false
 
 func _apply_report_result(result: Dictionary, _report_count: int):
@@ -408,22 +408,6 @@ func _apply_report_result(result: Dictionary, _report_count: int):
 	
 	if game_ui and game_ui.has_method("update_ui"):
 		game_ui.update_ui()
-
-func _sync_breathing_spell_use_count(used_count_gained: int):
-	if used_count_gained <= 0:
-		return
-
-	var spell_system = _get_spell_system()
-	if not spell_system or not spell_system.has_method("add_spell_use_count"):
-		return
-
-	var breathing_spells = spell_system.equipped_spells.get("breathing", []) if spell_system.get("equipped_spells") else []
-	if breathing_spells.is_empty():
-		return
-
-	var spell_id = str(breathing_spells[0])
-	for _i in range(used_count_gained):
-		spell_system.add_spell_use_count(spell_id)
 
 func flush_pending_and_then(action: Callable) -> bool:
 	if _pending_count > 0:
@@ -481,6 +465,7 @@ func on_cultivate_button_pressed():
 		_pending_count = 0
 		_accumulated_seconds = 0.0
 		_report_failure_count = 0
+		_time_invalid_prompted_in_streak = false
 		_optimistic_health_regen_accumulator = 0.0
 		if game_ui and game_ui.has_method("set_active_mode"):
 			game_ui.set_active_mode("cultivation")
@@ -501,8 +486,7 @@ func _stop_cultivation_internal(by_failure: bool):
 	if _pending_count > 0:
 		var flush_ok = await _flush_pending_report()
 		if not flush_ok and not by_failure:
-			log_message.emit("修炼增量尚未同步，请稍后再试")
-			return
+			log_message.emit("修炼同步异常，正在尝试停止修炼")
 
 	var result = await api.cultivation_stop()
 	if result.get("success", false):
@@ -510,15 +494,20 @@ func _stop_cultivation_internal(by_failure: bool):
 		_pending_count = 0
 		_accumulated_seconds = 0.0
 		_optimistic_health_regen_accumulator = 0.0
+		_time_invalid_prompted_in_streak = false
 		if game_ui and game_ui.has_method("clear_active_mode"):
 			game_ui.clear_active_mode("cultivation")
 		if cultivate_button:
 			cultivate_button.text = "修炼"
 			if game_ui and game_ui.has_method("refresh_all_player_data"):
 				await game_ui.refresh_all_player_data()
-			cultivation_stopped.emit()
-			if not by_failure:
-				log_message.emit(_resolve_cultivation_result_message(result, "停止修炼"))
+				cultivation_stopped.emit()
+				if not by_failure:
+					log_message.emit(_resolve_cultivation_result_message(result, "停止修炼"))
+	elif not by_failure:
+		var err_msg = _resolve_cultivation_result_message(result, "停止修炼失败")
+		if not err_msg.is_empty():
+			log_message.emit(err_msg)
 
 func on_breakthrough_button_pressed():
 	if not player or not api:

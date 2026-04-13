@@ -1,0 +1,1492 @@
+[gd_scene format=3 uid="uid://cvpk2nla76vl6"]
+
+[ext_resource type="Script" uid="uid://dvl8rnw1uw6xg" path="res://scripts/ui/app/GameUI.gd" id="1_ui"]
+[ext_resource type="Script" uid="uid://cj6dpcg2w0usj" path="res://scripts/ui/common/BackgroundManager.gd" id="2_background"]
+[ext_resource type="Texture2D" uid="uid://csmun1mvk2vmg" path="res://assets/cultivation/cultivation_figure.png" id="3_cultivation"]
+[ext_resource type="Texture2D" uid="uid://dk1i8gl0y2088" path="res://assets/cultivation/cultivation_figure_particles.png" id="4_cultivation_particles"]
+[ext_resource type="Script" uid="uid://cxd3rhoo6inv8" path="res://scripts/ui/common/SpiritProgressBar.gd" id="5_spirit_progress"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tab_normal"]
+bg_color = Color(0.7, 0.67, 0.63, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.55, 0.52, 0.48, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tab_pressed"]
+bg_color = Color(0.9, 0.87, 0.83, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.75, 0.72, 0.68, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tab_hover"]
+bg_color = Color(0.8, 0.77, 0.73, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.65, 0.62, 0.58, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status_panel"]
+bg_color = Color(0.92, 0.9, 0.87, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.7, 0.65, 0.6, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.1)
+shadow_size = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
+bg_color = Color(0.75, 0.72, 0.68, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.6, 0.58, 0.55, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
+bg_color = Color(0.65, 0.62, 0.58, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.5, 0.48, 0.45, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
+bg_color = Color(0.85, 0.82, 0.78, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.6, 0.58, 0.55, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_detail"]
+bg_color = Color(0.9, 0.88, 0.85, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.7, 0.7, 0.7, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_alchemy_panel"]
+bg_color = Color(0.85, 0.82, 0.78, 0.75)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_disabled"]
+bg_color = Color(0.6, 0.58, 0.55, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.7, 0.68, 0.65, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_log"]
+bg_color = Color(0.85, 0.8, 0.75, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="Main" type="Control" unique_id=960069680]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ui")
+
+[node name="BackgroundManager" type="Control" parent="." unique_id=1786042643]
+z_index = -100
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_background")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=535112029]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopSpacer" type="Control" parent="VBoxContainer" unique_id=992490503]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="TopBar" type="Control" parent="VBoxContainer" unique_id=992490502]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+
+[node name="TopBarBackground" type="TextureRect" parent="VBoxContainer/TopBar" unique_id=674857305]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="TopBarContent" type="HBoxContainer" parent="VBoxContainer/TopBar" unique_id=1314718613]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="PlayerInfo" type="HBoxContainer" parent="VBoxContainer/TopBar/TopBarContent" unique_id=790674460]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LeftSpacer" type="Control" parent="VBoxContainer/TopBar/TopBarContent/PlayerInfo" unique_id=1652762232]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+
+[node name="AvatarContainer" type="Control" parent="VBoxContainer/TopBar/TopBarContent/PlayerInfo" unique_id=1652762231]
+custom_minimum_size = Vector2(55, 55)
+layout_mode = 2
+
+[node name="AvatarTexture" type="TextureRect" parent="VBoxContainer/TopBar/TopBarContent/PlayerInfo/AvatarContainer" unique_id=1764552311]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PlayerNameLabel" type="Label" parent="VBoxContainer/TopBar/TopBarContent/PlayerInfo" unique_id=1006222965]
+layout_mode = 2
+theme_type_variation = &"HeaderMedium"
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 22
+text = "hsams"
+
+[node name="RealmContainer" type="Control" parent="VBoxContainer/TopBar/TopBarContent" unique_id=2111441072]
+custom_minimum_size = Vector2(220, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RealmLabel" type="Label" parent="VBoxContainer/TopBar/TopBarContent/RealmContainer" unique_id=914167314]
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = -12.0
+offset_bottom = 12.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "炼气期 第1层"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SpiritStoneContainer" type="HBoxContainer" parent="VBoxContainer/TopBar/TopBarContent" unique_id=872638970]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="SpiritStoneIcon" type="Label" parent="VBoxContainer/TopBar/TopBarContent/SpiritStoneContainer" unique_id=175024947]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 24
+text = "💎"
+horizontal_alignment = 1
+
+[node name="SpiritStoneLabel" type="Label" parent="VBoxContainer/TopBar/TopBarContent/SpiritStoneContainer" unique_id=172021799]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 22
+text = "0"
+horizontal_alignment = 1
+
+[node name="ContentPanel" type="Control" parent="VBoxContainer" unique_id=1027355514]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="NeishiPanel" type="Control" parent="VBoxContainer/ContentPanel" unique_id=1224340084]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="NeishiTabBar" type="HBoxContainer" parent="VBoxContainer/ContentPanel/NeishiPanel" unique_id=1352927155]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -225.0
+offset_top = 10.0
+offset_right = 225.0
+offset_bottom = 50.0
+grow_horizontal = 2
+alignment = 1
+
+[node name="CultivationTab" type="Button" parent="VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar" unique_id=857891155]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
+text = "修炼"
+
+[node name="SpellTab" type="Button" parent="VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar" unique_id=857891157]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
+text = "术法"
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer/ContentPanel/NeishiPanel" unique_id=1793208028]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 55.0
+offset_bottom = 59.0
+grow_horizontal = 2
+scale = Vector2(1, 3)
+
+[node name="CultivationContainer" type="Control" parent="VBoxContainer/ContentPanel/NeishiPanel" unique_id=828400658]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 60.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SpiritProgressBar" type="Control" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer" unique_id=1823840122]
+visible = false
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("5_spirit_progress")
+
+[node name="StatusArea" type="PanelContainer" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer" unique_id=1352927156]
+custom_minimum_size = Vector2(400, 180)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -250.0
+offset_top = 40.0
+offset_right = 250.0
+offset_bottom = 226.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_status_panel")
+
+[node name="PlayerDataContainer" type="MarginContainer" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea" unique_id=1352927157]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer" unique_id=1352927158]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HealthRow" type="HBoxContainer" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=458812414]
+layout_mode = 2
+alignment = 1
+
+[node name="HealthLabel" type="Label" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HealthRow" unique_id=458812415]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "气血"
+
+[node name="HealthBar" type="ProgressBar" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HealthRow" unique_id=1061263608]
+custom_minimum_size = Vector2(150, 20)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1000.0
+value = 1000.0
+show_percentage = false
+
+[node name="HealthValue" type="Label" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HealthRow" unique_id=671186878]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "500/500"
+horizontal_alignment = 2
+
+[node name="SpiritRow" type="HBoxContainer" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=671186877]
+layout_mode = 2
+alignment = 1
+
+[node name="SpiritLabel" type="Label" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritRow" unique_id=671186879]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "灵气"
+
+[node name="SpiritBar" type="ProgressBar" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritRow" unique_id=1061263609]
+custom_minimum_size = Vector2(150, 20)
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+
+[node name="SpiritValue" type="Label" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritRow" unique_id=671186880]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "0/100"
+horizontal_alignment = 2
+
+[node name="Separator" type="HSeparator" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=1352927159]
+layout_mode = 2
+
+[node name="StatsRow" type="HBoxContainer" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=1352927160]
+layout_mode = 2
+alignment = 1
+
+[node name="AttackLabel" type="Label" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow" unique_id=1352927161]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "攻击: 50"
+horizontal_alignment = 1
+
+[node name="DefenseLabel" type="Label" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow" unique_id=1352927162]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "防御: 25"
+horizontal_alignment = 1
+
+[node name="SpeedLabel" type="Label" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow" unique_id=1352927163]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "速度: 10"
+horizontal_alignment = 1
+
+[node name="SpiritGainLabel" type="Label" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=1352927164]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "灵气获取: 5/秒"
+horizontal_alignment = 1
+
+[node name="CultivationVisual" type="Control" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer" unique_id=408833440]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -124.0
+offset_right = 200.0
+offset_bottom = 276.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CultivationFigure" type="TextureRect" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual" unique_id=1380201750]
+z_index = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 4.0
+offset_bottom = 4.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_cultivation")
+expand_mode = 1
+stretch_mode = 4
+
+[node name="CultivationFigureParticles" type="TextureRect" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual" unique_id=2131668695]
+z_index = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 4.0
+offset_bottom = 4.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("4_cultivation_particles")
+expand_mode = 1
+stretch_mode = 4
+
+[node name="CultivationStatusLabel" type="Label" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual" unique_id=408833441]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -99.0
+offset_top = -177.0
+offset_right = 101.0
+offset_bottom = -137.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 24
+text = "未修炼"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CultivationBottomBar" type="HBoxContainer" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer" unique_id=1729988]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -175.0
+offset_top = -80.0
+offset_right = 175.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+
+[node name="CultivateButton" type="Button" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationBottomBar" unique_id=873835089]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "开始修炼"
+
+[node name="BreakthroughButton" type="Button" parent="VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationBottomBar" unique_id=26434131]
+custom_minimum_size = Vector2(150, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "突破"
+
+[node name="SpellPanel" type="Control" parent="VBoxContainer/ContentPanel/NeishiPanel" unique_id=828400660]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 60.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ChunaPanel" type="VBoxContainer" parent="VBoxContainer/ContentPanel" unique_id=20478333]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="TopBar" type="HBoxContainer" parent="VBoxContainer/ContentPanel/ChunaPanel" unique_id=137317974]
+layout_mode = 2
+
+[node name="CapacityLabel" type="Label" parent="VBoxContainer/ContentPanel/ChunaPanel/TopBar" unique_id=2033629295]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = "0/50"
+vertical_alignment = 1
+
+[node name="ExpandButton" type="Button" parent="VBoxContainer/ContentPanel/ChunaPanel/TopBar" unique_id=1012295766]
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "+"
+
+[node name="Spacer" type="Control" parent="VBoxContainer/ContentPanel/ChunaPanel/TopBar" unique_id=711026084]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SortButton" type="Button" parent="VBoxContainer/ContentPanel/ChunaPanel/TopBar" unique_id=1081617033]
+custom_minimum_size = Vector2(80, 35)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "整理"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="VBoxContainer/ContentPanel/ChunaPanel" unique_id=230463376]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 2
+vertical_scroll_mode = 3
+
+[node name="InventoryGrid" type="GridContainer" parent="VBoxContainer/ContentPanel/ChunaPanel/ScrollContainer" unique_id=856887571]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 5
+theme_override_constants/v_separation = 5
+columns = 5
+
+[node name="ItemDetailPanel" type="Panel" parent="VBoxContainer/ContentPanel/ChunaPanel" unique_id=510795323]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_detail")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel" unique_id=735898791]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = -10.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="DetailName" type="Label" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer" unique_id=1753561546]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+
+[node name="DetailInfo" type="HBoxContainer" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer" unique_id=28440963]
+layout_mode = 2
+alignment = 1
+
+[node name="DetailType" type="Label" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/DetailInfo" unique_id=642918191]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="DetailCount" type="Label" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/DetailInfo" unique_id=701632544]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="ScrollContainer" type="ScrollContainer" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer" unique_id=667238205]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="DetailContent" type="VBoxContainer" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/ScrollContainer" unique_id=667238206]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DetailDesc" type="Label" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/ScrollContainer/DetailContent" unique_id=1906005603]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="DetailStats" type="Label" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/ScrollContainer/DetailContent" unique_id=667238204]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+
+[node name="ButtonContainer" type="HBoxContainer" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer" unique_id=216849043]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="UseButton" type="Button" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/ButtonContainer" unique_id=351503503]
+custom_minimum_size = Vector2(80, 35)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "使用"
+
+[node name="DiscardButton" type="Button" parent="VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/ButtonContainer" unique_id=373287178]
+custom_minimum_size = Vector2(80, 35)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "丢弃"
+
+[node name="DongfuPanel" type="Control" parent="VBoxContainer/ContentPanel" unique_id=143177763]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/DongfuPanel" unique_id=588402188]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer/ContentPanel/DongfuPanel/VBoxContainer" unique_id=1952081931]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 28
+text = "洞府"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer/ContentPanel/DongfuPanel/VBoxContainer" unique_id=2021923674]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+
+[node name="AlchemyRoomButton" type="Button" parent="VBoxContainer/ContentPanel/DongfuPanel/VBoxContainer" unique_id=298954297]
+custom_minimum_size = Vector2(200, 80)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "炼丹房"
+
+[node name="LianliPanel" type="Control" parent="VBoxContainer/ContentPanel" unique_id=143177764]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LianliSelectPanel" type="Control" parent="VBoxContainer/ContentPanel/LianliPanel" unique_id=1772412576]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel" unique_id=588402189]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=1952081932]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.909804, 0.65098, 0.12549, 1)
+theme_override_font_sizes/font_size = 28
+text = "普通区域"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=2021923675]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="Area1Button" type="Button" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=1225992098]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "炼气期历练场"
+
+[node name="Area2Button" type="Button" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=718509521]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "炼气期内围山谷"
+
+[node name="Area3Button" type="Button" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=718509522]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "筑基期外围荒原"
+
+[node name="Area4Button" type="Button" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=718509523]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "筑基期内围沼泽"
+
+[node name="SpecialAreaSeparator" type="HSeparator" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=1410065407]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="SpecialAreaLabel" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=298954296]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.909804, 0.65098, 0.12549, 1)
+theme_override_font_sizes/font_size = 28
+text = "特殊区域"
+horizontal_alignment = 1
+
+[node name="HSeparator2" type="HSeparator" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=-812156815]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="EndlessTowerButton" type="Button" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=-1923267927]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.5, 0.8, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "无尽塔 (第1层)"
+
+[node name="DailyDungeonSeparator" type="HSeparator" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=1410065409]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="DailyDungeonLabel" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=798783212]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.909804, 0.65098, 0.12549, 1)
+theme_override_font_sizes/font_size = 28
+text = "每日副本"
+horizontal_alignment = 1
+
+[node name="HSeparator3" type="HSeparator" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=-812156816]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="Area5Button" type="Button" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=-1923267926]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "破境草洞穴"
+
+[node name="AreaInfoLabel" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=664048807]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 18
+text = "选择区域开始挑战"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="LianliScenePanel" type="Control" parent="VBoxContainer/ContentPanel/LianliPanel" unique_id=1054973176]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel" unique_id=236430756]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LianliStatusLabel" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer" unique_id=1617555487]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 0, 1)
+theme_override_font_sizes/font_size = 24
+text = "准备历练..."
+horizontal_alignment = 1
+
+[node name="PlayerInfo" type="VBoxContainer" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer" unique_id=764139790]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+
+[node name="PlayerNameLabel" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/PlayerInfo" unique_id=591162901]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.290196, 0.560784, 0.886275, 1)
+theme_override_font_sizes/font_size = 20
+text = "玩家"
+horizontal_alignment = 1
+
+[node name="PlayerHealthBar" type="ProgressBar" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/PlayerInfo" unique_id=1675217033]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+max_value = 1000.0
+value = 1000.0
+show_percentage = false
+
+[node name="PlayerHealthValue" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/PlayerInfo" unique_id=1841613027]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 16
+text = "1000/1000"
+horizontal_alignment = 1
+
+[node name="EnemyInfo" type="VBoxContainer" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer" unique_id=1851957420]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+
+[node name="EnemyNameLabel" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/EnemyInfo" unique_id=1248032495]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.941176, 0.352941, 0.352941, 1)
+theme_override_font_sizes/font_size = 20
+text = "敌人名称"
+horizontal_alignment = 1
+
+[node name="EnemyHealthBar" type="ProgressBar" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/EnemyInfo" unique_id=596202818]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+max_value = 1000.0
+value = 1000.0
+show_percentage = false
+
+[node name="EnemyHealthValue" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/EnemyInfo" unique_id=1063026986]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 16
+text = "1000/1000"
+horizontal_alignment = 1
+
+[node name="BattleInfo" type="VBoxContainer" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer" unique_id=1617555495]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+
+[node name="AreaNameLabel" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleInfo" unique_id=1617555496]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 20
+text = "区域名称"
+horizontal_alignment = 1
+
+[node name="RewardInfoLabel" type="Label" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleInfo" unique_id=1617555497]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.909804, 0.65098, 0.12549, 1)
+theme_override_font_sizes/font_size = 16
+text = "奖励信息"
+horizontal_alignment = 1
+
+[node name="BattleButtonContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer" unique_id=1880439014]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+
+[node name="ContinuousCheckBox" type="CheckBox" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleButtonContainer" unique_id=1617555498]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = "连续战斗"
+
+[node name="ContinueButton" type="Button" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleButtonContainer" unique_id=1617555499]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.5, 0.8, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "继续战斗"
+
+[node name="SpeedExitContainer" type="HBoxContainer" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleButtonContainer" unique_id=1617555500]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+alignment = 1
+
+[node name="LianliSpeedButton" type="Button" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleButtonContainer/SpeedExitContainer" unique_id=1330929435]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "历练速度: 1x"
+
+[node name="ExitLianliButton" type="Button" parent="VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleButtonContainer/SpeedExitContainer" unique_id=809898911]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "退出历练"
+
+[node name="SettingsPanel" type="Control" parent="VBoxContainer/ContentPanel" unique_id=170258378]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/SettingsPanel" unique_id=1554290781]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer" unique_id=1193928617]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 28
+text = "设置"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer" unique_id=634867014]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="NicknameSection" type="VBoxContainer" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer" unique_id=1554290782]
+layout_mode = 2
+alignment = 1
+
+[node name="NicknameLabel" type="Label" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/NicknameSection" unique_id=1554290783]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "修改昵称"
+horizontal_alignment = 1
+
+[node name="NicknameHBox" type="HBoxContainer" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/NicknameSection" unique_id=1554290784]
+layout_mode = 2
+alignment = 1
+
+[node name="NicknameInput" type="LineEdit" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/NicknameSection/NicknameHBox" unique_id=1554290785]
+custom_minimum_size = Vector2(200, 40)
+layout_mode = 2
+placeholder_text = "输入新昵称"
+
+[node name="ConfirmNicknameButton" type="Button" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/NicknameSection/NicknameHBox" unique_id=1554290786]
+custom_minimum_size = Vector2(80, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "确定"
+
+[node name="HSeparator2" type="HSeparator" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer" unique_id=1432729416]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="RankButton" type="Button" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer" unique_id=1554290787]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "排行榜"
+
+[node name="HSeparator3" type="HSeparator" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer" unique_id=1554290788]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="SaveButton" type="Button" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer" unique_id=1689783417]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "存档"
+
+[node name="LogoutButton" type="Button" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer" unique_id=1390146577]
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "登出"
+
+[node name="HSeparator4" type="HSeparator" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer" unique_id=1554290789]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+
+[node name="RankPanel" type="Control" parent="VBoxContainer/ContentPanel/SettingsPanel" unique_id=1554290790]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/SettingsPanel/RankPanel" unique_id=1554290791]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleBar" type="HBoxContainer" parent="VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer" unique_id=1554290792]
+layout_mode = 2
+alignment = 1
+
+[node name="BackButton" type="Button" parent="VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/TitleBar" unique_id=1554290793]
+custom_minimum_size = Vector2(60, 32)
+layout_mode = 2
+text = "< 返回"
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/TitleBar" unique_id=1554290794]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 28
+text = "排行榜"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/TitleBar" unique_id=1554290795]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer" unique_id=1554290796]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="RankList" type="VBoxContainer" parent="VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer" unique_id=1554290797]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="AlchemyRoomPanel" type="Control" parent="VBoxContainer/ContentPanel" unique_id=1816358069]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel" unique_id=1816358070]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleBar" type="HBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer" unique_id=1816358071]
+layout_mode = 2
+alignment = 1
+
+[node name="BackButton" type="Button" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/TitleBar" unique_id=1816358102]
+custom_minimum_size = Vector2(60, 32)
+layout_mode = 2
+text = "< 返回"
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/TitleBar" unique_id=1816358103]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 28
+text = "炼丹房"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/TitleBar" unique_id=1816358104]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer" unique_id=1816358072]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="MainHBox" type="HBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer" unique_id=1816358073]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RecipeListPanel" type="PanelContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox" unique_id=1816358074]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_alchemy_panel")
+
+[node name="RecipeListVBox" type="VBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/RecipeListPanel" unique_id=1816358075]
+layout_mode = 2
+
+[node name="RecipeListLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/RecipeListPanel/RecipeListVBox" unique_id=1816358076]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 22
+text = "丹方列表"
+horizontal_alignment = 1
+
+[node name="RecipeScroll" type="ScrollContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/RecipeListPanel/RecipeListVBox" unique_id=1816358077]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RecipeListContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/RecipeListPanel/RecipeListVBox/RecipeScroll" unique_id=1816358078]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CraftPanel" type="PanelContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox" unique_id=1816358079]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_alchemy_panel")
+
+[node name="CraftVBox" type="VBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel" unique_id=1816358080]
+layout_mode = 2
+alignment = 1
+
+[node name="RecipeNameLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358081]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 24
+text = "请选择丹方"
+horizontal_alignment = 1
+
+[node name="SuccessRateLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358082]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "成功率: -"
+horizontal_alignment = 1
+
+[node name="CraftTimeLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358083]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 18
+text = "耗时: -"
+horizontal_alignment = 1
+
+[node name="HSeparator2" type="HSeparator" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358084]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="MaterialsLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358085]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "材料需求"
+horizontal_alignment = 1
+
+[node name="MaterialsContainer" type="VBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358086]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+
+[node name="HSeparator3" type="HSeparator" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358087]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="CountHBox" type="HBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358088]
+layout_mode = 2
+alignment = 1
+
+[node name="Count1Button" type="Button" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/CountHBox" unique_id=1816358090]
+custom_minimum_size = Vector2(50, 35)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "1"
+
+[node name="Count10Button" type="Button" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/CountHBox" unique_id=1816358091]
+custom_minimum_size = Vector2(50, 35)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "10"
+
+[node name="Count100Button" type="Button" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/CountHBox" unique_id=1816358092]
+custom_minimum_size = Vector2(50, 35)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "100"
+
+[node name="CountMaxButton" type="Button" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/CountHBox" unique_id=1816358093]
+custom_minimum_size = Vector2(50, 35)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Max"
+
+[node name="CraftCountLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1823910151]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 24
+text = "0/0"
+horizontal_alignment = 1
+
+[node name="CraftProgressBar" type="ProgressBar" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1816358095]
+custom_minimum_size = Vector2(0, 28)
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+
+[node name="ButtonHBox" type="HBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox" unique_id=1233295825]
+layout_mode = 2
+alignment = 1
+
+[node name="CraftButton" type="Button" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/ButtonHBox" unique_id=1816358094]
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_button_disabled")
+disabled = true
+text = "开始炼制"
+
+[node name="StopButton" type="Button" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/ButtonHBox" unique_id=1406787781]
+custom_minimum_size = Vector2(120, 45)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_button_disabled")
+disabled = true
+text = "停止"
+
+[node name="BottomPanel" type="PanelContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer" unique_id=1816358096]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_alchemy_panel")
+
+[node name="BottomVBox" type="VBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/BottomPanel" unique_id=1816358097]
+layout_mode = 2
+
+[node name="BonusTitleLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/BottomPanel/BottomVBox" unique_id=1816358098]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = "炼丹加成"
+horizontal_alignment = 1
+
+[node name="BottomHBox" type="HBoxContainer" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/BottomPanel/BottomVBox" unique_id=1816358099]
+layout_mode = 2
+size_flags_vertical = 3
+alignment = 1
+
+[node name="AlchemyInfoLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/BottomPanel/BottomVBox/BottomHBox" unique_id=1816358100]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.3, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 16
+text = "炼丹术: 未学习"
+horizontal_alignment = 1
+
+[node name="FurnaceInfoLabel" type="Label" parent="VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/BottomPanel/BottomVBox/BottomHBox" unique_id=1816358101]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.3, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 16
+text = "丹炉: 无"
+horizontal_alignment = 1
+
+[node name="LogArea" type="PanelContainer" parent="VBoxContainer" unique_id=342638057]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_log")
+
+[node name="LogText" type="RichTextLabel" parent="VBoxContainer/LogArea" unique_id=699068195]
+layout_mode = 2
+theme_override_colors/default_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/normal_font_size = 20
+text = "欢迎来到修仙世界！
+点击下方按钮开始修炼"
+scroll_following = true
+
+[node name="TabBar" type="HBoxContainer" parent="VBoxContainer" unique_id=1586396813]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+alignment = 1
+
+[node name="NeishiButton" type="Button" parent="VBoxContainer/TabBar" unique_id=857891154]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
+text = "内视"
+
+[node name="ChunaButton" type="Button" parent="VBoxContainer/TabBar" unique_id=685655892]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
+text = "储纳"
+
+[node name="DongfuButton" type="Button" parent="VBoxContainer/TabBar" unique_id=685655893]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
+text = "洞府"
+
+[node name="BattleButton" type="Button" parent="VBoxContainer/TabBar" unique_id=822891400]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
+text = "历练"
+
+[node name="SettingsButton" type="Button" parent="VBoxContainer/TabBar" unique_id=1653514296]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
+text = "设置"
+
+[node name="BottomSpacer" type="Control" parent="VBoxContainer" unique_id=1586396814]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+size_flags_vertical = 0

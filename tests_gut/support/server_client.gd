@@ -62,10 +62,6 @@ func load_game() -> Dictionary:
 	_count("load_game")
 	return await api.load_game()
 
-func claim_offline_reward() -> Dictionary:
-	_count("claim_offline_reward")
-	return await api.claim_offline_reward()
-
 func cultivation_start() -> Dictionary:
 	_count("cultivation_start")
 	return await api.cultivation_start()

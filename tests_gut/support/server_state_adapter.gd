@@ -5,9 +5,25 @@ class_name ServerStateAdapter
 static func apply_game_data(game_manager: Node, data: Dictionary) -> void:
 	if not game_manager:
 		return
-	var save_manager = game_manager.get_save_manager() if game_manager.has_method("get_save_manager") else null
-	if save_manager and save_manager.has_method("apply_game_data"):
-		save_manager.apply_game_data(data)
+	if data.has("account_info"):
+		game_manager.apply_save_data(data.account_info)
+
+	var player = game_manager.get_player() if game_manager.has_method("get_player") else null
+	var inventory = game_manager.get_inventory() if game_manager.has_method("get_inventory") else null
+	var spell_system = game_manager.get_spell_system() if game_manager.has_method("get_spell_system") else null
+	var lianli_system = game_manager.get_lianli_system() if game_manager.has_method("get_lianli_system") else null
+	var alchemy_system = game_manager.get_alchemy_system() if game_manager.has_method("get_alchemy_system") else null
+
+	if player and data.has("player"):
+		player.apply_save_data(data.player)
+	if inventory and data.has("inventory"):
+		inventory.apply_save_data(data.inventory)
+	if spell_system and data.has("spell_system"):
+		spell_system.apply_save_data(data.spell_system)
+	if lianli_system and data.has("lianli_system"):
+		lianli_system.apply_save_data(data.lianli_system)
+	if alchemy_system and data.has("alchemy_system"):
+		alchemy_system.apply_save_data(data.alchemy_system)
 
 static func sync_full_state(client: Node, game_manager: Node) -> Dictionary:
 	if not client:

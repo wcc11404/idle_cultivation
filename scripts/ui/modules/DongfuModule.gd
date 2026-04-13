@@ -45,7 +45,3 @@ func _on_alchemy_room_pressed():
 		alchemy_module.show_alchemy_room()
 	# 发送信号
 	alchemy_room_requested.emit()
-
-# 打开炼丹房（供外部调用）
-func open_alchemy_room():
-	_on_alchemy_room_pressed()

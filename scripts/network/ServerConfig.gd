@@ -2,12 +2,10 @@
 
 class_name ServerConfig
 
-const DEFAULT_API_BASE = "http://127.0.0.1:8444/api"
+const DEFAULT_API_BASE = "http://localhost:8444/api"
 const TOKEN_FILE = "user://auth_token.dat"
 const SERVER_CONFIG_FILE = "user://server_config.dat"
-const MAX_RETRY_COUNT = 3
 const REQUEST_TIMEOUT = 5.0
-const QUICK_THRESHOLD = 0.5
 
 static func get_api_base() -> String:
 	# 从本地存储加载服务器配置

@@ -2,7 +2,7 @@ extends Node
 
 class_name ModuleHarness
 
-const MainScene = preload("res://scenes/main/Main.tscn")
+const MainScene = preload("res://scenes/app/Main.tscn")
 const ServerConfig = preload("res://scripts/network/ServerConfig.gd")
 const TestSessionHelper = preload("res://tests_gut/support/session_helper.gd")
 const TestServerClient = preload("res://tests_gut/support/server_client.gd")
@@ -28,6 +28,11 @@ func bootstrap(api_base: String = ServerConfig.DEFAULT_API_BASE, preset_name: St
 
 func cleanup() -> void:
 	_stop_runtime_modules()
+	if game_ui and is_instance_valid(game_ui):
+		if game_ui.has_method("begin_test_shutdown"):
+			game_ui.begin_test_shutdown()
+		if game_ui.has_method("await_pending_test_tasks"):
+			await game_ui.await_pending_test_tasks()
 	if game_ui and is_instance_valid(game_ui):
 		if game_ui.get_parent() == self:
 			remove_child(game_ui)

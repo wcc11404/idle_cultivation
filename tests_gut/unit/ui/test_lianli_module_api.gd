@@ -2,12 +2,63 @@ extends GutTest
 
 const ModuleHarness = preload("res://tests_gut/support/module_harness.gd")
 
+class FakeLianliNetworkManager:
+	extends Node
+
+	func get_api_error_text_for_ui(_result: Dictionary, fallback: String = "") -> String:
+		return fallback
+
+class FakeLianliApi:
+	extends Node
+
+	var network_manager := FakeLianliNetworkManager.new()
+	var simulate_calls: int = 0
+	var finish_calls: int = 0
+
+	func _ready():
+		add_child(network_manager)
+
+	func lianli_finish(_speed: float, _index: int = -1) -> Dictionary:
+		finish_calls += 1
+		return {
+			"success": true,
+			"reason_code": "LIANLI_FINISH_FULLY_SETTLED",
+			"reason_data": {},
+			"loot_gained": []
+		}
+
+	func lianli_simulate(area_id: String) -> Dictionary:
+		simulate_calls += 1
+		return {
+			"success": true,
+			"reason_code": "LIANLI_SIMULATE_SUCCEEDED",
+			"reason_data": {},
+			"battle_timeline": [
+				{
+					"time": 0.1,
+					"type": "player_action",
+					"info": {
+						"spell_id": "norm_attack",
+						"effect_type": "instant_damage",
+						"damage": 1,
+						"target_health_after": 99
+					}
+				}
+			],
+			"total_time": 0.2,
+			"victory": true,
+			"loot": [],
+			"enemy_data": {"name": "测试敌人", "level": 1, "health": 100},
+			"player_health_after": 100,
+			"area_id": area_id
+		}
+
 var harness: ModuleHarness = null
 
 func before_each():
 	harness = ModuleHarness.new()
 	add_child(harness)
-	await harness.bootstrap("http://127.0.0.1:8444/api", "lianli_ready")
+	await harness.bootstrap("http://localhost:8444/api", "lianli_ready")
 
 func after_each():
 	if harness:
@@ -43,3 +94,59 @@ func test_lianli_finish_failure_exits_battle_and_returns_to_select_panel():
 	assert_true(harness.last_log().contains("历练结算同步异常，请稍后重试"), "过早结算应提示同步异常，实际为: %s" % harness.last_log())
 	assert_false(harness.get_game_manager().get_lianli_system().is_in_lianli, "结算失败后应退出本地历练态")
 	assert_true(module.lianli_select_panel.visible, "结算失败后应返回区域选择页")
+
+func test_lianli_local_health_check_blocks_entry():
+	var set_state = await harness.client.test_post("/test/set_player_state", {"health": 0})
+	assert_true(set_state.get("success", false), "应能构造低气血状态")
+	await harness.sync_full_state()
+
+	var module = harness.game_ui.lianli_module
+	harness.clear_logs()
+	await module.start_lianli_in_area("qi_refining_outer")
+
+	assert_eq(harness.last_log(), "气血值不足，无法进入历练区域！请先修炼恢复气血值。", "本地气血校验应先于服务端请求拦截")
+
+func test_lianli_daily_dungeon_limit_uses_reason_code_copy():
+	var progress = await harness.client.test_post(
+		"/test/set_progress_state",
+		{"daily_dungeon_remaining_counts": {"foundation_herb_cave": 0}}
+	)
+	assert_true(progress.get("success", false), "应能设置日副本剩余次数")
+	await harness.sync_full_state()
+
+	var module = harness.game_ui.lianli_module
+	harness.clear_logs()
+	await module.start_lianli_in_area("foundation_herb_cave")
+
+	assert_eq(harness.last_log(), "今日副本次数已用完", "日副本次数耗尽应提示固定文案")
+
+func test_lianli_continuous_waiting_flow_advances_to_next_simulation():
+	var module = harness.game_ui.lianli_module
+	var fake_api = FakeLianliApi.new()
+	module.add_child(fake_api)
+	module.api = fake_api
+	module.continuous_checkbox.button_pressed = true
+	module.on_continuous_toggled(true)
+
+	module._start_timeline_from_simulation(
+		{
+			"battle_timeline": [],
+			"total_time": 0.0,
+			"victory": true,
+			"loot": [],
+			"enemy_data": {"name": "测试敌人", "level": 1, "health": 100},
+			"player_health_after": 100
+		},
+		"qi_refining_outer"
+	)
+
+	await module._finish_current_battle(true)
+	assert_true(module._is_waiting, "连续战斗开启后，结算胜利应进入等待态")
+	assert_true(harness.get_game_manager().get_lianli_system().is_waiting, "等待态应写入本地 lianli_system")
+
+	module._wait_interval = 0.01
+	module._wait_timer = 0.0
+	await module._process(0.02)
+
+	assert_eq(fake_api.simulate_calls, 1, "等待结束后应自动发起下一场模拟")
+	assert_false(module._is_waiting, "下一场模拟启动后应退出等待态")

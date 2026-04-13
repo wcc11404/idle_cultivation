@@ -1,130 +1,67 @@
-# 修仙挂机游戏 (Cultivation Idle Game)
+# 修仙挂机客户端（Godot 4）
 
-一款基于 Godot 4 开发的修仙题材挂机游戏。
+服务端权威模式下的 Godot 客户端项目。  
+当前核心体验以真实 API 为准，客户端保留必要的展示、乐观更新和流程编排逻辑。
 
-## 游戏简介
+## 当前关键约束
 
-在这个游戏中，你将扮演一名修仙者，通过修炼、历练、炼丹等方式提升修为，突破境界，最终飞升成仙。
+- 修炼的乐观 `pending/flush` 链路保留
+- 炼丹预扣池与停火汇总链路保留
+- 历练按服务端返回时间轴进行播放回放
+- 业务提示文案由客户端按 `reason_code + reason_data` 映射生成
 
-### 核心玩法
+## 目录总览
 
-- **修炼系统**: 自动修炼积累灵气，提升修为
-- **境界突破**: 从练气期到大乘期，共9大境界
-- **术法系统**: 装备吐纳心法、主动术法、被动术法增强实力
-- **历练系统**: 挑战各种妖兽获取资源，采用ATB战斗机制
-- **炼丹系统**: 炼制丹药辅助修炼
-- **储纳系统**: 管理背包物品
-- **账号系统**: 支持多用户存档
-- **离线收益**: 离线时自动积累修炼收益
-
-## 程序入口
-
-- **主脚本**: `scripts/autoload/GameManager.gd`
-- **项目文件**: `project.godot`
-
-## 文档结构
-
-```
-docs/
-├── Architecture.md          # 系统架构文档
-├── DevelopmentGuide.md     # 开发指南
-├── question_solve_plan/     # 问题解决方案
-│   ├── GodotHeadlessFix.md
-│   └── InventoryFixReport.md
-└── sub_system/              # 子系统文档
-    ├── AlchemySystem.md     # 炼丹系统
-    ├── AttributeSystem.md   # 属性系统
-    ├── CultivationSystem.md # 修炼系统
-    ├── InventorySystem.md   # 储纳系统
-    ├── LianliSystem.md      # 历练系统
-    ├── LogSystem.md         # 日志系统
-    └── SpellSystem.md       # 术法系统
-```
-
-## 项目结构
-
-```
-scripts/
-├── autoload/           # 自动加载脚本
-│   └── GameManager.gd  # 游戏管理器
-├── core/               # 核心系统
-│   ├── PlayerData.gd   # 玩家数据
-│   ├── AccountSystem.gd # 账号系统
-│   ├── SaveManager.gd  # 存档管理
-│   ├── OfflineReward.gd # 离线收益
-│   ├── realm/          # 境界相关系统
-│   │   ├── RealmSystem.gd     # 境界系统
-│   │   └── CultivationSystem.gd # 修炼系统
-│   ├── inventory/      # 背包相关系统
-│   │   ├── Inventory.gd       # 储纳系统
-│   │   └── ItemData.gd        # 物品数据
-│   ├── lianli/         # 历练相关系统
-│   │   ├── LianliSystem.gd    # 历练系统
-│   │   ├── LianliAreaData.gd  # 历练区域数据
-│   │   ├── EnemyData.gd       # 敌人数据
-│   │   └── EndlessTowerData.gd # 无尽塔数据
-│   ├── spell/          # 术法相关系统
-│   │   ├── SpellSystem.gd     # 术法系统
-│   │   └── SpellData.gd       # 术法数据
-│   └── alchemy/        # 炼丹相关系统
-│       ├── AlchemySystem.gd   # 炼丹系统
-│       └── AlchemyRecipeData.gd # 丹方数据
-├── ui/                 # UI 相关
-│   ├── GameUI.gd       # 主UI
-│   ├── LogManager.gd   # 日志管理器
-│   └── modules/        # UI模块
-│       ├── SpellModule.gd      # 术法模块
-│       ├── SpellDetailPopup.gd # 术法弹窗
-│       ├── ChunaModule.gd      # 储纳模块
-│       ├── LianliModule.gd     # 历练模块
-│       └── ...
-└── utils/              # 工具类
-    └── ui_utils.gd
-
-assets/                 # 游戏资源
-scenes/                 # 场景文件
-└── tests/              # 测试场景
-
-tests/                  # 测试代码
-├── test_helper.gd      # 测试辅助基类
-├── run_all_tests.gd    # 统一测试运行器
-├── TestRunner.tscn     # 测试运行场景
-├── unit/               # 单元测试
-└── integration/        # 集成测试
+```text
+idle_cultivation_client/
+├── scenes/
+├── scripts/
+│   ├── autoload/
+│   ├── core/
+│   │   ├── alchemy/
+│   │   ├── cultivation/
+│   │   ├── inventory/
+│   │   ├── lianli/
+│   │   └── spell/
+│   ├── managers/
+│   ├── network/
+│   └── ui/
+│       ├── login/
+│       └── modules/
+├── tests_gut/
+│   ├── support/
+│   ├── unit/
+│   └── integration/
+└── docs/
+    ├── 01-overview/
+    ├── 02-modules/
+    ├── 03-testing/
+    ├── 04-maintenance/
+    └── todo/
 ```
 
-## 如何运行
+## 本地运行
 
-1. 安装 [Godot 4.x](https://godotengine.org/)
-2. 打开项目：`project.godot`
-3. 点击运行按钮或按 F5
+1. 安装 Godot 4.6（或兼容 4.x）
+2. 打开 `project.godot`
+3. 运行主场景（`scenes/app/Main.tscn`）
 
-## 测试
+## 测试入口（统一）
 
-在 Godot 编辑器中运行测试场景 `tests/TestRunner.tscn`。
+在项目根目录执行：
 
-## 技术栈
+```bash
+./run_tests.sh
+```
 
-- **引擎**: Godot 4.x
-- **语言**: GDScript
-- **平台**: PC / macOS / Linux / Android / iOS
+说明：
+- 脚本会自动探测 `godot4` / `godot` / macOS app 路径
+- 统一跑 `tests_gut` 全量（含 unit + integration）
+- 兼容入口 `./tests_gut/run_gut_tests.sh` 仅做转发
 
-## 开发状态
+更多测试细节见 `tests_gut/README.md`。
 
-当前版本已实现：
-- ✅ 修炼系统（自动修炼、境界突破）
-- ✅ 术法系统（装备、升级、使用）
-- ✅ 历练系统（战斗、掉落、无尽塔）
-- ✅ 储纳系统（背包管理）
-- ✅ 炼丹系统（配方、炼制）
-- ✅ 存档系统（保存/读取）
-- ✅ 账号系统（多用户支持）
-- ✅ 离线收益系统
+## 相关文档
 
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 许可证
-
-MIT License
+- `docs/README.md`：文档总索引（推荐入口）
+- `docs/todo/瘦身计划.md`：客户端瘦身实施记录与约束

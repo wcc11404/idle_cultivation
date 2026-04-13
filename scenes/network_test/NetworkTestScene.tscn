@@ -1,6 +1,0 @@
-[gd_scene format=3]
-
-[ext_resource type="Script" path="res://scripts/network/NetworkTest.gd" id="1_80r1y"]
-
-[node name="NetworkTestScene" type="Node"]
-script = ExtResource( "1_80r1y" )
