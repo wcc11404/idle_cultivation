@@ -62,6 +62,7 @@ func _stop_runtime_modules() -> void:
 		game_ui.get("spell_module"),
 		game_ui.get("alchemy_module"),
 		game_ui.get("lianli_module"),
+		game_ui.get("herb_gather_module"),
 		game_ui.get("settings_module"),
 		game_ui.get("neishi_module")
 	]
@@ -191,5 +192,7 @@ func _bind_api_to_scene() -> void:
 		game_ui.alchemy_module.api = client
 	if game_ui.lianli_module:
 		game_ui.lianli_module.api = client
+	if game_ui.herb_gather_module:
+		game_ui.herb_gather_module.api = client
 	if game_ui.settings_module:
 		game_ui.settings_module.api = client

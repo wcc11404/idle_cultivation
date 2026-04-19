@@ -11,8 +11,8 @@ enum ItemType {
 }
 
 const QUALITY_COLORS: Array = [
-	Color("#D3D3D3"),
-	Color.GREEN,
+	Color("#111111"),
+	Color("#1F6A25"),
 	Color("#00BFFF"),
 	Color("#EE82EE"),
 	Color.ORANGE

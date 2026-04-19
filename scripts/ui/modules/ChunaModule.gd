@@ -2,6 +2,8 @@ class_name ChunaModule extends Node
 
 # 储纳模块 - 处理物品管理、物品详情等功能
 const ActionLockManager = preload("res://scripts/utils/flow/ActionLockManager.gd")
+const ActionButtonTemplate = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
+const PopupStyleTemplate = preload("res://scripts/ui/common/PopupStyleTemplate.gd")
 
 # 信号
 signal item_selected(item_id: String, index: int)
@@ -35,6 +37,11 @@ var sort_button: Button = null
 # 常量
 const GRID_COLS = 5
 const MAX_SLOTS = 200
+const SLOT_BG_EMPTY := Color(0.82, 0.78, 0.70, 1.0)
+const SLOT_BG_OCCUPIED := Color(0.88, 0.84, 0.76, 1.0)
+const SLOT_BG_SELECTED := Color(0.95, 0.90, 0.80, 1.0)
+const SLOT_BORDER_DEFAULT := Color(0.71, 0.64, 0.51, 1.0)
+const SLOT_BORDER_SELECTED := Color(0.87, 0.71, 0.21, 1.0)
 
 # 当前选中的物品
 var current_selected_item_id: String = ""
@@ -42,6 +49,12 @@ var current_selected_index: int = -1
 
 # 信号连接状态标记
 var _signals_connected: bool = false
+var _discard_overlay_host: Control = null
+var _discard_confirm_overlay: ColorRect = null
+var _discard_confirm_panel: Panel = null
+var _discard_confirm_line1: Label = null
+var _discard_confirm_line2: Label = null
+var _discard_confirm_button: Button = null
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
@@ -69,10 +82,22 @@ func initialize(
 	
 	# 检查必需节点
 	_check_required_nodes()
+	_apply_action_button_templates()
 	
 	_setup_signals()
 	_setup_viewport_listener()
+	_setup_discard_confirm_popup()
 	setup_inventory_grid()
+
+func _apply_action_button_templates():
+	if use_button:
+		ActionButtonTemplate.apply_cultivation_yellow(use_button, use_button.custom_minimum_size)
+	if discard_button:
+		ActionButtonTemplate.apply_breakthrough_red(discard_button, discard_button.custom_minimum_size)
+	if expand_button:
+		ActionButtonTemplate.apply_cultivation_yellow(expand_button, expand_button.custom_minimum_size)
+	if sort_button:
+		ActionButtonTemplate.apply_light_neutral(sort_button, sort_button.custom_minimum_size)
 
 func _get_game_manager() -> Node:
 	return get_node_or_null("/root/GameManager")
@@ -225,6 +250,121 @@ func cleanup():
 		sort_button.pressed.disconnect(_on_sort_button_pressed)
 	
 	_signals_connected = false
+	_hide_discard_confirm_popup(false)
+	if _discard_confirm_overlay and is_instance_valid(_discard_confirm_overlay):
+		_discard_confirm_overlay.queue_free()
+	_discard_confirm_overlay = null
+	_discard_confirm_panel = null
+	_discard_confirm_line1 = null
+	_discard_confirm_line2 = null
+	_discard_confirm_button = null
+	_discard_overlay_host = null
+
+func _setup_discard_confirm_popup():
+	if _discard_confirm_overlay:
+		return
+	_discard_overlay_host = game_ui as Control
+	if not _discard_overlay_host:
+		_discard_overlay_host = chuna_panel
+	if not _discard_overlay_host:
+		return
+
+	_discard_confirm_overlay = ColorRect.new()
+	_discard_confirm_overlay.name = "DiscardConfirmOverlay"
+	_discard_confirm_overlay.visible = false
+	_discard_confirm_overlay.color = Color(0, 0, 0, 0.45)
+	_discard_confirm_overlay.z_index = 1200
+	_discard_confirm_overlay.layout_mode = 1
+	_discard_confirm_overlay.anchors_preset = 15
+	_discard_confirm_overlay.anchor_right = 1.0
+	_discard_confirm_overlay.anchor_bottom = 1.0
+	_discard_confirm_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_discard_confirm_overlay.gui_input.connect(_on_discard_overlay_input)
+	_discard_overlay_host.add_child(_discard_confirm_overlay)
+
+	_discard_confirm_panel = Panel.new()
+	_discard_confirm_panel.name = "DiscardConfirmPanel"
+	_discard_confirm_panel.z_index = 1201
+	_discard_confirm_panel.layout_mode = 1
+	_discard_confirm_panel.anchors_preset = 8
+	_discard_confirm_panel.anchor_left = 0.5
+	_discard_confirm_panel.anchor_top = 0.5
+	_discard_confirm_panel.anchor_right = 0.5
+	_discard_confirm_panel.anchor_bottom = 0.5
+	_discard_confirm_panel.offset_left = -170
+	_discard_confirm_panel.offset_top = -90
+	_discard_confirm_panel.offset_right = 170
+	_discard_confirm_panel.offset_bottom = 90
+	_discard_confirm_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_discard_confirm_panel.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed:
+			_discard_confirm_panel.accept_event()
+	)
+	_discard_confirm_panel.add_theme_stylebox_override("panel", PopupStyleTemplate.build_panel_style({
+		"bg_color": PopupStyleTemplate.POPUP_BG_COLOR,
+		"border_color": PopupStyleTemplate.POPUP_BORDER_COLOR,
+		"corner_radius": 12,
+		"border_width": 2
+	}))
+	_discard_confirm_overlay.add_child(_discard_confirm_panel)
+
+	var margin := MarginContainer.new()
+	margin.layout_mode = 1
+	margin.anchors_preset = 15
+	margin.anchor_right = 1.0
+	margin.anchor_bottom = 1.0
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_bottom", 16)
+	_discard_confirm_panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	_discard_confirm_line1 = Label.new()
+	_discard_confirm_line1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_discard_confirm_line1.add_theme_font_size_override("font_size", 19)
+	_discard_confirm_line1.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1.0))
+	vbox.add_child(_discard_confirm_line1)
+
+	_discard_confirm_line2 = Label.new()
+	_discard_confirm_line2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_discard_confirm_line2.add_theme_font_size_override("font_size", 15)
+	_discard_confirm_line2.add_theme_color_override("font_color", Color(0.30, 0.27, 0.22, 1.0))
+	_discard_confirm_line2.text = "（此物品为重要物品，丢弃后无法找回）"
+	vbox.add_child(_discard_confirm_line2)
+
+	_discard_confirm_button = Button.new()
+	_discard_confirm_button.name = "DiscardConfirmButton"
+	_discard_confirm_button.text = "确定丢弃"
+	_discard_confirm_button.custom_minimum_size = Vector2(170, 46)
+	ActionButtonTemplate.apply_breakthrough_red(_discard_confirm_button, _discard_confirm_button.custom_minimum_size, 18)
+	_discard_confirm_button.pressed.connect(_on_discard_confirmed)
+	vbox.add_child(_discard_confirm_button)
+
+func _on_discard_overlay_input(event: InputEvent):
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_hide_discard_confirm_popup()
+		_on_discard_cancelled()
+		_discard_confirm_overlay.accept_event()
+
+func _show_discard_confirm_popup(item_name: String):
+	if not _discard_confirm_overlay:
+		_setup_discard_confirm_popup()
+	if not _discard_confirm_overlay:
+		return
+	if _discard_confirm_line1:
+		_discard_confirm_line1.text = "确定要丢弃 %s 吗？" % item_name
+	_discard_confirm_overlay.visible = true
+
+func _hide_discard_confirm_popup(clear_log: bool = false):
+	if _discard_confirm_overlay:
+		_discard_confirm_overlay.visible = false
+	if clear_log:
+		_on_discard_cancelled()
 
 func _setup_viewport_listener():
 	"""设置屏幕大小变化监听"""
@@ -298,11 +438,19 @@ func _create_slot(index: int) -> Control:
 	slot.custom_minimum_size = Vector2(100, 80)
 	
 	var bg = ColorRect.new()
+	bg.name = "SlotBg"
 	bg.color = Color(0.2, 0.2, 0.2, 0.5)
 	bg.layout_mode = 1
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.add_child(bg)
+
+	var border = Panel.new()
+	border.name = "SlotBorder"
+	border.layout_mode = 1
+	border.set_anchors_preset(Control.PRESET_FULL_RECT)
+	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(border)
 	
 	var name_label = Label.new()
 	name_label.name = "NameLabel"
@@ -311,7 +459,7 @@ func _create_slot(index: int) -> Control:
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	name_label.add_theme_font_size_override("font_size", 22)
-	name_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2, 1))
+	name_label.add_theme_color_override("font_color", Color(0.12, 0.12, 0.12, 1))
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.add_child(name_label)
@@ -327,12 +475,13 @@ func _create_slot(index: int) -> Control:
 	count_label.offset_right = -2
 	count_label.offset_bottom = -2
 	count_label.add_theme_font_size_override("font_size", 14)
-	count_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2, 1))
+	count_label.add_theme_color_override("font_color", Color(0.12, 0.12, 0.12, 1))
 	count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.add_child(count_label)
 	
 	slot.gui_input.connect(_on_slot_input.bind(index))
 	
+	_apply_slot_visual(slot, true, false)
 	return slot
 
 # 更新格子大小
@@ -378,6 +527,8 @@ func _select_slot(index: int):
 	else:
 		_clear_item_detail_panel()
 
+	_refresh_slot_visuals()
+
 # 更新储纳UI
 func update_inventory_ui():
 	if not inventory or not inventory_grid:
@@ -387,7 +538,7 @@ func update_inventory_ui():
 	if capacity_label:
 		var used = inventory.get_used_slots()
 		var cap = inventory.get_capacity()
-		capacity_label.text = "容量：" + str(used) + "/" + str(cap)
+		capacity_label.text = "容量：" + UIUtils.format_display_number(float(used)) + "/" + UIUtils.format_display_number(float(cap))
 	
 	# 更新扩展按钮状态
 	if expand_button:
@@ -406,8 +557,10 @@ func update_inventory_ui():
 			if item == null or item.get("empty", true):
 				if name_label:
 					name_label.text = ""
+					name_label.add_theme_color_override("font_color", Color(0.12, 0.12, 0.12, 1))
 				if count_label:
 					count_label.text = ""
+				_apply_slot_visual(child, true, index == current_selected_index)
 			else:
 				var item_id = item.get("id", "")
 				var count = int(item.get("count", 0))
@@ -423,17 +576,51 @@ func update_inventory_ui():
 						count_label.text = "x" + UIUtils.format_number(int(count))
 					else:
 						count_label.text = ""
+				_apply_slot_visual(child, false, index == current_selected_index)
+
+func _refresh_slot_visuals():
+	if not inventory or not inventory_grid:
+		return
+	var item_list = inventory.get_item_list()
+	for child in inventory_grid.get_children():
+		var index = child.get_meta("index", -1)
+		if index < 0 or index >= item_list.size():
+			_apply_slot_visual(child, true, false)
+			continue
+		var item = item_list[index]
+		var is_empty = item == null or item.get("empty", true)
+		_apply_slot_visual(child, is_empty, index == current_selected_index)
+
+func _apply_slot_visual(slot: Control, is_empty: bool, is_selected: bool):
+	if not slot:
+		return
+	var bg = slot.get_node_or_null("SlotBg") as ColorRect
+	if bg:
+		if is_selected:
+			bg.color = SLOT_BG_SELECTED
+		else:
+			bg.color = SLOT_BG_EMPTY if is_empty else SLOT_BG_OCCUPIED
+	var border = slot.get_node_or_null("SlotBorder") as Panel
+	if border:
+		var sb = StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0)
+		sb.corner_radius_top_left = 4
+		sb.corner_radius_top_right = 4
+		sb.corner_radius_bottom_left = 4
+		sb.corner_radius_bottom_right = 4
+		sb.border_width_left = 2 if is_selected else 1
+		sb.border_width_top = 2 if is_selected else 1
+		sb.border_width_right = 2 if is_selected else 1
+		sb.border_width_bottom = 2 if is_selected else 1
+		sb.border_color = SLOT_BORDER_SELECTED if is_selected else SLOT_BORDER_DEFAULT
+		border.add_theme_stylebox_override("panel", sb)
 
 # 获取显示用的品质颜色（确保足够亮度）
 func _get_display_quality_color(quality: int) -> Color:
 	if not item_data or not item_data.has_method("get_item_quality_color"):
-		return Color(0.2, 0.2, 0.2, 1)
+		return Color(0.12, 0.12, 0.12, 1)
 	
-	var quality_color = item_data.get_item_quality_color(quality)
-	# 确保颜色不会太暗
-	if quality_color.get_luminance() < 0.3:
-		quality_color = quality_color.lightened(0.3)
-	return quality_color
+	return item_data.get_item_quality_color(quality)
 
 # 显示物品详情
 func _show_item_detail(index: int):
@@ -481,7 +668,7 @@ func _show_item_detail(index: int):
 			ItemData.ItemType.UNLOCK_FURNACE: type_str = "解锁炼丹炉"
 		detail_type.text = "类型: " + type_str
 	if detail_count:
-		detail_count.text = "数量: " + str(int(count))
+		detail_count.text = "数量: " + UIUtils.format_display_number(float(count))
 	
 	# 隐藏装备属性显示（暂无装备类物品）
 	if detail_stats:
@@ -546,12 +733,16 @@ func _clear_item_detail_panel():
 	
 	current_selected_index = -1
 	current_selected_item_id = ""
+	_refresh_slot_visuals()
 
 func _begin_action_lock(action_key: String) -> bool:
 	return _action_lock.try_begin(action_key)
 
 func _end_action_lock(action_key: String):
 	_action_lock.end(action_key, ACTION_COOLDOWN_SECONDS)
+
+func has_pending_test_tasks() -> bool:
+	return _action_lock.has_any_in_flight()
 
 func _refresh_after_inventory_action():
 	if game_ui and game_ui.has_method("refresh_all_player_data"):
@@ -618,17 +809,10 @@ func _on_discard_button_pressed():
 
 # 显示丢弃确认对话框
 func _show_discard_confirm_dialog(item_name: String):
-	var dialog = AcceptDialog.new()
-	dialog.title = "确认丢弃"
-	dialog.dialog_text = "确定要丢弃 " + item_name + " 吗？\n\n（此物品为重要物品，丢弃后无法找回）"
-	dialog.ok_button_text = "确定"
-	# 取消按钮使用默认文本
-	dialog.confirmed.connect(_on_discard_confirmed)
-	dialog.canceled.connect(_on_discard_cancelled)
-	add_child(dialog)
-	dialog.popup_centered()
+	_show_discard_confirm_popup(item_name)
 
 func _on_discard_confirmed():
+	_hide_discard_confirm_popup()
 	_perform_discard()
 
 func _on_discard_cancelled():

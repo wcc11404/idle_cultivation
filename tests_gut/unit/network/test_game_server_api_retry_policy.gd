@@ -65,3 +65,20 @@ func test_lianli_finish_enables_single_retry_with_delay():
 	assert_eq(int(options.get("retry_count", -1)), 1, "历练结算应配置单次重试")
 	assert_eq(float(options.get("retry_delay_seconds", -1.0)), 1.0, "历练结算应配置 1 秒重试延迟")
 	assert_true(bool(options.get("show_retry_toast", false)), "历练结算应开启重试 toast")
+
+func test_lianli_finish_omits_index_when_full_settle():
+	var result = await api.lianli_finish(1.0, null)
+	assert_true(result.get("success", false), "mock 请求应返回成功")
+	assert_eq(mock_network_manager.calls.size(), 1, "应只发起一次请求")
+
+	var body = mock_network_manager.calls[0].get("body", {})
+	assert_true(body.has("speed"), "请求体应包含 speed")
+	assert_false(body.has("index"), "完整结算时不应上传 index 字段")
+
+func test_lianli_finish_includes_negative_index_for_cancel_before_action():
+	var result = await api.lianli_finish(1.0, -1)
+	assert_true(result.get("success", false), "mock 请求应返回成功")
+	assert_eq(mock_network_manager.calls.size(), 1, "应只发起一次请求")
+
+	var body = mock_network_manager.calls[0].get("body", {})
+	assert_eq(int(body.get("index", 0)), -1, "首帧退出应显式上传 index=-1")

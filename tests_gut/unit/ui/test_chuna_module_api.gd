@@ -116,14 +116,21 @@ func test_discard_important_item_cancel_keeps_item_and_logs_cancel():
 	harness.clear_logs()
 	await module._on_discard_button_pressed()
 
-	var dialog: AcceptDialog = null
-	for child in module.get_children():
-		if child is AcceptDialog:
-			dialog = child
+	var dialog: Control = null
+	var search_roots: Array = [harness.game_ui, module.chuna_panel]
+	for root in search_roots:
+		if not root:
+			continue
+		for child in root.get_children():
+			if child is Control and child.name == "DiscardConfirmOverlay":
+				dialog = child
+				break
+		if dialog:
 			break
-	assert_not_null(dialog, "重要物品丢弃应弹出确认框")
+	assert_not_null(dialog, "重要物品丢弃应弹出确认弹窗")
 
-	dialog.canceled.emit()
+	dialog.visible = false
+	module._on_discard_cancelled()
 	await get_tree().process_frame
 
 	assert_eq(harness.last_log(), "取消丢弃", "取消应输出固定提示")
@@ -139,16 +146,25 @@ func test_discard_important_item_confirm_consumes_item():
 	harness.clear_logs()
 	await module._on_discard_button_pressed()
 
-	var dialog: AcceptDialog = null
-	for child in module.get_children():
-		if child is AcceptDialog:
-			dialog = child
+	var dialog: Control = null
+	var search_roots: Array = [harness.game_ui, module.chuna_panel]
+	for root in search_roots:
+		if not root:
+			continue
+		for child in root.get_children():
+			if child is Control and child.name == "DiscardConfirmOverlay":
+				dialog = child
+				break
+		if dialog:
 			break
-	assert_not_null(dialog, "重要物品丢弃应弹出确认框")
+	assert_not_null(dialog, "重要物品丢弃应弹出确认弹窗")
 
-	dialog.confirmed.emit()
+	module._on_discard_confirmed()
 	await get_tree().process_frame
-	await get_tree().create_timer(0.15).timeout
+	if harness.game_ui and harness.game_ui.has_method("await_pending_test_tasks"):
+		await harness.game_ui.await_pending_test_tasks()
+	else:
+		await get_tree().create_timer(0.3).timeout
 
 	assert_true(harness.last_log().contains("丢弃成功"), "确认后应执行丢弃并输出成功文案")
 	assert_eq(int(harness.get_inventory().get_item_count("test_pack")), before_count - 1, "确认后应实际扣减物品")

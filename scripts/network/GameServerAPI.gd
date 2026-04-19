@@ -48,6 +48,11 @@ func change_nickname(new_nickname: String) -> Dictionary:
 		"nickname": new_nickname
 	}, _critical_options())
 
+func change_avatar(avatar_id: String) -> Dictionary:
+	return await network_manager.request("POST", "/auth/change_avatar", {
+		"avatar_id": avatar_id
+	}, _critical_options())
+
 # ==================== 基础数据 ====================
 
 func load_game() -> Dictionary:
@@ -153,10 +158,14 @@ func lianli_simulate(area_id: String) -> Dictionary:
 		"area_id": area_id
 	}, _critical_options())
 
-func lianli_finish(speed: float, index: int = -1) -> Dictionary:
+func lianli_finish(speed: float, index = null) -> Dictionary:
+	# index 语义：
+	# - null: 完整结算（服务端按完整时间轴校验）
+	# - -1: 首帧退出，仅退出不结算任何事件
+	# - >=0: 部分结算到指定事件索引
 	var body := {"speed": speed}
-	if index >= 0:
-		body["index"] = index
+	if index != null:
+		body["index"] = int(index)
 	return await network_manager.request("POST", "/game/lianli/finish", body, _critical_options(1, true, 1.0))
 
 func lianli_foundation_herb_cave() -> Dictionary:
@@ -164,3 +173,19 @@ func lianli_foundation_herb_cave() -> Dictionary:
 
 func lianli_tower() -> Dictionary:
 	return await network_manager.request("GET", "/game/tower/highest_floor", {}, _critical_options())
+
+# ==================== 百草山采集 ====================
+
+func herb_points() -> Dictionary:
+	return await network_manager.request("GET", "/game/herb/points", {}, _critical_options())
+
+func herb_start(point_id: String) -> Dictionary:
+	return await network_manager.request("POST", "/game/herb/start", {
+		"point_id": point_id
+	}, _critical_options())
+
+func herb_report() -> Dictionary:
+	return await network_manager.request("POST", "/game/herb/report", {}, _critical_options(1, true, 1.0))
+
+func herb_stop() -> Dictionary:
+	return await network_manager.request("POST", "/game/herb/stop", {}, _critical_options())

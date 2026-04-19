@@ -161,10 +161,10 @@ func get_tower_max_floor() -> int:
 	return int(TOWER_CONFIG.get("max_floor", 51))
 
 func get_tower_id() -> String:
-	return TOWER_CONFIG.get("id", "endless_tower")
+	return TOWER_CONFIG.get("id", "sourth_endless_tower")
 
 func is_tower_area(area_id: String) -> bool:
-	return area_id == TOWER_CONFIG.get("id", "endless_tower")
+	return area_id == TOWER_CONFIG.get("id", "sourth_endless_tower")
 
 func get_tower_name() -> String:
 	var config = TOWER_CONFIG.get("config", {})
@@ -191,7 +191,7 @@ func get_tower_reward_for_floor(floor: int) -> Dictionary:
 
 func get_tower_random_template() -> String:
 	var config = TOWER_CONFIG.get("config", {})
-	var templates = config.get("templates", ["wolf"])
+	var templates = config.get("templates", ["qingwen_fox"])
 	return templates[randi() % templates.size()]
 
 func get_tower_next_reward_floor(current_floor: int) -> int:

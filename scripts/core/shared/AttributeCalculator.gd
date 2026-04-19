@@ -8,67 +8,57 @@ class_name AttributeCalculator
 ## 默认格式化：保留两位小数，去除尾0
 # 1.50 -> "1.5", 2.00 -> "2", 1.05 -> "1.05"
 static func format_default(value: float) -> String:
-	var result = "%.2f" % value
-	# 去除末尾的0
+	if abs(value) >= 1000.0:
+		return _format_compact(value, 1)
+	return _trim_to_fixed(value, 2)
+
+static func _trim_to_fixed(value: float, fixed: int) -> String:
+	var pattern = "%." + str(max(0, fixed)) + "f"
+	var result = pattern % value
 	while result.find(".") != -1 and result.ends_with("0"):
 		result = result.substr(0, result.length() - 1)
-	# 去除末尾的小数点
 	if result.ends_with("."):
 		result = result.substr(0, result.length() - 1)
 	return result
+
+static func _format_compact(value: float, decimal_places: int = 1) -> String:
+	var abs_value = abs(value)
+	if abs_value >= 1000000000.0:
+		return _trim_to_fixed(value / 1000000000.0, decimal_places) + "B"
+	if abs_value >= 1000000.0:
+		return _trim_to_fixed(value / 1000000.0, decimal_places) + "M"
+	if abs_value >= 1000.0:
+		return _trim_to_fixed(value / 1000.0, decimal_places) + "K"
+	return _trim_to_fixed(value, 2)
 
 ## 百分比格式化：乘100，保留两位小数，去除尾0，加%
 # 0.15 -> "15%", 0.005 -> "0.5%", 1.10 -> "110%"
 static func format_percent(value: float) -> String:
 	var percent = value * 100.0
-	var result = "%.2f" % percent
-	# 去除末尾的0
-	while result.find(".") != -1 and result.ends_with("0"):
-		result = result.substr(0, result.length() - 1)
-	# 去除末尾的小数点
-	if result.ends_with("."):
-		result = result.substr(0, result.length() - 1)
-	return result + "%"
+	return _trim_to_fixed(percent, 2) + "%"
 
 ## 保留一位小数，去除尾0
 # 50.5 -> "50.5", 50.0 -> "50"
 static func format_one_decimal(value: float) -> String:
-	var result = "%.1f" % value
-	# 去除末尾的0和小数点
-	if result.ends_with(".0"):
-		result = result.substr(0, result.length() - 2)
-	return result
+	return _trim_to_fixed(value, 1)
 
 ## 保留整数
 # 255.7 -> "256"
 static func format_integer(value: float) -> String:
 	return str(int(round(value)))
 
-## 攻击/防御格式化：≤1000保留一位小数，>1000保留整数
+## 攻击/防御格式化
 static func format_attack_defense(value: float) -> String:
-	if value <= 1000.0:
-		return format_one_decimal(value)
-	else:
-		return format_integer(value)
+	return format_default(value)
 
-## 伤害值格式化：≤1000保留一位小数，>1000保留整数
+## 伤害值格式化
 static func format_damage(value: float) -> String:
-	if value <= 1000.0:
-		return format_one_decimal(value)
-	else:
-		return format_integer(value)
+	return format_default(value)
 
 ## 存档格式化：保留4位小数，去除尾0
 # 50.5000 -> "50.5", 100.0000 -> "100", 0.0020 -> "0.002"
 static func format_for_save(value: float) -> String:
-	var result = "%.4f" % value
-	# 去除末尾的0
-	while result.find(".") != -1 and result.ends_with("0"):
-		result = result.substr(0, result.length() - 1)
-	# 去除末尾的小数点
-	if result.ends_with("."):
-		result = result.substr(0, result.length() - 1)
-	return result
+	return _trim_to_fixed(value, 4)
 
 ## 格式化速度显示（保留两位小数，去除尾0）- 兼容旧代码
 static func format_speed(value: float) -> String:
@@ -78,9 +68,9 @@ static func format_speed(value: float) -> String:
 static func format_spirit_gain_speed(value: float) -> String:
 	return format_default(value)
 
-## 格式化生命/灵气显示（保留整数）- 兼容旧代码
+## 格式化生命/灵气显示（保留统一规则）- 兼容旧代码
 static func format_health_spirit(value: float) -> String:
-	return format_integer(value)
+	return format_default(value)
 
 # ==================== 静态最终能力值计算（返回float） ====================
 # 静态最终能力值 = 基础值 + 境界加成 + 术法加成 + 装备加成 + 功法加成 + 丹药加成
@@ -242,9 +232,12 @@ static func calculate_combat_max_health(player: Node, combat_buffs: Dictionary) 
 # defender_defense: 防御方的战斗防御力（float）
 # damage_percent: 伤害百分比（默认100%，即1.0）
 static func calculate_damage(attacker_attack: float, defender_defense: float, damage_percent: float = 1.0) -> float:
-	var base_damage = attacker_attack - defender_defense
-	var final_damage = base_damage * damage_percent
-	return max(1.0, final_damage)  # 最小伤害为1.0
+	var k_value = 100.0
+	var penetration = 0.0
+	var effective_defense = max(defender_defense - penetration, 0.0)
+	var defense_ratio = effective_defense / max(effective_defense + k_value, k_value)
+	var base_damage = attacker_attack * (1.0 - defense_ratio)
+	return max(base_damage, 1.0) * damage_percent
 
 ## 计算玩家对敌人的伤害
 static func calculate_player_damage(player: Node, enemy: Dictionary, combat_buffs: Dictionary = {}, damage_percent: float = 1.0) -> float:

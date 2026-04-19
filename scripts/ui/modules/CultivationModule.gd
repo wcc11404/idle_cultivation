@@ -21,6 +21,7 @@ var realm_system_ref: Node = null
 var cultivation_panel: Control = null
 var cultivate_button: Button = null
 var breakthrough_button: Button = null
+var breakthrough_material_labels: Array = []
 
 var health_bar: ProgressBar = null
 var health_value: Label = null
@@ -191,9 +192,7 @@ func _join_text_parts(parts: Array, separator: String) -> String:
 	return result
 
 func _format_breakthrough_amount(value: float) -> String:
-	if is_equal_approx(value, round(value)):
-		return str(int(round(value)))
-	return str(snapped(value, 0.1))
+	return UIUtils.format_display_number(value)
 
 func _get_breakthrough_cost_name(cost_id: String) -> String:
 	match cost_id:
@@ -251,13 +250,13 @@ func _get_breakthrough_missing_parts(preview: Dictionary) -> Array:
 	var energy_current = float(preview.get("spirit_energy_current", 0.0))
 	var missing_energy = int(ceil(max(0.0, energy_cost - energy_current)))
 	if missing_energy > 0:
-		missing_parts.append("灵气%d" % missing_energy)
+		missing_parts.append("灵气" + UIUtils.format_display_number(float(missing_energy)))
 
 	var stone_cost = int(preview.get("stone_cost", 0))
 	var stone_current = int(preview.get("stone_current", preview.get("spirit_stone_current", 0)))
 	var missing_stone = maxi(0, stone_cost - stone_current)
 	if missing_stone > 0:
-		missing_parts.append("灵石%d" % missing_stone)
+		missing_parts.append("灵石" + UIUtils.format_display_number(float(missing_stone)))
 
 	var materials = preview.get("materials", {})
 	for raw_material_id in materials.keys():
@@ -269,7 +268,7 @@ func _get_breakthrough_missing_parts(preview: Dictionary) -> Array:
 		var current = int(material_info.get("current", 0))
 		var missing_count = maxi(0, required - current)
 		if missing_count > 0:
-			missing_parts.append("%s x%d" % [_get_preview_item_name(material_id), missing_count])
+			missing_parts.append("%s x%s" % [_get_preview_item_name(material_id), UIUtils.format_display_number(float(missing_count))])
 
 	return missing_parts
 
@@ -290,7 +289,7 @@ func _build_breakthrough_preview_text(preview: Dictionary) -> String:
 		var required = int(material_info.get("required", 0))
 		var current = int(material_info.get("current", 0))
 		if current < required:
-			return "%s不足（%d/%d）" % [_get_preview_item_name(material_id), current, required]
+			return "%s不足（%s/%s）" % [_get_preview_item_name(material_id), UIUtils.format_display_number(float(current)), UIUtils.format_display_number(float(required))]
 
 	if reason == "灵气不足":
 		var current_energy = float(preview.get("energy_current", preview.get("spirit_energy_current", 0.0)))
@@ -310,6 +309,37 @@ func _build_breakthrough_preview_text(preview: Dictionary) -> String:
 		return "缺少" + _join_text_parts(missing_parts, "、")
 
 	return "暂不可突破"
+
+func _build_breakthrough_panel_material_entries(preview: Dictionary) -> Array:
+	var entries: Array = []
+
+	var energy_required = int(preview.get("energy_cost", 0))
+	if energy_required > 0:
+		var energy_current = int(floor(float(preview.get("spirit_energy_current", 0.0))))
+		entries.append("灵气：%s / %s" % [UIUtils.format_display_number(float(energy_current)), UIUtils.format_display_number(float(energy_required))])
+
+	var stone_required = int(preview.get("stone_cost", 0))
+	if stone_required > 0:
+		var stone_current = int(preview.get("stone_current", preview.get("spirit_stone_current", 0)))
+		entries.append("灵石：%s / %s" % [UIUtils.format_display_number(float(stone_current)), UIUtils.format_display_number(float(stone_required))])
+
+	var materials = preview.get("materials", {})
+	if materials is Dictionary:
+		var material_ids: Array[String] = []
+		for raw_id in materials.keys():
+			material_ids.append(str(raw_id))
+		material_ids.sort()
+		for material_id in material_ids:
+			var material_info = materials.get(material_id, {})
+			if not (material_info is Dictionary):
+				continue
+			var current = int(material_info.get("current", 0))
+			var required = int(material_info.get("required", 0))
+			entries.append("%s：%s / %s" % [_get_preview_item_name(material_id), UIUtils.format_display_number(float(current)), UIUtils.format_display_number(float(required))])
+			if entries.size() >= 3:
+				break
+
+	return entries
 
 func _resolve_breakthrough_failure_message(result: Dictionary) -> String:
 	var reason_code = str(result.get("reason_code", ""))
@@ -336,6 +366,8 @@ func _resolve_cultivation_result_message(result: Dictionary, fallback: String = 
 			return "正在战斗中，无法开始修炼"
 		"CULTIVATION_START_BLOCKED_BY_ALCHEMY":
 			return "正在炼丹中，无法开始修炼"
+		"CULTIVATION_START_BLOCKED_BY_HERB_GATHERING":
+			return "正在采集中，无法开始修炼"
 		"CULTIVATION_REPORT_NOT_ACTIVE":
 			return "当前未在修炼状态"
 		"CULTIVATION_REPORT_TIME_INVALID":
@@ -591,7 +623,19 @@ func update_display(status: Dictionary = {}):
 			breakthrough_button.text = "破境"
 		else:
 			breakthrough_button.text = "突破"
-		breakthrough_button.tooltip_text = _build_breakthrough_preview_text(_get_breakthrough_preview())
+		var preview = _get_breakthrough_preview()
+		breakthrough_button.tooltip_text = _build_breakthrough_preview_text(preview)
+		if not breakthrough_material_labels.is_empty():
+			var entries = _build_breakthrough_panel_material_entries(preview)
+			for i in range(breakthrough_material_labels.size()):
+				var label = breakthrough_material_labels[i]
+				if not (label is Label):
+					continue
+				if i < entries.size():
+					label.visible = true
+					label.text = str(entries[i])
+				else:
+					label.visible = false
 
 func cleanup():
 	pass

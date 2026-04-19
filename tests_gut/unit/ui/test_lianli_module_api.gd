@@ -18,7 +18,7 @@ class FakeLianliApi:
 	func _ready():
 		add_child(network_manager)
 
-	func lianli_finish(_speed: float, _index: int = -1) -> Dictionary:
+	func lianli_finish(_speed: float, _index = null) -> Dictionary:
 		finish_calls += 1
 		return {
 			"success": true,
@@ -53,6 +53,17 @@ class FakeLianliApi:
 			"area_id": area_id
 		}
 
+class CaptureFinishApi:
+	extends FakeLianliApi
+
+	var captured_finish_index = "__unset__"
+	var captured_finish_speed: float = -1.0
+
+	func lianli_finish(_speed: float, _index = null) -> Dictionary:
+		captured_finish_speed = _speed
+		captured_finish_index = _index
+		return await super.lianli_finish(_speed, _index)
+
 var harness: ModuleHarness = null
 
 func before_each():
@@ -69,12 +80,12 @@ func after_each():
 
 func test_lianli_local_state_keeps_scene_panel_when_returning_to_tab():
 	var module = harness.game_ui.lianli_module
-	var sim_result = await harness.client.lianli_simulate("qi_refining_outer")
+	var sim_result = await harness.client.lianli_simulate("area_1")
 	assert_true(sim_result.get("success", false), "历练模拟应先成功")
-	module._start_timeline_from_simulation(sim_result, "qi_refining_outer")
+	module._start_timeline_from_simulation(sim_result, "area_1")
 
 	assert_true(harness.get_game_manager().get_lianli_system().is_in_lianli, "进入区域后客户端应记录历练态")
-	assert_eq(harness.get_game_manager().get_lianli_system().current_area_id, "qi_refining_outer", "应记录当前历练区域")
+	assert_eq(harness.get_game_manager().get_lianli_system().current_area_id, "area_1", "应记录当前历练区域")
 
 	harness.game_ui.show_chuna_tab()
 	harness.game_ui.show_lianli_tab()
@@ -84,9 +95,9 @@ func test_lianli_local_state_keeps_scene_panel_when_returning_to_tab():
 
 func test_lianli_finish_failure_exits_battle_and_returns_to_select_panel():
 	var module = harness.game_ui.lianli_module
-	var sim_result = await harness.client.lianli_simulate("qi_refining_outer")
+	var sim_result = await harness.client.lianli_simulate("area_1")
 	assert_true(sim_result.get("success", false), "历练模拟应先成功")
-	module._start_timeline_from_simulation(sim_result, "qi_refining_outer")
+	module._start_timeline_from_simulation(sim_result, "area_1")
 	harness.clear_logs()
 
 	await module._finish_current_battle(true)
@@ -102,7 +113,7 @@ func test_lianli_local_health_check_blocks_entry():
 
 	var module = harness.game_ui.lianli_module
 	harness.clear_logs()
-	await module.start_lianli_in_area("qi_refining_outer")
+	await module.start_lianli_in_area("area_1")
 
 	assert_eq(harness.last_log(), "气血值不足，无法进入历练区域！请先修炼恢复气血值。", "本地气血校验应先于服务端请求拦截")
 
@@ -137,7 +148,7 @@ func test_lianli_continuous_waiting_flow_advances_to_next_simulation():
 			"enemy_data": {"name": "测试敌人", "level": 1, "health": 100},
 			"player_health_after": 100
 		},
-		"qi_refining_outer"
+		"area_1"
 	)
 
 	await module._finish_current_battle(true)
@@ -150,3 +161,59 @@ func test_lianli_continuous_waiting_flow_advances_to_next_simulation():
 
 	assert_eq(fake_api.simulate_calls, 1, "等待结束后应自动发起下一场模拟")
 	assert_false(module._is_waiting, "下一场模拟启动后应退出等待态")
+
+func test_lianli_exit_before_first_event_uses_minus_one_index():
+	var module = harness.game_ui.lianli_module
+	var capture_api = CaptureFinishApi.new()
+	module.add_child(capture_api)
+	module.api = capture_api
+
+	module._start_timeline_from_simulation(
+		{
+			"battle_timeline": [
+				{
+					"time": 1.0,
+					"type": "player_action",
+					"info": {
+						"spell_id": "norm_attack",
+						"effect_type": "instant_damage",
+						"damage": 1,
+						"target_health_after": 99
+					}
+				}
+			],
+			"total_time": 1.0,
+			"victory": true,
+			"loot": [],
+			"enemy_data": {"name": "测试敌人", "level": 1, "health": 100},
+			"player_health_after": 100
+		},
+		"area_1"
+	)
+	module._timeline_cursor = 0
+
+	await module._finish_current_battle(false)
+
+	assert_eq(capture_api.captured_finish_index, -1, "首个事件前退出应上传 index=-1")
+
+func test_lianli_full_settle_uses_null_index():
+	var module = harness.game_ui.lianli_module
+	var capture_api = CaptureFinishApi.new()
+	module.add_child(capture_api)
+	module.api = capture_api
+
+	module._start_timeline_from_simulation(
+		{
+			"battle_timeline": [],
+			"total_time": 0.0,
+			"victory": true,
+			"loot": [],
+			"enemy_data": {"name": "测试敌人", "level": 1, "health": 100},
+			"player_health_after": 100
+		},
+		"area_1"
+	)
+
+	await module._finish_current_battle(true)
+
+	assert_eq(capture_api.captured_finish_index, null, "完整结算应上传 null（请求体省略 index）")

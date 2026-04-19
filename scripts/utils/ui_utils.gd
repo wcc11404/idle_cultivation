@@ -5,33 +5,25 @@ class_name UIUtils
 
 # ==================== 数值单位转换 ====================
 
-# 将大数值转换为 K/M/B 格式
-# 如: 1500 -> "1.5K", 1000000 -> "1M"
+# 统一数值格式：
+# < 1000：保留两位小数并去尾0
+# >= 1000：转 K/M/B 并保留一位小数去尾0
 static func format_number(num: int) -> String:
-	if num >= 1000000000:
-		return str(num / 1000000000) + "B"
-	elif num >= 1000000:
-		return str(num / 1000000) + "M"
-	elif num >= 1000:
-		var decimal = (num % 1000) / 100
-		if decimal > 0:
-			return str(num / 1000) + "." + str(decimal) + "K"
-		else:
-			return str(num / 1000) + "K"
-	else:
-		return str(num)
+	return format_display_number(float(num))
 
-# 将大数值转换为带精度的 K/M/B 格式
-# 如: 1500 -> "1.5K", 1234 -> "1.23K"
 static func format_number_precise(num: float, decimal_places: int = 1) -> String:
-	if num >= 1000000000:
+	if abs(num) >= 1000000000.0:
 		return _format_with_decimal(num / 1000000000.0, decimal_places) + "B"
-	elif num >= 1000000:
+	elif abs(num) >= 1000000.0:
 		return _format_with_decimal(num / 1000000.0, decimal_places) + "M"
-	elif num >= 1000:
+	elif abs(num) >= 1000.0:
 		return _format_with_decimal(num / 1000.0, decimal_places) + "K"
-	else:
-		return str(int(num))
+	return format_decimal(num, 2)
+
+static func format_display_number(num: float) -> String:
+	if abs(num) >= 1000.0:
+		return format_number_precise(num, 1)
+	return format_decimal(num, 2)
 
 # 辅助函数：格式化小数
 static func _format_with_decimal(value: float, decimal_places: int) -> String:
@@ -144,11 +136,8 @@ static func format_battle_number(num: Variant) -> String:
 		float_num = num
 	else:
 		return str(num)
-	
-	if float_num >= 1000.0:
-		return format_number_precise(float_num, 1)
-	else:
-		return format_decimal(float_num, 2)
+
+	return format_display_number(float_num)
 
 # ==================== 颜色格式化 ====================
 

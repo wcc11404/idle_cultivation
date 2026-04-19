@@ -112,6 +112,8 @@ func _get_lianli_result_message(result: Dictionary, fallback: String = "") -> St
 			return "正在修炼中，无法开始历练"
 		"LIANLI_SIMULATE_BLOCKED_BY_ALCHEMY":
 			return "正在炼丹中，无法开始历练"
+		"LIANLI_SIMULATE_BLOCKED_BY_HERB_GATHERING":
+			return "正在采集中，无法开始历练"
 		"LIANLI_SIMULATE_HEALTH_INSUFFICIENT":
 			return "气血不足，无法进入历练区域"
 		"LIANLI_SIMULATE_TOWER_CLEARED":
@@ -210,7 +212,7 @@ func _process_battle_event(event: Dictionary, duration: float) -> void:
 			_simulated_player_max_health = float(info.get("self_max_health_after", _simulated_player_max_health))
 			player_health_bar_lianli.max_value = _simulated_player_max_health
 			if player_health_value_lianli:
-				player_health_value_lianli.text = AttributeCalculator.format_integer(max(0.0, enemy_health_after)) + "/" + AttributeCalculator.format_default(_simulated_player_max_health)
+				player_health_value_lianli.text = AttributeCalculator.format_default(max(0.0, enemy_health_after)) + "/" + AttributeCalculator.format_default(_simulated_player_max_health)
 			_animate_health_bar(player_health_bar_lianli, player_health_value_lianli, max(0.0, enemy_health_after), duration, false)
 		
 		_update_spell_proficiency(spell_id)
@@ -277,7 +279,7 @@ func _animate_health_bar(bar: ProgressBar, value_label: Label, target_health: fl
 
 	var clamped_target = clamp(target_health, 0.0, bar.max_value)
 	if value_label:
-		value_label.text = AttributeCalculator.format_integer(clamped_target) + "/" + AttributeCalculator.format_integer(bar.max_value)
+		value_label.text = AttributeCalculator.format_default(clamped_target) + "/" + AttributeCalculator.format_default(bar.max_value)
 
 	if is_enemy:
 		if _enemy_hp_tween:
@@ -317,7 +319,7 @@ func _start_timeline_from_simulation(sim_result: Dictionary, area_id: String):
 		enemy_health_bar.max_value = enemy_max_hp
 		enemy_health_bar.value = enemy_max_hp
 	if enemy_health_value and enemy_health_bar:
-		enemy_health_value.text = AttributeCalculator.format_integer(enemy_health_bar.value) + "/" + AttributeCalculator.format_integer(enemy_health_bar.max_value)
+		enemy_health_value.text = AttributeCalculator.format_default(enemy_health_bar.value) + "/" + AttributeCalculator.format_default(enemy_health_bar.max_value)
 
 	if player and player_health_bar_lianli:
 		var player_max_hp = player.get_combat_max_health()
@@ -325,11 +327,14 @@ func _start_timeline_from_simulation(sim_result: Dictionary, area_id: String):
 		player_health_bar_lianli.max_value = player_max_hp
 		player_health_bar_lianli.value = player.health
 	if player_health_value_lianli and player_health_bar_lianli:
-		player_health_value_lianli.text = AttributeCalculator.format_integer(player_health_bar_lianli.value) + "/" + AttributeCalculator.format_integer(player_health_bar_lianli.max_value)
+		player_health_value_lianli.text = AttributeCalculator.format_default(player_health_bar_lianli.value) + "/" + AttributeCalculator.format_default(player_health_bar_lianli.max_value)
 
 	if lianli_status_label:
 		lianli_status_label.text = "战斗中..."
 		lianli_status_label.modulate = Color.YELLOW
+
+	# 进入战斗场景后立即刷新一次区域/奖励信息，避免首次进入显示为空。
+	_update_battle_info()
 
 	_set_continuous_default()
 	_update_button_container()
@@ -340,9 +345,14 @@ func _finish_current_battle(full_settle: bool):
 		log_message.emit("网络接口未初始化")
 		return
 
-	var settle_index = -1
+	var settle_index = null
 	if not full_settle:
-		settle_index = max(0, _timeline_cursor - 1)
+		# 用户在首个战斗事件前点击退出时，使用 -1 表示“仅退出不结算任何事件”。
+		# 其余场景保持按已处理事件索引部分结算。
+		if _timeline_cursor <= 0:
+			settle_index = -1
+		else:
+			settle_index = max(0, _timeline_cursor - 1)
 	# 使用本次战斗的最大速度
 	var finish_result = await api.lianli_finish(current_battle_max_speed, settle_index)
 	if not finish_result.get("success", false):
@@ -386,7 +396,7 @@ func _finish_current_battle(full_settle: bool):
 					if item_data_ref and item_data_ref.has_method("get_item_name"):
 						item_name = item_data_ref.get_item_name(item_id)
 					if log_manager:
-						log_manager.add_battle_log("获得奖励: " + item_name + " x" + str(amount_int))
+						log_manager.add_battle_log("获得奖励: " + item_name + " x" + UIUtils.format_display_number(float(amount_int)))
 
 		# 特殊区域通关日志
 		if battle_victory and lianli_area_data:
@@ -630,7 +640,7 @@ func _update_tower_reward_info():
 	if next_reward_floor > 0:
 		var floors_to_reward = next_reward_floor - current_floor
 		var reward_desc = lianli_area_data.get_tower_reward_description(next_reward_floor)
-		reward_info_label.text = "再挑战 " + str(floors_to_reward) + " 层获得 " + reward_desc
+		reward_info_label.text = "距离下次奖励还需挑战 " + str(floors_to_reward) + " 层（第" + str(next_reward_floor) + "层）\n奖励：" + reward_desc
 	else:
 		reward_info_label.text = "已达到最高奖励层"
 
@@ -648,33 +658,79 @@ func _get_area_reward_text() -> String:
 # 特殊区域奖励文本
 func _get_special_area_reward_text() -> String:
 	var special_drops = lianli_area_data.get_special_drops(current_lianli_area_id)
-	if special_drops.is_empty():
-		return ""
-	
-	var drops_text = []
-	for item_id in special_drops.keys():
-		var amount = int(special_drops[item_id])
-		if item_id == "spirit_stone":
-			drops_text.append(str(amount) + " 灵石")
-		else:
-			var item_name = item_id
-			if item_data_ref:
-				item_name = item_data_ref.get_item_name(item_id)
-			drops_text.append(str(amount) + "x " + item_name)
-	return "通关奖励: " + ", ".join(drops_text) if drops_text.size() > 0 else ""
+	var lines: Array[String] = []
+
+	if not special_drops.is_empty():
+		lines.append("通关奖励：" + _format_special_drop_list(special_drops))
+
+	var enemy_drops := _get_current_drop_table()
+	if not enemy_drops.is_empty():
+		lines.append("战斗掉落：" + _format_drop_table(enemy_drops))
+
+	return "\n".join(lines)
 
 # 普通区域奖励文本
 func _get_normal_area_reward_text() -> String:
-	if not lianli_system:
+	var drops := _get_current_drop_table()
+	if drops.is_empty():
 		return ""
-	
-	var drops = lianli_system.get_current_enemy_drops()
-	if drops.has("spirit_stone"):
-		var stone_drop = drops["spirit_stone"]
-		var min_amount = int(stone_drop.get("min", 0))
-		var max_amount = int(stone_drop.get("max", 0))
-		return "掉落: " + str(min_amount) + "-" + str(max_amount) + " 灵石"
-	return ""
+	return "战斗掉落：" + _format_drop_table(drops)
+
+func _format_special_drop_list(special_drops: Dictionary) -> String:
+	var drops_text: Array[String] = []
+	for item_id in special_drops.keys():
+		var amount = int(special_drops[item_id])
+		if amount <= 0:
+			continue
+		drops_text.append(_get_item_name(item_id) + " x" + UIUtils.format_display_number(float(amount)))
+	return "、".join(drops_text)
+
+func _format_drop_table(drops: Dictionary) -> String:
+	var parts: Array[String] = []
+	for item_id in drops.keys():
+		var drop_info = drops[item_id]
+		if not (drop_info is Dictionary):
+			continue
+		var min_amount = int(drop_info.get("min", 0))
+		var max_amount = int(drop_info.get("max", 0))
+		var chance = float(drop_info.get("chance", 1.0))
+		var amount_text = UIUtils.format_display_number(float(min_amount)) if min_amount == max_amount else (UIUtils.format_display_number(float(min_amount)) + "-" + UIUtils.format_display_number(float(max_amount)))
+		var chance_text = ""
+		if chance < 0.9999:
+			chance_text = "（" + str(int(round(chance * 100.0))) + "%）"
+		parts.append(_get_item_name(item_id) + " x" + amount_text + chance_text)
+	return "、".join(parts)
+
+func _get_current_drop_table() -> Dictionary:
+	if _current_enemy_data.has("drops"):
+		var current_drops = _current_enemy_data.get("drops", {})
+		if current_drops is Dictionary and not current_drops.is_empty():
+			return current_drops
+	if lianli_system:
+		var system_drops = lianli_system.get_current_enemy_drops()
+		if system_drops is Dictionary and not system_drops.is_empty():
+			return system_drops
+	return _get_area_fallback_drops()
+
+func _get_area_fallback_drops() -> Dictionary:
+	if not lianli_area_data or current_lianli_area_id.is_empty():
+		return {}
+	var area_data = lianli_area_data.get_area_data(current_lianli_area_id)
+	var enemy_templates = area_data.get("enemies_template", [])
+	for group in enemy_templates:
+		if not (group is Dictionary):
+			continue
+		var group_drops = group.get("drops", {})
+		if group_drops is Dictionary and not group_drops.is_empty():
+			return group_drops
+	return {}
+
+func _get_item_name(item_id: String) -> String:
+	if item_id == "spirit_stone":
+		return "灵石"
+	if item_data_ref and item_data_ref.has_method("get_item_name"):
+		return str(item_data_ref.get_item_name(item_id))
+	return item_id
 
 func _update_button_container():
 	if continuous_checkbox:
@@ -690,7 +746,7 @@ func _set_continuous_default():
 	if not lianli_area_data:
 		continuous_checkbox.button_pressed = false
 		return
-	var area_id = current_lianli_area_id if not current_lianli_area_id.is_empty() else "qi_refining_outer"
+	var area_id = current_lianli_area_id if not current_lianli_area_id.is_empty() else "area_1"
 	continuous_checkbox.button_pressed = lianli_area_data.get_default_continuous(area_id)
 
 # 战斗结束

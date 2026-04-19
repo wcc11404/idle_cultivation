@@ -2,6 +2,7 @@ class_name AlchemyModule extends Node
 
 # 炼丹模块 - 处理炼丹房UI显示
 const ActionLockManager = preload("res://scripts/utils/flow/ActionLockManager.gd")
+const ActionButtonTemplate = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
 
 # === 信号 ===
 signal recipe_selected(recipe_id: String)
@@ -11,13 +12,11 @@ signal back_to_dongfu_requested
 # === 样式常量 ===
 const COLOR_BG_LIGHT := Color(0.92, 0.90, 0.87, 1.0)
 const COLOR_BG_SELECTED := Color(0.85, 0.82, 0.75, 1.0)
-const COLOR_BG_PANEL := Color(0.85, 0.82, 0.78, 0.75)
 const COLOR_TEXT_DARK := Color(0.25, 0.22, 0.18, 1.0)
 const COLOR_TEXT_DARKER := Color(0.15, 0.12, 0.10, 1.0)
 const COLOR_TEXT_LIGHT := Color(0.95, 0.95, 0.92, 1.0)
 const COLOR_TEXT_RED := Color(0.75, 0.25, 0.25, 1.0)
 const COLOR_INDICATOR := Color(0.3, 0.55, 0.3, 1.0)
-const COLOR_BUTTON_GREEN := Color(0.35, 0.50, 0.35, 1.0)
 const COLOR_BUTTON_RED := Color(0.6, 0.35, 0.35, 1.0)
 const COLOR_PROGRESS_BG := Color(0.5, 0.47, 0.43, 1.0)
 const COLOR_PROGRESS_FILL := Color(0.3, 0.6, 0.3, 1.0)
@@ -25,6 +24,9 @@ const COLOR_PROGRESS_FILL := Color(0.3, 0.6, 0.3, 1.0)
 const FONT_SIZE_TITLE := 24
 const FONT_SIZE_NORMAL := 18
 const FONT_SIZE_SMALL := 16
+const FONT_SIZE_TEXT := 19
+const FONT_SIZE_SMALL_TEXT := 17
+const ALCHEMY_BACK_BUTTON_MIN_SIZE := Vector2(96, 40)
 
 # === 引用 ===
 var game_ui: Node = null
@@ -34,6 +36,7 @@ var recipe_data: Node = null
 var item_data: Node = null
 var inventory: Node = null
 var api: Node = null
+var spell_system: Node = null
 
 # === UI节点引用 ===
 var alchemy_room_panel: Control = null
@@ -53,6 +56,8 @@ var count_10_button: Button = null
 var alchemy_back_button: Button = null
 var count_100_button: Button = null
 var count_max_button: Button = null
+var count_plus_10_button: Button = null
+var count_final_max_button: Button = null
 
 # === 状态 ===
 var selected_recipe: String = ""
@@ -74,8 +79,10 @@ var _report_time_invalid_prompted: bool = false
 var _recipe_cards: Dictionary = {}
 var _material_labels: Dictionary = {}
 var _cached_recipe_materials: Dictionary = {}
+var _material_entry_order: Array = []
 var _progress_margin_added: bool = false
 var _signals_connected: bool = false
+var _ui_style_setup_done: bool = false
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
@@ -111,6 +118,8 @@ func _get_alchemy_result_message(result: Dictionary, fallback: String = "") -> S
 			return "正在修炼中，无法开始炼丹"
 		"ALCHEMY_START_BLOCKED_BY_BATTLE":
 			return "正在战斗中，无法开始炼丹"
+		"ALCHEMY_START_BLOCKED_BY_HERB_GATHERING":
+			return "正在采集中，无法开始炼丹"
 		"ALCHEMY_REPORT_SUCCEEDED":
 			return ""
 		"ALCHEMY_REPORT_NOT_ACTIVE":
@@ -212,6 +221,7 @@ func _run_alchemy_tick():
 	_runtime_success_count += int(report_result.get("success_count", 0))
 	_runtime_fail_count += int(report_result.get("fail_count", 0))
 	_apply_report_result(report_result)
+	_apply_local_spell_use_count("alchemy")
 	var report_msg = _get_alchemy_tick_message(report_result)
 	if not report_msg.is_empty():
 		log_message.emit(report_msg)
@@ -228,6 +238,13 @@ func _run_alchemy_tick():
 		log_message.emit("灵材或灵气不足，无法继续炼丹")
 		await _finish_alchemy_session(false)
 	_pending_async_task_count = maxi(0, _pending_async_task_count - 1)
+
+func _apply_local_spell_use_count(spell_id: String):
+	if not spell_system or not spell_system.has_method("add_spell_use_count"):
+		return
+	spell_system.add_spell_use_count(spell_id)
+	if game_ui and game_ui.has_method("_on_spell_used"):
+		game_ui._on_spell_used(spell_id)
 
 func _apply_report_result(report_result: Dictionary):
 	var returned_materials = report_result.get("returned_materials", {})
@@ -318,8 +335,8 @@ func _get_alchemy_tick_message(report_result: Dictionary) -> String:
 		return ""
 	var returned_materials = report_result.get("returned_materials", {})
 	if returned_materials is Dictionary and not returned_materials.is_empty():
-		return "返还材料：" + _format_alchemy_items(returned_materials)
-	return ""
+		return "炼制失败，返还材料" + _format_alchemy_items(returned_materials)
+	return "炼制失败"
 
 func _add_items_silently(items: Dictionary):
 	for item_id in items.keys():
@@ -335,7 +352,7 @@ func _add_item_silently(item_id: String, count: int):
 		game_ui.end_silent_item_added_logs()
 
 func setup_styles():
-	_setup_ui_style()
+	_setup_ui_static_style()
 	_setup_signals()
 
 func _setup_signals():
@@ -352,20 +369,36 @@ func _setup_signals():
 		push_warning("AlchemyModule: stop_button is null")
 
 # === 样式设置 ===
-func _setup_ui_style():
+func _setup_ui_static_style():
+	if _ui_style_setup_done:
+		return
 	if not alchemy_room_panel:
 		return
-	alchemy_room_panel.modulate = Color(1, 1, 1, 0.95)
-	_apply_panel_style_recursive(alchemy_room_panel)
-	_setup_craft_panel_style()
+	_setup_craft_panel_static_style()
+	_ui_style_setup_done = true
 
-func _setup_craft_panel_style():
+func _setup_craft_panel_static_style():
+	_ensure_count_button_texts()
 	_style_recipe_name_label()
 	_style_info_labels()
 	_style_materials_section()
 	_style_progress_section()
-	_style_count_buttons()
+	_style_count_buttons_static()
 	_style_craft_button()
+
+func _ensure_count_button_texts():
+	if count_1_button:
+		count_1_button.text = "min"
+	if count_10_button:
+		count_10_button.text = "-10"
+	if count_100_button:
+		count_100_button.text = "-1"
+	if count_max_button:
+		count_max_button.text = "+1"
+	if count_plus_10_button:
+		count_plus_10_button.text = "+10"
+	if count_final_max_button:
+		count_final_max_button.text = "max"
 
 func _style_recipe_name_label():
 	if not recipe_name_label:
@@ -379,7 +412,7 @@ func _style_info_labels():
 	for label in [success_rate_label, craft_time_label]:
 		if label:
 			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			label.add_theme_font_size_override("font_size", FONT_SIZE_NORMAL)
+			label.add_theme_font_size_override("font_size", FONT_SIZE_TEXT)
 			label.add_theme_color_override("font_color", Color(0.3, 0.28, 0.25, 1.0))
 
 func _style_materials_section():
@@ -411,7 +444,7 @@ func _style_materials_section():
 		if child is Label and child.name == "MaterialsLabel":
 			child.text = "◇ 材料需求 ◇"
 			child.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			child.add_theme_font_size_override("font_size", FONT_SIZE_NORMAL)
+			child.add_theme_font_size_override("font_size", FONT_SIZE_TEXT)
 			child.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 		elif child is HSeparator:
 			var sep_style = StyleBoxLine.new()
@@ -424,8 +457,9 @@ func _style_materials_section():
 func _style_progress_section():
 	if craft_count_label:
 		craft_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		craft_count_label.add_theme_font_size_override("font_size", FONT_SIZE_NORMAL)
+		craft_count_label.add_theme_font_size_override("font_size", FONT_SIZE_TEXT)
 		craft_count_label.add_theme_color_override("font_color", Color(0.3, 0.28, 0.25, 1.0))
+		craft_count_label.custom_minimum_size = Vector2(0, 42)
 	
 	_style_progress_bar()
 
@@ -455,6 +489,8 @@ func _add_progress_bar_margin():
 	margin_container.name = "ProgressMargin"
 	margin_container.add_theme_constant_override("margin_left", 24)
 	margin_container.add_theme_constant_override("margin_right", 24)
+	margin_container.add_theme_constant_override("margin_top", 8)
+	margin_container.add_theme_constant_override("margin_bottom", 8)
 	
 	var idx = craft_progress_bar.get_index()
 	parent.remove_child(craft_progress_bar)
@@ -480,55 +516,37 @@ func _apply_progress_bar_styles():
 	style_fill.set_corner_radius_all(4)
 	craft_progress_bar.add_theme_stylebox_override("fill", style_fill)
 
-func _style_count_buttons():
-	_update_count_button_styles()
+func _style_count_buttons_static():
+	# 只做一次静态外观初始化
+	var all_buttons = [
+		count_1_button, count_10_button, count_100_button,
+		count_max_button, count_plus_10_button, count_final_max_button
+	]
+	for btn in all_buttons:
+		if btn:
+			_apply_count_button_style(btn, false)
 
 func _update_count_button_styles():
+	var disable_all = _is_alchemizing
 	var button_configs = [
-		{btn = count_1_button, count = 1},
-		{btn = count_10_button, count = 10},
-		{btn = count_100_button, count = 100},
-		{btn = count_max_button, count = -1}
+		{btn = count_1_button, disabled = disable_all}, # min
+		{btn = count_10_button, disabled = disable_all}, # -10
+		{btn = count_100_button, disabled = disable_all}, # -1
+		{btn = count_max_button, disabled = disable_all}, # +1
+		{btn = count_plus_10_button, disabled = disable_all}, # +10
+		{btn = count_final_max_button, disabled = disable_all}, # max
 	]
 	
 	for config in button_configs:
 		var btn = config.btn
 		if not btn:
 			continue
-		
-		var is_selected = (selected_count == config.count) or (config.count == -1 and selected_count > 100)
-		_apply_count_button_style(btn, is_selected)
+		_apply_count_button_style(btn, false)
+		btn.disabled = bool(config.disabled)
 
-func _apply_count_button_style(btn: Button, is_selected: bool):
-	btn.custom_minimum_size = Vector2(60, 40)
-	btn.add_theme_font_size_override("font_size", FONT_SIZE_NORMAL)
-	
-	var normal_style = StyleBoxFlat.new()
-	normal_style.set_border_width_all(2)
-	normal_style.set_corner_radius_all(4)
-	
-	if is_selected:
-		normal_style.bg_color = Color(0.55, 0.52, 0.48, 1.0)
-		normal_style.border_color = Color(0.35, 0.32, 0.28, 1.0)
-		btn.add_theme_color_override("font_color", Color(0.95, 0.92, 0.88, 1.0))
-	else:
-		normal_style.bg_color = Color(0.82, 0.78, 0.72, 1.0)
-		normal_style.border_color = Color(0.55, 0.50, 0.45, 1.0)
-		btn.add_theme_color_override("font_color", COLOR_TEXT_DARK)
-	
-	btn.add_theme_stylebox_override("normal", normal_style)
-	
-	var hover_style = normal_style.duplicate()
-	hover_style.bg_color = Color(0.75, 0.71, 0.65, 1.0) if not is_selected else Color(0.60, 0.57, 0.53, 1.0)
-	btn.add_theme_stylebox_override("hover", hover_style)
-	
-	var pressed_style = normal_style.duplicate()
-	pressed_style.bg_color = Color(0.68, 0.64, 0.58, 1.0) if not is_selected else Color(0.50, 0.47, 0.43, 1.0)
-	btn.add_theme_stylebox_override("pressed", pressed_style)
-	
-	var disabled_style = normal_style.duplicate()
-	disabled_style.bg_color = Color(0.88, 0.85, 0.80, 0.5)
-	btn.add_theme_stylebox_override("disabled", disabled_style)
+func _apply_count_button_style(btn: Button, _is_selected: bool):
+	btn.custom_minimum_size = Vector2(54, 40)
+	ActionButtonTemplate.apply_spell_view_brown(btn, btn.custom_minimum_size, FONT_SIZE_NORMAL)
 
 func _style_craft_button():
 	if not craft_button:
@@ -536,25 +554,7 @@ func _style_craft_button():
 	
 	craft_button.text = "开始炼制"
 	craft_button.custom_minimum_size = Vector2(160, 56)
-	craft_button.add_theme_font_size_override("font_size", FONT_SIZE_TITLE)
-	
-	var normal_style = _create_button_style(COLOR_BUTTON_GREEN, Color(0.25, 0.40, 0.25, 1.0))
-	craft_button.add_theme_stylebox_override("normal", normal_style)
-	craft_button.add_theme_color_override("font_color", COLOR_TEXT_LIGHT)
-	
-	var hover_style = normal_style.duplicate()
-	hover_style.bg_color = Color(0.40, 0.55, 0.40, 1.0)
-	craft_button.add_theme_stylebox_override("hover", hover_style)
-	
-	var pressed_style = normal_style.duplicate()
-	pressed_style.bg_color = Color(0.30, 0.45, 0.30, 1.0)
-	craft_button.add_theme_stylebox_override("pressed", pressed_style)
-	
-	var disabled_style = normal_style.duplicate()
-	disabled_style.bg_color = Color(0.6, 0.58, 0.55, 0.6)
-	disabled_style.border_color = Color(0.5, 0.48, 0.45, 0.6)
-	craft_button.add_theme_stylebox_override("disabled", disabled_style)
-	craft_button.add_theme_color_override("font_disabled_color", Color(0.4, 0.38, 0.35, 1.0))
+	ActionButtonTemplate.apply_alchemy_green(craft_button, craft_button.custom_minimum_size, FONT_SIZE_TITLE)
 	
 	_style_stop_button()
 
@@ -562,39 +562,14 @@ func _style_stop_button():
 	if not stop_button:
 		return
 	
-	stop_button.text = "停止"
+	stop_button.text = "停止炼制"
 	stop_button.custom_minimum_size = Vector2(160, 56)
-	stop_button.add_theme_font_size_override("font_size", FONT_SIZE_TITLE)
-	
-	var stop_normal = _create_button_style(COLOR_BUTTON_RED, Color(0.5, 0.25, 0.25, 1.0))
-	stop_button.add_theme_stylebox_override("normal", stop_normal)
-	stop_button.add_theme_color_override("font_color", COLOR_TEXT_LIGHT)
-	
-	var stop_hover = stop_normal.duplicate()
-	stop_hover.bg_color = Color(0.65, 0.40, 0.40, 1.0)
-	stop_button.add_theme_stylebox_override("hover", stop_hover)
+	ActionButtonTemplate.apply_breakthrough_red(stop_button, stop_button.custom_minimum_size, FONT_SIZE_TITLE)
 
-func _create_button_style(bg_color: Color, border_color: Color) -> StyleBoxFlat:
-	var style = StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.border_color = border_color
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(6)
-	style.content_margin_left = 24
-	style.content_margin_right = 24
-	style.content_margin_top = 12
-	style.content_margin_bottom = 12
-	return style
-
-func _apply_panel_style_recursive(node: Node):
-	if node is Panel or node is PanelContainer:
-		var style = StyleBoxFlat.new()
-		style.bg_color = COLOR_BG_PANEL
-		style.set_corner_radius_all(8)
-		node.add_theme_stylebox_override("panel", style)
-	
-	for child in node.get_children():
-		_apply_panel_style_recursive(child)
+func _clear_container_children(container: Node):
+	for child in container.get_children():
+		container.remove_child(child)
+		child.free()
 
 # === 返回按钮 ===
 func _setup_back_button():
@@ -602,7 +577,8 @@ func _setup_back_button():
 		return
 	
 	if alchemy_back_button:
-		_apply_count_button_style(alchemy_back_button, false)
+		alchemy_back_button.custom_minimum_size = ALCHEMY_BACK_BUTTON_MIN_SIZE
+		ActionButtonTemplate.apply_light_neutral(alchemy_back_button, alchemy_back_button.custom_minimum_size, FONT_SIZE_NORMAL)
 		return
 	
 	var title_bar = alchemy_room_panel.get_node_or_null("VBoxContainer/TitleBar")
@@ -619,9 +595,9 @@ func _setup_back_button():
 	
 	var back_button = Button.new()
 	back_button.text = "< 返回"
-	back_button.custom_minimum_size = Vector2(80, 40)
+	back_button.custom_minimum_size = ALCHEMY_BACK_BUTTON_MIN_SIZE
 	back_button.pressed.connect(_on_back_button_pressed)
-	_apply_count_button_style(back_button, false)
+	ActionButtonTemplate.apply_light_neutral(back_button, back_button.custom_minimum_size, FONT_SIZE_NORMAL)
 	title_bar.add_child(back_button)
 	
 	var spacer = Control.new()
@@ -638,10 +614,7 @@ func _on_back_button_pressed():
 func show_alchemy_room():
 	if alchemy_room_panel:
 		alchemy_room_panel.visible = true
-		_update_recipe_list()
-		_update_alchemy_info()
-		if selected_recipe:
-			_update_craft_panel()
+		_render_alchemy_ui(true)
 		call_deferred("_refresh_recipe_config_from_server")
 
 func hide_alchemy_room():
@@ -649,13 +622,7 @@ func hide_alchemy_room():
 		alchemy_room_panel.visible = false
 
 func refresh_ui():
-	_update_recipe_list()
-	_update_alchemy_info()
-	if selected_recipe:
-		_update_materials_display()
-		_update_craft_count_label()
-		if craft_button and not _is_alchemizing:
-			craft_button.disabled = false
+	_render_alchemy_ui(true)
 
 func _refresh_recipe_config_from_server():
 	if not api:
@@ -678,38 +645,107 @@ func _refresh_recipe_config_from_server():
 			"learned_recipes": result["learned_recipes"]
 		})
 
-	refresh_ui()
+	_render_alchemy_ui(true)
+
+func _render_alchemy_ui(rebuild_recipe_list: bool = false):
+	if rebuild_recipe_list:
+		_update_recipe_list()
+	else:
+		_update_recipe_selection()
+	_update_alchemy_info()
+	if selected_recipe:
+		_update_craft_panel()
+		if craft_button and not _is_alchemizing:
+			craft_button.disabled = false
+	else:
+		_clear_craft_panel()
+	_refresh_dynamic_ui_state()
+	_update_count_button_styles()
+
+func _refresh_dynamic_ui_state():
+	if craft_button:
+		craft_button.disabled = _is_alchemizing or selected_recipe.is_empty()
+	if stop_button:
+		stop_button.disabled = not _is_alchemizing
 
 # === 丹方列表 ===
 func _update_recipe_list():
 	if not recipe_list_container or not player or _is_alchemizing:
 		return
-	
-	for child in recipe_list_container.get_children():
-		child.queue_free()
-	_recipe_cards.clear()
-	
+
 	var learned = alchemy_system.get_learned_recipes() if alchemy_system else []
 	if learned.is_empty():
-		var label = Label.new()
-		label.text = "暂无学会的丹方"
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2, 1))
-		recipe_list_container.add_child(label)
+		_clear_container_children(recipe_list_container)
+		_recipe_cards.clear()
+		selected_recipe = ""
+		_ensure_empty_recipe_tip()
 		return
 	
 	var sorted_recipes = _sort_recipes(learned)
-	
-	for recipe_id in sorted_recipes:
-		var recipe_name = recipe_data.get_recipe_name(recipe_id)
-		var card = _create_recipe_card(recipe_id, recipe_name)
-		recipe_list_container.add_child(card)
-		_recipe_cards[recipe_id] = card
-	
+	_sync_recipe_cards(sorted_recipes)
 	_update_recipe_selection()
 	
-	if not selected_recipe and sorted_recipes.size() > 0:
+	if not selected_recipe or not _recipe_cards.has(selected_recipe):
+		selected_recipe = ""
+	if selected_recipe.is_empty() and sorted_recipes.size() > 0:
 		_select_recipe(sorted_recipes[0])
+
+func _ensure_empty_recipe_tip():
+	var label = recipe_list_container.get_node_or_null("EmptyRecipeLabel")
+	if label:
+		return
+	label = Label.new()
+	label.name = "EmptyRecipeLabel"
+	label.text = "暂无学会的丹方"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2, 1))
+	recipe_list_container.add_child(label)
+
+func _sync_recipe_cards(sorted_recipes: Array):
+	var new_set := {}
+	for recipe_id_variant in sorted_recipes:
+		var recipe_id = str(recipe_id_variant)
+		new_set[recipe_id] = true
+	
+	# 删除已失效卡片
+	var stale_ids: Array = []
+	for existing_id_variant in _recipe_cards.keys():
+		var existing_id = str(existing_id_variant)
+		if not new_set.has(existing_id):
+			stale_ids.append(existing_id)
+	for stale_id_variant in stale_ids:
+		var stale_id = str(stale_id_variant)
+		var stale_card = _recipe_cards.get(stale_id, null)
+		if is_instance_valid(stale_card):
+			stale_card.queue_free()
+		_recipe_cards.erase(stale_id)
+	
+	# 删除空态提示
+	var empty_label = recipe_list_container.get_node_or_null("EmptyRecipeLabel")
+	if empty_label:
+		empty_label.queue_free()
+	
+	# 新增/更新并重排
+	for index in range(sorted_recipes.size()):
+		var recipe_id = str(sorted_recipes[index])
+		var recipe_name = recipe_data.get_recipe_name(recipe_id)
+		var card: Control = _recipe_cards.get(recipe_id, null)
+		if not is_instance_valid(card):
+			card = _create_recipe_card(recipe_id, recipe_name)
+			_recipe_cards[recipe_id] = card
+			recipe_list_container.add_child(card)
+		else:
+			_update_recipe_card_name(card, recipe_name)
+		
+		if card.get_parent() == recipe_list_container and card.get_index() != index:
+			recipe_list_container.move_child(card, index)
+	
+func _update_recipe_card_name(card: Control, recipe_name: String):
+	if not is_instance_valid(card):
+		return
+	var name_label = card.find_child("RecipeNameLabel", true, false)
+	if name_label and name_label is Label:
+		(name_label as Label).text = recipe_name
 
 func _create_recipe_card(recipe_id: String, recipe_name: String) -> Control:
 	var card = PanelContainer.new()
@@ -740,7 +776,7 @@ func _create_recipe_card(recipe_id: String, recipe_name: String) -> Control:
 	name_label.name = "RecipeNameLabel"
 	name_label.text = recipe_name
 	name_label.add_theme_color_override("font_color", COLOR_TEXT_DARK)
-	name_label.add_theme_font_size_override("font_size", FONT_SIZE_SMALL)
+	name_label.add_theme_font_size_override("font_size", FONT_SIZE_SMALL_TEXT)
 	hbox.add_child(name_label)
 	
 	var button = Button.new()
@@ -832,6 +868,7 @@ func _update_craft_panel():
 	
 	_update_materials_display()
 	_update_craft_count_label()
+	_update_count_button_styles()
 	
 	if craft_button and not _is_alchemizing:
 		craft_button.text = "开始炼制"
@@ -849,13 +886,15 @@ func _clear_craft_panel():
 			child.queue_free()
 	_material_labels.clear()
 	_cached_recipe_materials.clear()
+	_material_entry_order.clear()
 	if craft_count_label:
 		craft_count_label.text = "制作: 第 0 颗 / 共 0 颗"
 	if craft_progress_bar:
 		craft_progress_bar.value = 0
 	if craft_button:
 		craft_button.text = "开始炼制"
-		craft_button.disabled = true
+	_refresh_dynamic_ui_state()
+	_update_count_button_styles()
 
 # === 材料显示 ===
 func _update_materials_display():
@@ -863,75 +902,109 @@ func _update_materials_display():
 		return
 	
 	var materials = recipe_data.get_recipe_materials(selected_recipe)
-	
-	if _cached_recipe_materials != materials:
-		_cached_recipe_materials = materials.duplicate()
-		_rebuild_material_labels(materials)
-	else:
-		_update_material_labels_text()
-
-func _rebuild_material_labels(materials: Dictionary):
-	for child in materials_container.get_children():
-		child.get_parent().remove_child(child)
-		child.free()
-	_material_labels.clear()
-	
-	var hbox = HBoxContainer.new()
-	hbox.name = "MaterialsHBox"
-	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	materials_container.add_child(hbox)
-	
-	var col1 = VBoxContainer.new()
-	col1.name = "Column1"
-	col1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col1.custom_minimum_size = Vector2(0, 90)
-	hbox.add_child(col1)
-	
-	var col2 = VBoxContainer.new()
-	col2.name = "Column2"
-	col2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col2.custom_minimum_size = Vector2(0, 90)
-	hbox.add_child(col2)
-	
-	var all_items = []
-	for material_id in materials:
-		all_items.append({"type": "material", "id": material_id, "required": materials[material_id]})
-	
 	var spirit_required = recipe_data.get_recipe_spirit_energy(selected_recipe)
-	if spirit_required > 0:
-		all_items.append({"type": "spirit", "id": "spirit_energy", "required": spirit_required})
-	
-	for i in range(all_items.size()):
-		var item = all_items[i]
-		var target_col = col1 if i < 3 else col2
-		_create_material_item(target_col, item)
+	var entry_order = _build_material_entry_order(materials, spirit_required)
+	_sync_material_labels(materials, spirit_required, entry_order)
+	_cached_recipe_materials = materials.duplicate()
+	_update_material_labels_text()
 
-func _create_material_item(parent: VBoxContainer, item: Dictionary):
+func _build_material_entry_order(materials: Dictionary, spirit_required: int) -> Array:
+	var material_ids: Array = []
+	for material_id_variant in materials.keys():
+		material_ids.append(str(material_id_variant))
+	material_ids.sort()
+	var order: Array = []
+	for material_id in material_ids:
+		order.append(material_id)
+	if spirit_required > 0:
+		order.append("spirit_energy")
+	return order
+
+func _ensure_material_columns() -> Dictionary:
+	var hbox = materials_container.get_node_or_null("MaterialsHBox")
+	if not hbox:
+		hbox = HBoxContainer.new()
+		hbox.name = "MaterialsHBox"
+		hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		materials_container.add_child(hbox)
+
+	var col1 = hbox.get_node_or_null("Column1")
+	if not col1:
+		col1 = VBoxContainer.new()
+		col1.name = "Column1"
+		col1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col1.custom_minimum_size = Vector2(0, 90)
+		hbox.add_child(col1)
+
+	var col2 = hbox.get_node_or_null("Column2")
+	if not col2:
+		col2 = VBoxContainer.new()
+		col2.name = "Column2"
+		col2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col2.custom_minimum_size = Vector2(0, 90)
+		hbox.add_child(col2)
+
+	return {"col1": col1, "col2": col2}
+
+func _sync_material_labels(materials: Dictionary, spirit_required: int, entry_order: Array):
+	var valid_set := {}
+	for entry_id_variant in entry_order:
+		var entry_id = str(entry_id_variant)
+		valid_set[entry_id] = true
+
+	# 删除失效标签
+	var stale_ids: Array = []
+	for existing_id_variant in _material_labels.keys():
+		var existing_id = str(existing_id_variant)
+		if not valid_set.has(existing_id):
+			stale_ids.append(existing_id)
+	for stale_id_variant in stale_ids:
+		var stale_id = str(stale_id_variant)
+		var label = _material_labels.get(stale_id, null)
+		if is_instance_valid(label):
+			var parent = label.get_parent()
+			if parent:
+				parent.remove_child(label)
+			label.free()
+		_material_labels.erase(stale_id)
+
+	var columns = _ensure_material_columns()
+	var col1: VBoxContainer = columns["col1"]
+	var col2: VBoxContainer = columns["col2"]
+
+	# 新增/重排
+	for i in range(entry_order.size()):
+		var entry_id = str(entry_order[i])
+		var target_col: VBoxContainer = col1 if i < 3 else col2
+		var target_index: int = i if i < 3 else i - 3
+
+		var label: Label = _material_labels.get(entry_id, null)
+		if not is_instance_valid(label):
+			label = _create_material_label(entry_id)
+			_material_labels[entry_id] = label
+			target_col.add_child(label)
+		elif label.get_parent() != target_col:
+			var old_parent = label.get_parent()
+			if old_parent:
+				old_parent.remove_child(label)
+			target_col.add_child(label)
+
+		if label.get_parent() == target_col and label.get_index() != target_index:
+			target_col.move_child(label, target_index)
+
+	_material_entry_order = entry_order.duplicate()
+
+func _create_material_label(entry_id: String) -> Label:
 	var label = Label.new()
-	
-	if item.type == "spirit":
-		label.name = "SpiritEnergyLabel"
-		var total_spirit = item.required * selected_count
-		var has_spirit = int(player.spirit_energy) if player else 0
-		label.text = "灵气: %d/%d" % [has_spirit, total_spirit]
-		label.add_theme_color_override("font_color", COLOR_TEXT_RED if has_spirit < total_spirit else COLOR_TEXT_DARK)
-		_material_labels["spirit_energy"] = label
-	else:
-		var material_id = item.id
-		var total_required = item.required * selected_count
-		var has = inventory.get_item_count(material_id) if inventory else 0
-		var item_name = item_data.get_item_name(material_id) if item_data else material_id
-		label.text = "%s: %d/%d" % [item_name, has, total_required]
-		label.add_theme_color_override("font_color", COLOR_TEXT_RED if has < total_required else COLOR_TEXT_DARK)
-		_material_labels[material_id] = label
-	
+	label.name = "MaterialLabel_%s" % entry_id
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	label.add_theme_font_size_override("font_size", FONT_SIZE_NORMAL)
-	parent.add_child(label)
+	label.add_theme_font_size_override("font_size", FONT_SIZE_TEXT)
+	return label
 
 func _update_material_labels_text():
-	for material_id in _material_labels:
-		var label = _material_labels[material_id]
+	for material_id_variant in _material_entry_order:
+		var material_id = str(material_id_variant)
+		var label = _material_labels.get(material_id, null)
 		if not is_instance_valid(label):
 			continue
 		
@@ -1096,14 +1169,12 @@ func _finish_alchemy_session(natural_finished: bool):
 func _on_alchemy_crafting_started(recipe_id: String, count: int):
 	if game_ui and game_ui.has_method("set_active_mode"):
 		game_ui.set_active_mode("alchemy")
-	if craft_button:
-		craft_button.disabled = true
-	if stop_button:
-		stop_button.disabled = false
+	_refresh_dynamic_ui_state()
 	if craft_progress_bar:
 		craft_progress_bar.visible = true
 		craft_progress_bar.value = 0
 	_update_craft_count_label()
+	_update_count_button_styles()
 	var start_msg = _get_alchemy_result_message({"reason_code": "ALCHEMY_START_SUCCEEDED"}, "开炉炼丹")
 	if not start_msg.is_empty():
 		log_message.emit(start_msg + "，开始炼制[" + recipe_data.get_recipe_name(recipe_id) + "]")
@@ -1119,40 +1190,55 @@ func _on_alchemy_single_craft_completed(success: bool, recipe_name: String):
 
 func _on_alchemy_crafting_finished(recipe_id: String, success_count: int, fail_count: int):
 	if craft_button:
-		craft_button.disabled = false
 		craft_button.text = "开始炼制"
-	if stop_button:
-		stop_button.disabled = true
+	_refresh_dynamic_ui_state()
 	if craft_progress_bar:
 		craft_progress_bar.value = 0
 
-	_update_recipe_list()
-	_update_alchemy_info()
-	_update_materials_display()
-	_update_craft_count_label()
+	_render_alchemy_ui(true)
 	log_message.emit(_build_alchemy_summary_message(success_count, fail_count))
 
 func _on_alchemy_crafting_stopped(success_count: int, fail_count: int):
 	if craft_button:
-		craft_button.disabled = false
 		craft_button.text = "开始炼制"
-	if stop_button:
-		stop_button.disabled = true
+	_refresh_dynamic_ui_state()
 	if craft_progress_bar:
 		craft_progress_bar.value = 0
 
-	_update_recipe_list()
-	_update_craft_panel()
-	_update_alchemy_info()
-	_update_materials_display()
-	_update_craft_count_label()
+	_render_alchemy_ui(true)
 	log_message.emit(_build_alchemy_summary_message(success_count, fail_count))
 
 # === 公共方法 ===
 func set_craft_count(count: int):
 	if _is_alchemizing:
 		return
-	selected_count = count
+	var max_allowed = maxi(get_max_craft_count(), 1)
+	selected_count = clampi(count, 1, max_allowed)
+	_update_craft_count_label()
+	_update_materials_display()
+	_update_count_button_styles()
+
+func adjust_craft_count(delta: int):
+	if _is_alchemizing:
+		return
+	var max_allowed = maxi(get_max_craft_count(), 1)
+	selected_count = clampi(selected_count + delta, 1, max_allowed)
+	_update_craft_count_label()
+	_update_materials_display()
+	_update_count_button_styles()
+
+func set_craft_count_to_min():
+	if _is_alchemizing:
+		return
+	selected_count = 1
+	_update_craft_count_label()
+	_update_materials_display()
+	_update_count_button_styles()
+
+func set_craft_count_to_max():
+	if _is_alchemizing:
+		return
+	selected_count = maxi(get_max_craft_count(), 1)
 	_update_craft_count_label()
 	_update_materials_display()
 	_update_count_button_styles()

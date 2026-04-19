@@ -28,3 +28,9 @@ func end(action_key: String, cooldown_seconds: float = 0.1) -> void:
 		_cooldown_until_ms[action_key] = Time.get_ticks_msec() + cooldown_ms
 	else:
 		_cooldown_until_ms.erase(action_key)
+
+func is_in_flight(action_key: String) -> bool:
+	return bool(_in_flight.get(action_key, false))
+
+func has_any_in_flight() -> bool:
+	return not _in_flight.is_empty()

@@ -1,5 +1,8 @@
 class_name SpellDetailPopup extends Panel
 
+const PopupStyleTemplate = preload("res://scripts/ui/common/PopupStyleTemplate.gd")
+const ActionButtonTemplate = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
+
 ## 术法详情弹窗 - 独立管理弹窗UI
 ## 负责显示术法详细信息、升级条件、充灵操作等
 
@@ -17,6 +20,8 @@ var vbox: VBoxContainer = null
 var charge_button: Button = null
 var multiplier_button: Button = null
 var upgrade_button: Button = null
+var close_button: Button = null
+var overlay_host: Control = null
 
 # 常量
 const MULTIPLIER_LABELS = ["x10", "x100", "Max"]
@@ -25,30 +30,41 @@ func _init():
 	name = "SpellDetailPopup"
 	visible = false
 	z_index = 100
-	custom_minimum_size = Vector2(400, 550)
+	set_process_input(true)
 
 func setup(parent_node: Node):
 	"""初始化弹窗，创建所有UI元素"""
+	if parent_node is Control:
+		overlay_host = parent_node
+	else:
+		overlay_host = get_tree().current_scene as Control
 	_create_background()
 	_create_popup_content()
+	_apply_popup_theme()
+	if get_viewport():
+		get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 func _create_background():
 	"""创建背景遮罩层"""
-	background = ColorRect.new()
+	if not overlay_host:
+		return
+	background = PopupStyleTemplate.create_overlay(self, Callable(), 0.62)
 	background.name = "SpellPopupBackground"
-	background.visible = false
-	background.z_index = -1  # 设置为-1，确保在弹窗内容之下
-	background.color = Color(0, 0, 0, 0.5)
-	background.layout_mode = 1
-	background.anchors_preset = 15
-	background.anchor_right = 1.0
-	background.anchor_bottom = 1.0
-	background.grow_horizontal = 2
-	background.grow_vertical = 2
-	background.mouse_filter = Control.MOUSE_FILTER_STOP
-	background.gui_input.connect(_on_background_clicked)
-	
-	add_child(background)
+	overlay_host.add_child(background)
+
+func _input(event: InputEvent) -> void:
+	# 当弹窗显示时：点击外部关闭，点击内部不关闭
+	if not visible:
+		return
+	if not (event is InputEventMouseButton):
+		return
+	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	var mouse_event := event as InputEventMouseButton
+	if get_global_rect().has_point(mouse_event.position):
+		return
+	close_requested.emit()
+	get_viewport().set_input_as_handled()
 
 func _create_popup_content():
 	"""创建弹窗内容"""
@@ -58,10 +74,10 @@ func _create_popup_content():
 	anchor_top = 0.5
 	anchor_right = 0.5
 	anchor_bottom = 0.5
-	offset_left = -200.0
-	offset_top = -275.0
-	offset_right = 200.0
-	offset_bottom = 275.0
+	offset_left = -180.0
+	offset_top = -220.0
+	offset_right = 180.0
+	offset_bottom = 220.0
 	grow_horizontal = 2
 	grow_vertical = 2
 	mouse_filter = Control.MOUSE_FILTER_STOP  # 阻止事件传递到背景
@@ -78,6 +94,7 @@ func _create_popup_content():
 	vbox.offset_bottom = -20.0
 	vbox.grow_horizontal = 2
 	vbox.grow_vertical = 2
+	vbox.add_theme_constant_override("separation", 10)
 	add_child(vbox)
 	
 	# 标题
@@ -85,65 +102,108 @@ func _create_popup_content():
 	title.name = "TitleLabel"
 	title.text = "术法详情"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_color_override("font_color", Color(0.22, 0.2, 0.18, 1))
 	vbox.add_child(title)
 	
 	# 类型
 	var type_label = Label.new()
 	type_label.name = "TypeLabel"
 	type_label.text = "类型："
+	type_label.add_theme_font_size_override("font_size", 21)
+	type_label.add_theme_color_override("font_color", Color(0.22, 0.2, 0.18, 1))
 	vbox.add_child(type_label)
 	
 	# 等级
 	var level_label = Label.new()
 	level_label.name = "LevelLabel"
 	level_label.text = "等级："
+	level_label.add_theme_font_size_override("font_size", 21)
+	level_label.add_theme_color_override("font_color", Color(0.22, 0.2, 0.18, 1))
 	vbox.add_child(level_label)
 	
 	# 分隔线
+	vbox.add_child(_create_section_gap(4))
 	vbox.add_child(_create_thick_separator())
+	vbox.add_child(_create_section_gap(2))
 	
 	# 属性加成
 	var attr_title = Label.new()
+	attr_title.name = "AttrTitleLabel"
 	attr_title.text = "【属性加成】"
+	attr_title.add_theme_font_size_override("font_size", 23)
+	attr_title.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
 	vbox.add_child(attr_title)
 	
 	var attr_value = Label.new()
 	attr_value.name = "AttributeValue"
 	attr_value.text = ""
+	attr_value.add_theme_font_size_override("font_size", 19)
+	attr_value.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
 	vbox.add_child(attr_value)
 	
 	# 分隔线
+	vbox.add_child(_create_section_gap(4))
 	vbox.add_child(_create_thick_separator())
+	vbox.add_child(_create_section_gap(2))
 	
 	# 术法效果
 	var effect_title = Label.new()
+	effect_title.name = "EffectTitleLabel"
 	effect_title.text = "【术法效果】"
+	effect_title.add_theme_font_size_override("font_size", 23)
+	effect_title.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
 	vbox.add_child(effect_title)
 	
 	var effect_value = Label.new()
 	effect_value.name = "EffectValue"
 	effect_value.text = ""
+	effect_value.add_theme_font_size_override("font_size", 19)
+	effect_value.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
 	effect_value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(effect_value)
 	
 	# 分隔线
+	vbox.add_child(_create_section_gap(4))
 	vbox.add_child(_create_thick_separator())
+	vbox.add_child(_create_section_gap(2))
 	
 	# 升级条件
 	var upgrade_title = Label.new()
+	upgrade_title.name = "UpgradeTitleLabel"
 	upgrade_title.text = "【升级条件】"
+	upgrade_title.add_theme_font_size_override("font_size", 23)
+	upgrade_title.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
 	vbox.add_child(upgrade_title)
 	
 	var max_level_label = Label.new()
 	max_level_label.name = "MaxLevelLabel"
 	max_level_label.text = "已达到最高等级"
+	max_level_label.add_theme_font_size_override("font_size", 19)
+	max_level_label.add_theme_color_override("font_color", Color(0.5, 0.18, 0.16, 1))
 	max_level_label.visible = false
 	vbox.add_child(max_level_label)
+	
+	var use_count_container = HBoxContainer.new()
+	use_count_container.name = "UseCountContainer"
+	use_count_container.alignment = BoxContainer.ALIGNMENT_BEGIN
+	use_count_container.add_theme_constant_override("separation", 8)
+	vbox.add_child(use_count_container)
 	
 	var use_count_label = Label.new()
 	use_count_label.name = "UseCountLabel"
 	use_count_label.text = "使用次数："
-	vbox.add_child(use_count_label)
+	use_count_label.custom_minimum_size = Vector2(106, 0)
+	use_count_label.add_theme_font_size_override("font_size", 19)
+	use_count_label.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
+	use_count_container.add_child(use_count_label)
+	
+	var use_count_value_label = Label.new()
+	use_count_value_label.name = "UseCountValueLabel"
+	use_count_value_label.text = "0/0"
+	use_count_value_label.add_theme_font_size_override("font_size", 19)
+	use_count_value_label.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
+	use_count_container.add_child(use_count_value_label)
 	
 	# 灵气充入容器
 	var spirit_charge_container = HBoxContainer.new()
@@ -155,29 +215,36 @@ func _create_popup_content():
 	var spirit_charge_label = Label.new()
 	spirit_charge_label.name = "SpiritChargeLabel"
 	spirit_charge_label.text = "所需灵气："
+	spirit_charge_label.custom_minimum_size = Vector2(106, 0)
+	spirit_charge_label.add_theme_font_size_override("font_size", 19)
+	spirit_charge_label.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
 	spirit_charge_container.add_child(spirit_charge_label)
 	
 	var spirit_amount_label = Label.new()
 	spirit_amount_label.name = "SpiritAmountLabel"
 	spirit_amount_label.text = "0/0"
+	spirit_amount_label.add_theme_font_size_override("font_size", 19)
+	spirit_amount_label.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
 	spirit_charge_container.add_child(spirit_amount_label)
 	
 	charge_button = Button.new()
 	charge_button.name = "ChargeButton"
 	charge_button.text = "+"
+	charge_button.custom_minimum_size = Vector2(58, 42)
+	charge_button.add_theme_font_size_override("font_size", 24)
 	charge_button.pressed.connect(func(): charge_requested.emit())
 	spirit_charge_container.add_child(charge_button)
 	
 	multiplier_button = Button.new()
 	multiplier_button.name = "MultiplierButton"
 	multiplier_button.text = "x10"
+	multiplier_button.custom_minimum_size = Vector2(84, 42)
+	multiplier_button.add_theme_font_size_override("font_size", 22)
 	multiplier_button.pressed.connect(func(): multiplier_changed.emit())
 	spirit_charge_container.add_child(multiplier_button)
 	
-	# 占位
-	var spacer = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(spacer)
+	# 轻量留白（避免使用 EXPAND_FILL 把弹窗高度异常撑大）
+	vbox.add_child(_create_section_gap(8))
 	
 	# 按钮容器
 	var button_container = HBoxContainer.new()
@@ -189,20 +256,66 @@ func _create_popup_content():
 	upgrade_button = Button.new()
 	upgrade_button.name = "UpgradeButton"
 	upgrade_button.text = "升级"
+	upgrade_button.custom_minimum_size = Vector2(124, 46)
+	upgrade_button.add_theme_font_size_override("font_size", 22)
 	upgrade_button.pressed.connect(func(): upgrade_requested.emit())
 	button_container.add_child(upgrade_button)
 	
 	# 关闭按钮
-	var close_button = Button.new()
+	close_button = Button.new()
 	close_button.text = "关闭"
+	close_button.custom_minimum_size = Vector2(124, 46)
+	close_button.add_theme_font_size_override("font_size", 22)
 	close_button.pressed.connect(func(): close_requested.emit())
 	button_container.add_child(close_button)
+
+func _apply_popup_theme():
+	add_theme_stylebox_override("panel", PopupStyleTemplate.build_panel_style({
+		"bg_color": PopupStyleTemplate.POPUP_BG_COLOR,
+		"border_color": PopupStyleTemplate.POPUP_BORDER_COLOR,
+		"corner_radius": 12,
+		"border_width": 2
+	}))
+	_apply_action_button_styles()
+
+func _apply_action_button_styles():
+	if charge_button:
+		ActionButtonTemplate.apply_spell_view_brown(charge_button, charge_button.custom_minimum_size, 24)
+	if multiplier_button:
+		ActionButtonTemplate.apply_spell_view_brown(multiplier_button, multiplier_button.custom_minimum_size, 22)
+	if upgrade_button:
+		ActionButtonTemplate.apply_cultivation_yellow(upgrade_button, upgrade_button.custom_minimum_size, 22)
+	if close_button:
+		ActionButtonTemplate.apply_breakthrough_red(close_button, close_button.custom_minimum_size, 22)
 
 func show_popup():
 	"""显示弹窗"""
 	if background:
+		background.z_index = z_index - 1
 		background.visible = true
 	visible = true
+	_update_popup_layout()
+	# 首次显示时等一帧再二次布局，避免初次高度异常
+	call_deferred("_update_popup_layout")
+
+func _on_viewport_size_changed():
+	if visible:
+		_update_popup_layout()
+
+func _update_popup_layout():
+	if not vbox:
+		return
+	# 基于内容和屏幕动态计算弹窗尺寸，避免写死宽高导致比例异常
+	var viewport_size = get_viewport_rect().size
+	var content_min_size = vbox.get_combined_minimum_size()
+	var popup_width = clamp(content_min_size.x + 40.0, 360.0, max(360.0, viewport_size.x - 40.0))
+	# 高度上限按屏幕 82%，并且不让无意义留白撑高
+	var max_height = max(420.0, floor(viewport_size.y * 0.82))
+	var popup_height = clamp(content_min_size.y + 34.0, 420.0, max_height)
+	offset_left = -popup_width * 0.5
+	offset_top = -popup_height * 0.5
+	offset_right = popup_width * 0.5
+	offset_bottom = popup_height * 0.5
 
 func hide_popup():
 	"""隐藏弹窗"""
@@ -236,7 +349,9 @@ func update_content(spell_info: Dictionary, spell_config: Dictionary,
 	# 更新等级
 	var level_label = vbox.get_node_or_null("LevelLabel")
 	if level_label:
-		level_label.text = "等级：" + str(int(spell_info.get("level", 0))) + "/" + str(int(spell_config.get("max_level", 3)))
+		var current_level = int(spell_info.get("level", 0))
+		var max_level = int(spell_config.get("max_level", 3))
+		level_label.text = "等级：%s（%d/%d）" % [_format_level_tier_name(current_level), current_level, max_level]
 	
 	# 获取当前等级数据
 	var current_level = spell_info.get("level", 0)
@@ -261,12 +376,16 @@ func _update_attribute_value(level_data: Dictionary):
 	
 	var attr_bonus = level_data.get("attribute_bonus", {})
 	var attr_text = ""
-	for attr in attr_bonus.keys():
+	var keys = attr_bonus.keys()
+	for i in range(keys.size()):
+		var attr = keys[i]
 		var value = attr_bonus[attr]
 		if attr == "speed":
-			attr_text += "速度 +" + str(value) + "\n"
+			attr_text += "速度 +" + UIUtils.format_display_number(float(value))
 		else:
-			attr_text += _get_attribute_name(attr) + " ×" + str(value) + "\n"
+			attr_text += _get_attribute_name(attr) + " ×" + UIUtils.format_display_number(float(value))
+		if i < keys.size() - 1:
+			attr_text += "\n"
 	attr_value.text = attr_text
 
 func _update_effect_value(spell_config: Dictionary, level_data: Dictionary):
@@ -283,7 +402,8 @@ func _update_upgrade_conditions(spell_info: Dictionary, spell_config: Dictionary
 								multiplier_index: int, multipliers: Array):
 	"""更新升级条件显示"""
 	var max_level_label = vbox.get_node_or_null("MaxLevelLabel")
-	var use_count_label = vbox.get_node_or_null("UseCountLabel")
+	var use_count_container = vbox.get_node_or_null("UseCountContainer")
+	var use_count_value_label = vbox.get_node_or_null("UseCountContainer/UseCountValueLabel")
 	var spirit_charge_container = vbox.get_node_or_null("SpiritChargeContainer")
 	
 	var current_level = spell_info.get("level", 0)
@@ -292,9 +412,10 @@ func _update_upgrade_conditions(spell_info: Dictionary, spell_config: Dictionary
 	if current_level <= 0:
 		if max_level_label:
 			max_level_label.visible = false
-		if use_count_label:
-			use_count_label.visible = true
-			use_count_label.text = "使用次数：-/-"
+		if use_count_container:
+			use_count_container.visible = true
+		if use_count_value_label:
+			use_count_value_label.text = "-/-"
 		if spirit_charge_container:
 			spirit_charge_container.visible = true
 			var spirit_amount_label = spirit_charge_container.get_node_or_null("SpiritAmountLabel")
@@ -304,16 +425,16 @@ func _update_upgrade_conditions(spell_info: Dictionary, spell_config: Dictionary
 	elif current_level >= max_level:
 		if max_level_label:
 			max_level_label.visible = true
-		if use_count_label:
-			use_count_label.visible = false
+		if use_count_container:
+			use_count_container.visible = false
 		if spirit_charge_container:
 			spirit_charge_container.visible = false
 		_set_buttons_enabled(false, multiplier_index)
 	else:
 		if max_level_label:
 			max_level_label.visible = false
-		if use_count_label:
-			use_count_label.visible = true
+		if use_count_container:
+			use_count_container.visible = true
 		if spirit_charge_container:
 			spirit_charge_container.visible = true
 		
@@ -322,12 +443,12 @@ func _update_upgrade_conditions(spell_info: Dictionary, spell_config: Dictionary
 		var spirit_cost = int(current_level_data.get("spirit_cost", 0))
 		var charged_spirit = int(spell_info.get("charged_spirit", 0))
 		
-		if use_count_label:
-			use_count_label.text = "使用次数：" + str(spell_info.get("use_count", 0)) + "/" + str(use_count_required)
+		if use_count_value_label:
+			use_count_value_label.text = UIUtils.format_display_number(float(spell_info.get("use_count", 0))) + "/" + UIUtils.format_display_number(float(use_count_required))
 		if spirit_charge_container:
 			var spirit_amount_label = spirit_charge_container.get_node_or_null("SpiritAmountLabel")
 			if spirit_amount_label:
-				spirit_amount_label.text = str(charged_spirit) + "/" + str(spirit_cost)
+				spirit_amount_label.text = UIUtils.format_display_number(float(charged_spirit)) + "/" + UIUtils.format_display_number(float(spirit_cost))
 		
 		_set_buttons_enabled(true, multiplier_index)
 
@@ -344,8 +465,9 @@ func _set_buttons_enabled(enabled: bool, multiplier_index: int):
 func update_use_count_only(spell_info: Dictionary, spell_config: Dictionary, spell_data: Node):
 	"""只更新使用次数（用于实时更新）"""
 	var max_level_label = vbox.get_node_or_null("MaxLevelLabel")
-	var use_count_label = vbox.get_node_or_null("UseCountLabel")
-	if not use_count_label:
+	var use_count_container = vbox.get_node_or_null("UseCountContainer")
+	var use_count_value_label = vbox.get_node_or_null("UseCountContainer/UseCountValueLabel")
+	if not use_count_container or not use_count_value_label:
 		return
 	
 	var current_level = spell_info.get("level", 0)
@@ -354,33 +476,24 @@ func update_use_count_only(spell_info: Dictionary, spell_config: Dictionary, spe
 	if current_level <= 0:
 		if max_level_label:
 			max_level_label.visible = false
-		use_count_label.visible = true
-		use_count_label.text = "使用次数：-/-"
+		use_count_container.visible = true
+		use_count_value_label.text = "-/-"
 	elif current_level >= max_level:
 		if max_level_label:
 			max_level_label.visible = true
-		use_count_label.visible = false
+		use_count_container.visible = false
 	else:
 		if max_level_label:
 			max_level_label.visible = false
-		use_count_label.visible = true
+		use_count_container.visible = true
 		var current_level_data = spell_data.get_spell_level_data(spell_info.get("id", ""), current_level) if spell_data else {}
 		var use_count_required = int(current_level_data.get("use_count_required", 0))
-		use_count_label.text = "使用次数：" + str(int(spell_info.get("use_count", 0))) + "/" + str(use_count_required)
+		use_count_value_label.text = UIUtils.format_display_number(float(spell_info.get("use_count", 0))) + "/" + UIUtils.format_display_number(float(use_count_required))
 	
-	use_count_label.queue_redraw()
+	use_count_value_label.queue_redraw()
 	
 	if current_level > 0 and current_level < max_level:
 		_set_buttons_enabled(true, 0)
-
-func _on_background_clicked(event: InputEvent):
-	"""点击背景关闭弹窗"""
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		# 检查点击位置是否在弹窗内容区域内
-		var popup_rect = get_global_rect()
-		if not popup_rect.has_point(event.global_position):
-			close_requested.emit()
-			accept_event()  # 接受事件，防止继续传播
 
 func cleanup():
 	"""清理资源"""
@@ -402,9 +515,7 @@ func _get_attribute_name(attr: String) -> String:
 		_: return attr
 
 func _format_spell_number(value: float) -> String:
-	if value == int(value):
-		return str(int(value))
-	return str(value)
+	return UIUtils.format_display_number(value)
 
 func _format_spell_percent(value: float) -> String:
 	var percent = value * 100
@@ -450,11 +561,25 @@ func _format_effect_description(description: String, effect: Dictionary) -> Stri
 	
 	return result
 
+func _format_level_tier_name(level: int) -> String:
+	var names = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
+	if level >= 1 and level < names.size():
+		return names[level] + "重"
+	if level == 10:
+		return "十重"
+	return str(level) + "重"
+
 func _create_thick_separator() -> HSeparator:
 	"""创建粗分割线，使其在不同分辨率下都能清晰显示"""
 	var separator = HSeparator.new()
 	var separator_style = StyleBoxLine.new()
-	separator_style.color = Color(0.5, 0.5, 0.5, 0.5)
+	separator_style.color = Color(0.66, 0.6, 0.5, 0.55)
 	separator_style.thickness = 2
 	separator.add_theme_stylebox_override("separator", separator_style)
+	separator.custom_minimum_size = Vector2(0, 6)
 	return separator
+
+func _create_section_gap(height: int) -> Control:
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, float(max(0, height)))
+	return spacer

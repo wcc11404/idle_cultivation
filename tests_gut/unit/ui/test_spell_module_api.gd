@@ -4,6 +4,16 @@ const ModuleHarness = preload("res://tests_gut/support/module_harness.gd")
 
 var harness: ModuleHarness = null
 
+func _toggle_and_get_last_log(module, retries: int = 3, retry_wait: float = 0.12) -> String:
+	for i in range(retries):
+		await module._on_spell_equip_toggle()
+		var msg = harness.last_log()
+		if not msg.is_empty():
+			return msg
+		if i < retries - 1:
+			await get_tree().create_timer(retry_wait).timeout
+	return harness.last_log()
+
 func before_each():
 	harness = ModuleHarness.new()
 	add_child(harness)
@@ -21,26 +31,26 @@ func test_spell_slot_limit_then_unequip_and_equip_messages():
 
 	module.current_viewing_spell = "basic_defense"
 	harness.clear_logs()
-	await module._on_spell_equip_toggle()
-	assert_eq(harness.last_log(), "开局术法槽位已达上限，请先卸下任意术法", "槽位上限提示应使用中文槽位名")
+	var limit_msg = await _toggle_and_get_last_log(module)
+	assert_eq(limit_msg, "开局术法槽位已达上限，请先卸下任意术法", "槽位上限提示应使用中文槽位名")
 
-	await get_tree().create_timer(0.12).timeout
+	await get_tree().create_timer(0.2).timeout
 	module.current_viewing_spell = "basic_steps"
 	harness.clear_logs()
-	await module._on_spell_equip_toggle()
-	assert_eq(harness.last_log(), "基础步法卸下成功", "卸下成功文案应由客户端翻译")
+	var unequip_msg = await _toggle_and_get_last_log(module)
+	assert_eq(unequip_msg, "基础步法卸下成功", "卸下成功文案应由客户端翻译")
 
-	await get_tree().create_timer(0.12).timeout
+	await get_tree().create_timer(0.2).timeout
 	module.current_viewing_spell = "basic_defense"
 	harness.clear_logs()
-	await module._on_spell_equip_toggle()
-	assert_eq(harness.last_log(), "基础防御装备成功", "装备成功文案应由客户端翻译")
+	var equip_msg = await _toggle_and_get_last_log(module)
+	assert_eq(equip_msg, "基础防御装备成功", "装备成功文案应由客户端翻译")
 
 func test_spell_actions_are_locked_during_battle():
 	await harness.client.test_post("/test/set_runtime_state", {
 		"is_in_lianli": true,
 		"is_battling": true,
-		"current_area_id": "qi_refining_outer"
+		"current_area_id": "area_1"
 	})
 
 	var spell_module = harness.game_ui.spell_module

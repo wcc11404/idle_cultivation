@@ -9,7 +9,13 @@ const SpellModule = preload("res://scripts/ui/modules/SpellModule.gd")
 const NeishiModule = preload("res://scripts/ui/modules/NeishiModule.gd")
 const CultivationModule = preload("res://scripts/ui/modules/CultivationModule.gd")
 const LianliModule = preload("res://scripts/ui/modules/LianliModule.gd")
+const HerbGatherModule = preload("res://scripts/ui/modules/HerbGatherModule.gd")
+const ProfileEditPopup = preload("res://scripts/ui/modules/ProfileEditPopup.gd")
 const GameServerAPI = preload("res://scripts/network/GameServerAPI.gd")
+const TabBarStyleTemplate = preload("res://scripts/ui/common/TabBarStyleTemplate.gd")
+const DisplayPanelTemplate = preload("res://scripts/ui/common/DisplayPanelTemplate.gd")
+const ActionButtonTemplate = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
+const AccountConfig = preload("res://scripts/core/account/AccountConfig.gd")
 
 var player: Node = null
 var inventory: Node = null
@@ -24,9 +30,11 @@ var alchemy_module = null
 
 # 设置模块
 var settings_module = null
+var profile_edit_popup: ProfileEditPopup = null
 
-# 洞府模块
-var dongfu_module = null
+# 地区模块
+var region_module = null
+var herb_gather_module = null
 
 # 储纳模块
 var chuna_module = null
@@ -60,6 +68,7 @@ const REALM_FRAME_TEXTURES = {
 
 @onready var player_name_label_top: Label = $VBoxContainer/TopBar/TopBarContent/PlayerInfo/PlayerNameLabel
 @onready var avatar_texture: TextureRect = $VBoxContainer/TopBar/TopBarContent/PlayerInfo/AvatarContainer/AvatarTexture
+@onready var top_player_info: HBoxContainer = $VBoxContainer/TopBar/TopBarContent/PlayerInfo
 @onready var top_bar_background: TextureRect = $VBoxContainer/TopBar/TopBarBackground
 @onready var realm_label: Label = $VBoxContainer/TopBar/TopBarContent/RealmContainer/RealmLabel
 @onready var spirit_stone_label: Label = $VBoxContainer/TopBar/TopBarContent/SpiritStoneContainer/SpiritStoneLabel
@@ -78,30 +87,43 @@ const REALM_FRAME_TEXTURES = {
 @onready var speed_label: Label = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/SpeedLabel
 @onready var spirit_gain_label: Label = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritGainLabel
 
-# 灵气进度条现在在 CultivationContainer 中
-#@onready var spirit_progress_bar: Control = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/SpiritProgressBar
-
 # 修炼小人素材
 @onready var cultivation_figure: TextureRect = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual/CultivationFigure
 @onready var cultivation_figure_particles: TextureRect = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual/CultivationFigureParticles
 @onready var cultivation_visual: Control = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual
 
 @onready var log_text: RichTextLabel = $VBoxContainer/LogArea/LogText
-@onready var cultivate_button: Button = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationBottomBar/CultivateButton
-@onready var breakthrough_button: Button = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationBottomBar/BreakthroughButton
-@onready var bottom_bar: HBoxContainer = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationBottomBar
+@onready var cultivate_button: Button = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughButtonBar/CultivateButton
+@onready var breakthrough_button: Button = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughButtonBar/BreakthroughButton
+@onready var bottom_bar: HBoxContainer = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughButtonBar
+@onready var breakthrough_material_label_1: Label = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow/BreakthroughMaterialLabel1
+@onready var breakthrough_material_label_2: Label = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow/BreakthroughMaterialLabel2
+@onready var breakthrough_material_label_3: Label = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow/BreakthroughMaterialLabel3
 
 @onready var tab_neishi: Button = $VBoxContainer/TabBar/NeishiButton
 @onready var tab_chuna: Button = $VBoxContainer/TabBar/ChunaButton
-@onready var tab_dongfu: Button = get_node_or_null("VBoxContainer/TabBar/DongfuButton")
+@onready var tab_region: Button = get_node_or_null("VBoxContainer/TabBar/RegionButton")
 @onready var tab_lianli: Button = $VBoxContainer/TabBar/BattleButton
 @onready var tab_settings: Button = $VBoxContainer/TabBar/SettingsButton
+@onready var tab_bar: HBoxContainer = $VBoxContainer/TabBar
+@onready var neishi_tab_bar: HBoxContainer = $VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar
+@onready var bottom_spacer: Control = $VBoxContainer/BottomSpacer
+@onready var status_header_row: HBoxContainer = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsHeaderRow")
+@onready var breakthrough_header_row: HBoxContainer = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughHeaderRow")
+@onready var status_header_bottom_spacer: Control = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HeaderBottomSpacer")
+@onready var status_health_left_pad: Control = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HealthRow/HealthLeftPad")
+@onready var status_spirit_left_pad: Control = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritRow/SpiritLeftPad")
+@onready var status_separator_margin: MarginContainer = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SeparatorMargin")
+@onready var breakthrough_header_bottom_spacer: Control = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughHeaderBottomSpacer")
+@onready var breakthrough_materials_margin: MarginContainer = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin")
 
 @onready var neishi_panel: Control = $VBoxContainer/ContentPanel/NeishiPanel
 @onready var chuna_panel: Control = $VBoxContainer/ContentPanel/ChunaPanel
-@onready var dongfu_panel: Control = get_node_or_null("VBoxContainer/ContentPanel/DongfuPanel")
+@onready var region_panel: Control = get_node_or_null("VBoxContainer/ContentPanel/RegionPanel")
+@onready var herb_gather_panel: Control = get_node_or_null("VBoxContainer/ContentPanel/HerbGatherPanel")
 @onready var lianli_panel: Control = $VBoxContainer/ContentPanel/LianliPanel
 @onready var settings_panel: Control = $VBoxContainer/ContentPanel/SettingsPanel
+@onready var settings_scroll: ScrollContainer = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll
 
 # 内室子Tab
 @onready var cultivation_tab: Button = $VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar/CultivationTab
@@ -109,11 +131,23 @@ const REALM_FRAME_TEXTURES = {
 
 @onready var cultivation_panel: Control = $VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer
 @onready var spell_panel: Control = $VBoxContainer/ContentPanel/NeishiPanel/SpellPanel
-@onready var save_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SaveButton
-@onready var logout_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/LogoutButton
-@onready var nickname_input: LineEdit = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/NicknameSection/NicknameHBox/NicknameInput
-@onready var confirm_nickname_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/NicknameSection/NicknameHBox/ConfirmNicknameButton
-@onready var rank_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/RankButton
+@onready var save_button: Button = get_node_or_null("VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SaveButton")
+@onready var fps_30_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/FpsSection/FpsPresetRow/Fps30Button
+@onready var fps_60_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/FpsSection/FpsPresetRow/Fps60Button
+@onready var fps_120_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/FpsSection/FpsPresetRow/Fps120Button
+@onready var fps_144_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/FpsSection/FpsPresetRow/Fps144Button
+@onready var fps_unlimited_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/FpsSection/FpsPresetRow/FpsUnlimitedButton
+@onready var fps_limit_option_button: OptionButton = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/FpsSection/FpsLimitOptionButton
+@onready var music_mute_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/AudioSection/MusicRow/MusicMuteButton
+@onready var music_volume_slider: HSlider = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/AudioSection/MusicRow/MusicVolumeSlider
+@onready var music_volume_value_label: Label = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/AudioSection/MusicRow/MusicVolumeValueLabel
+@onready var redeem_code_input: LineEdit = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/RedeemSection/RedeemCodeRow/RedeemCodeInput
+@onready var redeem_confirm_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/RedeemSection/RedeemCodeRow/RedeemConfirmButton
+@onready var mailbox_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/ActionButtons/MailboxButton
+@onready var mall_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/ActionButtons/MallButton
+@onready var rank_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/ActionButtons/RankButton
+@onready var guide_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/ActionButtons/GuideButton
+@onready var logout_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/ActionButtons/LogoutButton
 @onready var rank_panel: Control = $VBoxContainer/ContentPanel/SettingsPanel/RankPanel
 @onready var rank_list: VBoxContainer = $VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/RankList
 @onready var back_button: Button = $VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/TitleBar/BackButton
@@ -140,7 +174,10 @@ var view_button: Button = null
 @onready var endless_tower_button: Button = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer/EndlessTowerButton")
 
 # 炼丹房UI节点
-@onready var alchemy_room_button: Button = get_node_or_null("VBoxContainer/ContentPanel/DongfuPanel/VBoxContainer/AlchemyRoomButton")
+@onready var alchemy_workshop_button: Button = get_node_or_null("VBoxContainer/ContentPanel/RegionPanel/VBoxContainer/AlchemyWorkshopButton")
+@onready var herb_mountain_button: Button = get_node_or_null("VBoxContainer/ContentPanel/RegionPanel/VBoxContainer/HerbMountainButton")
+@onready var herb_gather_back_button: Button = get_node_or_null("VBoxContainer/ContentPanel/HerbGatherPanel/VBoxContainer/TitleBar/BackButton")
+@onready var herb_gather_point_list: VBoxContainer = get_node_or_null("VBoxContainer/ContentPanel/HerbGatherPanel/VBoxContainer/PointScroll/PointList")
 @onready var alchemy_room_panel: Control = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel")
 @onready var recipe_list_container: VBoxContainer = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/RecipeListPanel/RecipeListVBox/RecipeScroll/RecipeListContainer")
 @onready var recipe_name_label: Label = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/RecipeNameLabel")
@@ -155,6 +192,8 @@ var view_button: Button = null
 @onready var count_10_button: Button = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/CountHBox/Count10Button")
 @onready var count_100_button: Button = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/CountHBox/Count100Button")
 @onready var count_max_button: Button = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/CountHBox/CountMaxButton")
+@onready var count_plus_10_button: Button = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/CountHBox/CountPlus10Button")
+@onready var count_final_max_button: Button = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/MainHBox/CraftPanel/CraftVBox/CountHBox/CountFinalMaxButton")
 @onready var alchemy_info_label: Label = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/BottomPanel/BottomVBox/BottomHBox/AlchemyInfoLabel")
 @onready var furnace_info_label: Label = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/BottomPanel/BottomVBox/BottomHBox/FurnaceInfoLabel")
 @onready var alchemy_back_button: Button = get_node_or_null("VBoxContainer/ContentPanel/AlchemyRoomPanel/VBoxContainer/TitleBar/BackButton")
@@ -163,17 +202,17 @@ var view_button: Button = null
 var lianli_area_buttons: Array = []
 var lianli_area_ids: Array = []
 
-@onready var player_name_label: Label = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/PlayerInfo/PlayerNameLabel
-@onready var player_health_bar_lianli: ProgressBar = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/PlayerInfo/PlayerHealthBar
-@onready var player_health_value_lianli: Label = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/PlayerInfo/PlayerHealthValue
-@onready var enemy_name_label: Label = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/EnemyInfo/EnemyNameLabel
-@onready var enemy_health_bar: ProgressBar = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/EnemyInfo/EnemyHealthBar
-@onready var enemy_health_value: Label = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/EnemyInfo/EnemyHealthValue
+@onready var player_name_label: Label = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/CombatInfoPanel/CombatInfoMargin/CombatInfoVBox/PlayerInfo/PlayerNameLabel
+@onready var player_health_bar_lianli: ProgressBar = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/CombatInfoPanel/CombatInfoMargin/CombatInfoVBox/PlayerInfo/PlayerHealthBar
+@onready var player_health_value_lianli: Label = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/CombatInfoPanel/CombatInfoMargin/CombatInfoVBox/PlayerInfo/PlayerHealthValue
+@onready var enemy_name_label: Label = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/CombatInfoPanel/CombatInfoMargin/CombatInfoVBox/EnemyInfo/EnemyNameLabel
+@onready var enemy_health_bar: ProgressBar = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/CombatInfoPanel/CombatInfoMargin/CombatInfoVBox/EnemyInfo/EnemyHealthBar
+@onready var enemy_health_value: Label = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/CombatInfoPanel/CombatInfoMargin/CombatInfoVBox/EnemyInfo/EnemyHealthValue
 @onready var lianli_status_label: Label = $VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/LianliStatusLabel
 
 # BattleInfo UI控件
-@onready var area_name_label: Label = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleInfo/AreaNameLabel")
-@onready var reward_info_label: Label = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleInfo/RewardInfoLabel")
+@onready var area_name_label: Label = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/AreaInfoPanel/AreaInfoMargin/AreaInfoVBox/AreaInfoContentMargin/AreaInfoContentVBox/AreaNameLabel")
+@onready var reward_info_label: Label = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/AreaInfoPanel/AreaInfoMargin/AreaInfoVBox/AreaInfoContentMargin/AreaInfoContentVBox/RewardInfoLabel")
 
 # BattleButtonContainer UI控件
 @onready var continuous_checkbox: CheckBox = get_node_or_null("VBoxContainer/ContentPanel/LianliPanel/LianliScenePanel/VBoxContainer/BattleButtonContainer/ContinuousCheckBox")
@@ -203,6 +242,8 @@ const NETWORK_UI_LOG_THROTTLE_SECONDS := 2.0
 func _ready():
 	# 安全获取可选节点
 	_setup_optional_nodes()
+	_setup_bottom_tab_layout()
+	_setup_neishi_sub_tab_layout()
 	
 	# 初始化GameServerAPI
 	api = GameServerAPI.new()
@@ -215,7 +256,9 @@ func _ready():
 	setup_log_manager()
 	setup_alchemy_module()
 	setup_settings_module()
-	setup_dongfu_module()
+	setup_profile_edit_popup()
+	setup_region_module()
+	setup_herb_gather_module()
 	setup_chuna_module()
 	setup_spell_module()
 	setup_neishi_module()
@@ -240,9 +283,132 @@ func _ready():
 
 func _setup_optional_nodes():
 	view_button = get_node_or_null("VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/ButtonContainer/ViewButton")
+	_setup_action_button_templates()
+	_setup_log_scroll_behavior()
+	_setup_settings_scroll_behavior()
+	_setup_status_header_style()
+	_setup_breakthrough_panel_style()
 
 	# 监听屏幕大小变化
 	get_viewport().size_changed.connect(_on_viewport_size_changed)
+
+func _setup_action_button_templates():
+	if cultivate_button:
+		ActionButtonTemplate.apply_cultivation_yellow(
+			cultivate_button,
+			cultivate_button.custom_minimum_size,
+			20
+		)
+	if breakthrough_button:
+		ActionButtonTemplate.apply_breakthrough_red(
+			breakthrough_button,
+			breakthrough_button.custom_minimum_size,
+			20
+		)
+
+func _setup_status_header_style():
+	if not status_header_row:
+		return
+	DisplayPanelTemplate.apply_to_row(status_header_row, {
+		"title_text": "属性面板",
+		"accent_color": Color(0.870588, 0.705882, 0.207843, 1.0),
+		"title_color": Color(0.22, 0.2, 0.18, 1.0),
+		"line_color": Color(0.82, 0.78, 0.71, 1.0),
+		"title_font_size": 22,
+		"accent_width": 4.0,
+		"accent_height": 24.0,
+		"row_separation": 8
+	})
+	# 展示面板模板约束：内容左侧与标题首字左侧对齐，标题下留白固定
+	DisplayPanelTemplate.apply_content_layout(
+		[status_health_left_pad, status_spirit_left_pad],
+		status_separator_margin,
+		status_header_bottom_spacer
+	)
+
+func _setup_breakthrough_panel_style():
+	if not breakthrough_header_row:
+		return
+	DisplayPanelTemplate.apply_to_row(breakthrough_header_row, {
+		"title_text": "突破详情",
+		"accent_color": Color(0.870588, 0.705882, 0.207843, 1.0),
+		"title_color": Color(0.22, 0.2, 0.18, 1.0),
+		"line_color": Color(0.82, 0.78, 0.71, 1.0),
+		"title_font_size": 22,
+		"accent_width": 4.0,
+		"accent_height": 24.0,
+		"row_separation": 8
+	})
+	# 展示面板模板约束：内容左侧与标题首字左侧对齐，标题下留白固定
+	DisplayPanelTemplate.apply_content_layout(
+		[],
+		breakthrough_materials_margin,
+		breakthrough_header_bottom_spacer
+	)
+
+func _setup_log_scroll_behavior():
+	if not log_text:
+		return
+	var v_scrollbar: VScrollBar = log_text.get_v_scroll_bar()
+	if not v_scrollbar:
+		return
+	# 保留滚动能力，但隐藏纵向滚动条视觉
+	v_scrollbar.modulate = Color(1, 1, 1, 0)
+	v_scrollbar.self_modulate = Color(1, 1, 1, 0)
+	v_scrollbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v_scrollbar.custom_minimum_size.x = 0.0
+
+func _setup_settings_scroll_behavior():
+	if not settings_scroll:
+		return
+	var v_scrollbar: VScrollBar = settings_scroll.get_v_scroll_bar()
+	if not v_scrollbar:
+		return
+	# 设置页保留滚动能力，但不显示纵向滚轴
+	v_scrollbar.modulate = Color(1, 1, 1, 0)
+	v_scrollbar.self_modulate = Color(1, 1, 1, 0)
+	v_scrollbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v_scrollbar.custom_minimum_size.x = 0.0
+
+func _setup_bottom_tab_layout():
+	if not tab_bar:
+		return
+	TabBarStyleTemplate.apply_to_bar(tab_bar, {
+		"bar_height": 62.0,
+		"font_size": 19,
+		"line_position": "top",
+		"line_width": 2,
+		"selected_line_width": 3,
+		"normal_bg": Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0),
+		"hover_bg": Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0),
+		"pressed_bg": Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0),
+		"selected_bg": Color(0.95, 0.92, 0.85, 1.0),
+		"line_color": Color(0.52, 0.49, 0.45, 1.0),
+		"selected_line_color": Color(222.0 / 255.0, 180.0 / 255.0, 53.0 / 255.0, 1.0),
+		"font_color": Color(0.35, 0.32, 0.28, 1.0),
+		"selected_font_color": Color(222.0 / 255.0, 180.0 / 255.0, 53.0 / 255.0, 1.0)
+	})
+	if bottom_spacer:
+		bottom_spacer.custom_minimum_size.y = 8.0
+
+func _setup_neishi_sub_tab_layout():
+	if not neishi_tab_bar:
+		return
+	TabBarStyleTemplate.apply_to_bar(neishi_tab_bar, {
+		"bar_height": 58.0,
+		"font_size": 18,
+		"line_position": "bottom",
+		"line_width": 2,
+		"selected_line_width": 3,
+		"normal_bg": Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0),
+		"hover_bg": Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0),
+		"pressed_bg": Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0),
+		"selected_bg": Color(0.95, 0.92, 0.85, 1.0),
+		"line_color": Color(0.52, 0.49, 0.45, 1.0),
+		"selected_line_color": Color(222.0 / 255.0, 180.0 / 255.0, 53.0 / 255.0, 1.0),
+		"font_color": Color(0.35, 0.32, 0.28, 1.0),
+		"selected_font_color": Color(222.0 / 255.0, 180.0 / 255.0, 53.0 / 255.0, 1.0)
+	})
 
 func _on_viewport_size_changed():
 	update_font_sizes()
@@ -303,12 +469,14 @@ func setup_button_connections():
 		tab_neishi.pressed.connect(_on_tab_neishi_pressed)
 	if tab_chuna:
 		tab_chuna.pressed.connect(_on_tab_chuna_pressed)
-	if tab_dongfu:
-		tab_dongfu.pressed.connect(_on_tab_dongfu_pressed)
+	if tab_region:
+		tab_region.pressed.connect(_on_tab_region_pressed)
 	if tab_lianli:
 		tab_lianli.pressed.connect(_on_tab_lianli_pressed)
 	if tab_settings:
 		tab_settings.pressed.connect(_on_tab_settings_pressed)
+	if top_player_info:
+		top_player_info.gui_input.connect(_on_top_player_info_gui_input)
 	
 	# 内室子Tab连接（NeishiModule）
 	if cultivation_tab and neishi_module:
@@ -354,7 +522,10 @@ func setup_alchemy_module():
 	alchemy_module.count_10_button = count_10_button
 	alchemy_module.count_100_button = count_100_button
 	alchemy_module.count_max_button = count_max_button
+	alchemy_module.count_plus_10_button = count_plus_10_button
+	alchemy_module.count_final_max_button = count_final_max_button
 	alchemy_module.alchemy_back_button = alchemy_back_button
+	alchemy_module.spell_system = spell_system
 	
 	# 初始化炼丹模块（在设置UI节点引用之后）
 	alchemy_module.initialize(self, player, alchemy_system, recipe_data, item_data_ref, api)
@@ -364,25 +535,29 @@ func setup_alchemy_module():
 
 	# 连接数量选择按钮
 	if count_1_button:
-		count_1_button.pressed.connect(func(): _on_craft_count_changed(1))
+		count_1_button.pressed.connect(_on_craft_count_min)
 	if count_10_button:
-		count_10_button.pressed.connect(func(): _on_craft_count_changed(10))
+		count_10_button.pressed.connect(func(): _on_craft_count_delta(-10))
 	if count_100_button:
-		count_100_button.pressed.connect(func(): _on_craft_count_changed(100))
+		count_100_button.pressed.connect(func(): _on_craft_count_delta(-1))
 	if count_max_button:
-		count_max_button.pressed.connect(_on_craft_count_max)
+		count_max_button.pressed.connect(func(): _on_craft_count_delta(1))
+	if count_plus_10_button:
+		count_plus_10_button.pressed.connect(func(): _on_craft_count_delta(10))
+	if count_final_max_button:
+		count_final_max_button.pressed.connect(_on_craft_count_max)
 	
 	# 连接信号
 	alchemy_module.log_message.connect(_on_alchemy_log)
-	alchemy_module.back_to_dongfu_requested.connect(_on_back_to_dongfu_requested)
+	alchemy_module.back_to_dongfu_requested.connect(_on_back_to_region_requested)
 	
 	# 连接返回按钮
 	if alchemy_back_button:
-		alchemy_back_button.pressed.connect(_on_back_to_dongfu_requested)
+		alchemy_back_button.pressed.connect(_on_back_to_region_requested)
 
-func _on_back_to_dongfu_requested():
-	"""处理返回洞府请求"""
-	show_dongfu_tab()
+func _on_back_to_region_requested():
+	"""处理返回地区请求"""
+	show_region_tab()
 
 func setup_settings_module():
 	# 创建设置模块
@@ -394,9 +569,21 @@ func setup_settings_module():
 	settings_module.settings_panel = settings_panel
 	settings_module.save_button = save_button
 	settings_module.logout_button = logout_button
-	settings_module.nickname_input = nickname_input
-	settings_module.confirm_nickname_button = confirm_nickname_button
 	settings_module.rank_button = rank_button
+	settings_module.mall_button = mall_button
+	settings_module.guide_button = guide_button
+	settings_module.mailbox_button = mailbox_button
+	settings_module.redeem_confirm_button = redeem_confirm_button
+	settings_module.redeem_code_input = redeem_code_input
+	settings_module.fps_30_button = fps_30_button
+	settings_module.fps_60_button = fps_60_button
+	settings_module.fps_120_button = fps_120_button
+	settings_module.fps_144_button = fps_144_button
+	settings_module.fps_unlimited_button = fps_unlimited_button
+	settings_module.fps_limit_option_button = fps_limit_option_button
+	settings_module.music_mute_button = music_mute_button
+	settings_module.music_volume_slider = music_volume_slider
+	settings_module.music_volume_value_label = music_volume_value_label
 	settings_module.rank_panel = rank_panel
 	settings_module.rank_list = rank_list
 	settings_module.back_button = back_button
@@ -407,18 +594,165 @@ func setup_settings_module():
 	# 连接信号
 	settings_module.log_message.connect(_on_module_log)
 
-func setup_dongfu_module():
-	# 创建洞府模块
-	dongfu_module = DongfuModule.new()
-	dongfu_module.name = "DongfuModule"
-	add_child(dongfu_module)
+func setup_profile_edit_popup():
+	if profile_edit_popup:
+		return
+	profile_edit_popup = ProfileEditPopup.new()
+	add_child(profile_edit_popup)
+	profile_edit_popup.setup(self)
+	profile_edit_popup.nickname_submit_requested.connect(_on_profile_nickname_submit_requested)
+	profile_edit_popup.avatar_submit_requested.connect(_on_profile_avatar_submit_requested)
+	profile_edit_popup.popup_closed.connect(_on_profile_popup_closed)
+
+	if top_player_info:
+		top_player_info.mouse_filter = Control.MOUSE_FILTER_STOP
+		_set_children_mouse_filter_ignore(top_player_info)
+
+func _set_children_mouse_filter_ignore(node: Node):
+	for child in node.get_children():
+		if child is Control:
+			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_set_children_mouse_filter_ignore(child)
+
+func _on_top_player_info_gui_input(event: InputEvent):
+	if not (event is InputEventMouseButton):
+		return
+	var mb = event as InputEventMouseButton
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	_open_profile_edit_popup()
+	get_viewport().set_input_as_handled()
+
+func _open_profile_edit_popup():
+	if not profile_edit_popup:
+		return
+	var account_info := {}
+	var game_manager = get_node_or_null("/root/GameManager")
+	if game_manager:
+		account_info = game_manager.get_account_info()
+	var nickname = str(account_info.get("nickname", "修仙者"))
+	var avatar_id = str(account_info.get("avatar_id", AccountConfig.get_default_avatar_id()))
+	profile_edit_popup.show_popup(nickname, avatar_id)
+
+func _on_profile_popup_closed():
+	pass
+
+func _on_profile_nickname_submit_requested(new_nickname: String):
+	if not api:
+		_on_module_log("接口未初始化，请稍后再试")
+		return
+	if new_nickname.is_empty():
+		_on_module_log("昵称不能为空")
+		return
+	if new_nickname.length() < 4 or new_nickname.length() > 10:
+		_on_module_log("昵称长度应在4-10位之间")
+		return
+	if " " in new_nickname:
+		_on_module_log("昵称不能包含空格")
+		return
+	if new_nickname.is_valid_int():
+		_on_module_log("昵称不能全是数字")
+		return
+
+	var result = await api.change_nickname(new_nickname)
+	if result.get("success", false):
+		_on_module_log(_get_profile_nickname_result_text(result, "昵称修改成功"))
+		var game_manager = get_node_or_null("/root/GameManager")
+		if game_manager:
+			var account_info = game_manager.get_account_info()
+			account_info["nickname"] = new_nickname
+			game_manager.set_account_info(account_info)
+		update_account_ui()
+	else:
+		var err_msg = _get_profile_nickname_result_text(result, "昵称修改失败")
+		if not err_msg.is_empty():
+			_on_module_log(err_msg)
+
+func _on_profile_avatar_submit_requested(avatar_id: String):
+	if not api:
+		_on_module_log("接口未初始化，请稍后再试")
+		return
+	if avatar_id.is_empty():
+		_on_module_log("请选择头像")
+		return
+
+	var result = await api.change_avatar(avatar_id)
+	if result.get("success", false):
+		_on_module_log(_get_profile_avatar_result_text(result, "头像更换成功"))
+		var game_manager = get_node_or_null("/root/GameManager")
+		if game_manager:
+			var account_info = game_manager.get_account_info()
+			account_info["avatar_id"] = avatar_id
+			game_manager.set_account_info(account_info)
+		update_account_ui()
+	else:
+		var err_msg = _get_profile_avatar_result_text(result, "头像更换失败")
+		if not err_msg.is_empty():
+			_on_module_log(err_msg)
+
+func _get_profile_nickname_result_text(result: Dictionary, fallback: String = "昵称修改失败") -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	match reason_code:
+		"ACCOUNT_NICKNAME_CHANGE_SUCCEEDED":
+			return "昵称修改成功"
+		"ACCOUNT_NICKNAME_EMPTY":
+			return "昵称不能为空"
+		"ACCOUNT_NICKNAME_LENGTH_INVALID":
+			return "昵称长度应在4-10位之间"
+		"ACCOUNT_NICKNAME_CONTAINS_SPACE":
+			return "昵称不能包含空格"
+		"ACCOUNT_NICKNAME_INVALID_CHARACTER":
+			return "昵称包含非法字符"
+		"ACCOUNT_NICKNAME_ALL_DIGITS":
+			return "昵称不能全是数字"
+		"ACCOUNT_NICKNAME_SENSITIVE":
+			return "昵称包含敏感词汇"
+		"ACCOUNT_NICKNAME_PLAYER_NOT_FOUND":
+			return "角色数据异常，请重新登录后再试"
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
+
+func _get_profile_avatar_result_text(result: Dictionary, fallback: String = "头像更换失败") -> String:
+	var reason_code = str(result.get("reason_code", ""))
+	match reason_code:
+		"ACCOUNT_AVATAR_CHANGE_SUCCEEDED":
+			return "头像更换成功"
+		"ACCOUNT_AVATAR_PLAYER_NOT_FOUND":
+			return "角色数据异常，请重新登录后再试"
+		_:
+			return api.network_manager.get_api_error_text_for_ui(result, fallback)
+
+func setup_region_module():
+	# 创建地区模块
+	region_module = DongfuModule.new()
+	region_module.name = "RegionModule"
+	add_child(region_module)
 	
 	# 设置UI节点引用
-	dongfu_module.dongfu_panel = dongfu_panel
-	dongfu_module.alchemy_room_button = alchemy_room_button
+	region_module.region_panel = region_panel
+	region_module.alchemy_workshop_button = alchemy_workshop_button
+	region_module.herb_mountain_button = herb_mountain_button
 	
 	# 初始化模块
-	dongfu_module.initialize(self, player, alchemy_module)
+	region_module.initialize(self, player, alchemy_module)
+	region_module.log_message.connect(_on_module_log)
+	region_module.herb_gather_requested.connect(_on_herb_gather_requested)
+
+func setup_herb_gather_module():
+	herb_gather_module = HerbGatherModule.new()
+	herb_gather_module.name = "HerbGatherModule"
+	add_child(herb_gather_module)
+
+	herb_gather_module.herb_gather_panel = herb_gather_panel
+	herb_gather_module.point_list = herb_gather_point_list
+	herb_gather_module.back_button = herb_gather_back_button
+	herb_gather_module.spell_system = spell_system
+	herb_gather_module.initialize(self, player, inventory, item_data_ref, api)
+	herb_gather_module.log_message.connect(_on_module_log)
+	herb_gather_module.back_to_region_requested.connect(_on_back_to_region_requested)
+
+func _on_herb_gather_requested():
+	show_herb_gather_panel()
 
 func setup_chuna_module():
 	# 创建储纳模块
@@ -468,6 +802,11 @@ func setup_neishi_module():
 	cultivation_module.cultivation_panel = cultivation_panel
 	cultivation_module.cultivate_button = cultivate_button
 	cultivation_module.breakthrough_button = breakthrough_button
+	cultivation_module.breakthrough_material_labels = [
+		breakthrough_material_label_1,
+		breakthrough_material_label_2,
+		breakthrough_material_label_3
+	]
 	
 	# 设置气血/灵气条
 	cultivation_module.health_bar = health_bar
@@ -638,6 +977,8 @@ func set_player(player_node: Node):
 	# 初始化设置模块的玩家引用
 	if settings_module:
 		settings_module.player = player
+	if herb_gather_module:
+		herb_gather_module.player = player
 
 func set_spell_system(spell_system_node: Node):
 	spell_system = spell_system_node
@@ -648,6 +989,10 @@ func set_spell_system(spell_system_node: Node):
 	if spell_module:
 		spell_module.spell_system = spell_system
 		spell_module.spell_data = spell_data_ref
+	if alchemy_module:
+		alchemy_module.spell_system = spell_system
+	if herb_gather_module:
+		herb_gather_module.spell_system = spell_system
 	# 初始化储纳模块的术法系统引用
 	if chuna_module:
 		chuna_module.spell_system = spell_system
@@ -676,6 +1021,8 @@ func set_item_data(item_data_node: Node):
 		chuna_module.item_data = item_data_node
 	if cultivation_module:
 		cultivation_module.item_data = item_data_node
+	if herb_gather_module:
+		herb_gather_module.item_data = item_data_node
 
 func _on_spell_used(spell_id: String):
 	# 通知术法模块更新使用次数
@@ -693,6 +1040,8 @@ func set_inventory(inventory_node: Node):
 		lianli_module.inventory = inventory
 	if alchemy_module:
 		alchemy_module.inventory = inventory
+	if herb_gather_module:
+		herb_gather_module.inventory = inventory
 
 func refresh_all_player_data():
 	"""
@@ -770,7 +1119,7 @@ func _on_item_added(item_id: String, count: int):
 	if _silent_item_added_log_depth > 0:
 		return
 	if log_manager:
-		log_manager.add_system_log("获得物品: " + item_data_ref.get_item_name(item_id) + " x" + str(count))
+		log_manager.add_system_log("获得物品: " + item_data_ref.get_item_name(item_id) + " x" + UIUtils.format_display_number(float(count)))
 
 func begin_silent_item_added_logs():
 	_silent_item_added_log_depth += 1
@@ -781,8 +1130,10 @@ func end_silent_item_added_logs():
 func show_neishi_tab():
 	neishi_panel.visible = true
 	chuna_panel.visible = false
-	if dongfu_panel:
-		dongfu_panel.visible = false
+	if region_panel:
+		region_panel.visible = false
+	if herb_gather_panel:
+		herb_gather_panel.visible = false
 	lianli_panel.visible = false
 	settings_panel.visible = false
 	# 隐藏炼丹房
@@ -793,8 +1144,8 @@ func show_neishi_tab():
 		chuna_module.hide_tab()
 	tab_neishi.disabled = true
 	tab_chuna.disabled = false
-	if tab_dongfu:
-		tab_dongfu.disabled = false
+	if tab_region:
+		tab_region.disabled = false
 	tab_lianli.disabled = false
 	tab_settings.disabled = false
 
@@ -805,8 +1156,10 @@ func show_neishi_tab():
 func show_chuna_tab():
 	neishi_panel.visible = false
 	chuna_panel.visible = true
-	if dongfu_panel:
-		dongfu_panel.visible = false
+	if region_panel:
+		region_panel.visible = false
+	if herb_gather_panel:
+		herb_gather_panel.visible = false
 	lianli_panel.visible = false
 	settings_panel.visible = false
 	# 隐藏炼丹房
@@ -817,39 +1170,43 @@ func show_chuna_tab():
 		chuna_module.show_tab()
 	tab_neishi.disabled = false
 	tab_chuna.disabled = true
-	if tab_dongfu:
-		tab_dongfu.disabled = false
+	if tab_region:
+		tab_region.disabled = false
 	tab_lianli.disabled = false
 	tab_settings.disabled = false
 	# 确保面板可见
 	if item_detail_panel:
 		item_detail_panel.visible = true
 
-func show_dongfu_tab():
+func show_region_tab():
 	neishi_panel.visible = false
 	chuna_panel.visible = false
-	if dongfu_panel:
-		dongfu_panel.visible = true
+	if region_panel:
+		region_panel.visible = true
+	if herb_gather_panel:
+		herb_gather_panel.visible = false
 	lianli_panel.visible = false
 	settings_panel.visible = false
 	# 隐藏炼丹房
 	if alchemy_module:
 		alchemy_module.hide_alchemy_room()
-	# 显示洞府Tab
-	if dongfu_module:
-		dongfu_module.show_tab()
+	# 显示地区Tab
+	if region_module:
+		region_module.show_tab()
 	tab_neishi.disabled = false
 	tab_chuna.disabled = false
-	if tab_dongfu:
-		tab_dongfu.disabled = true
+	if tab_region:
+		tab_region.disabled = true
 	tab_lianli.disabled = false
 	tab_settings.disabled = false
 
 func show_lianli_tab():
 	neishi_panel.visible = false
 	chuna_panel.visible = false
-	if dongfu_panel:
-		dongfu_panel.visible = false
+	if region_panel:
+		region_panel.visible = false
+	if herb_gather_panel:
+		herb_gather_panel.visible = false
 	lianli_panel.visible = true
 	settings_panel.visible = false
 	# 隐藏炼丹房
@@ -857,8 +1214,8 @@ func show_lianli_tab():
 		alchemy_module.hide_alchemy_room()
 	tab_neishi.disabled = false
 	tab_chuna.disabled = false
-	if tab_dongfu:
-		tab_dongfu.disabled = false
+	if tab_region:
+		tab_region.disabled = false
 	tab_lianli.disabled = true
 	tab_settings.disabled = false
 
@@ -881,8 +1238,10 @@ func show_lianli_tab():
 func show_settings_tab():
 	neishi_panel.visible = false
 	chuna_panel.visible = false
-	if dongfu_panel:
-		dongfu_panel.visible = false
+	if region_panel:
+		region_panel.visible = false
+	if herb_gather_panel:
+		herb_gather_panel.visible = false
 	lianli_panel.visible = false
 	settings_panel.visible = true
 	# 隐藏炼丹房
@@ -893,10 +1252,30 @@ func show_settings_tab():
 		settings_module.show_tab()
 	tab_neishi.disabled = false
 	tab_chuna.disabled = false
-	if tab_dongfu:
-		tab_dongfu.disabled = false
+	if tab_region:
+		tab_region.disabled = false
 	tab_lianli.disabled = false
 	tab_settings.disabled = true
+
+func show_herb_gather_panel():
+	neishi_panel.visible = false
+	chuna_panel.visible = false
+	if region_panel:
+		region_panel.visible = false
+	if herb_gather_panel:
+		herb_gather_panel.visible = true
+	lianli_panel.visible = false
+	settings_panel.visible = false
+	if alchemy_module:
+		alchemy_module.hide_alchemy_room()
+	tab_neishi.disabled = false
+	tab_chuna.disabled = false
+	if tab_region:
+		tab_region.disabled = true
+	tab_lianli.disabled = false
+	tab_settings.disabled = false
+	if herb_gather_module:
+		herb_gather_module.show_tab()
 
 func _on_tab_neishi_pressed():
 	show_neishi_tab()
@@ -904,8 +1283,8 @@ func _on_tab_neishi_pressed():
 func _on_tab_chuna_pressed():
 	show_chuna_tab()
 
-func _on_tab_dongfu_pressed():
-	show_dongfu_tab()
+func _on_tab_region_pressed():
+	show_region_tab()
 
 func _on_tab_lianli_pressed():
 	show_lianli_tab()
@@ -959,10 +1338,10 @@ func _init_lianli_area_buttons():
 		normal_area_ids = lianli_area_data.get_normal_area_ids()
 		daily_area_ids = lianli_area_data.get_daily_area_ids()
 	else:
-		normal_area_ids = ["qi_refining_outer", "qi_refining_inner", "foundation_outer", "foundation_inner"]
+		normal_area_ids = ["area_1", "area_2", "area_3", "area_4"]
 		daily_area_ids = ["foundation_herb_cave"]
 	
-	var tower_area_ids = ["endless_tower"]
+	var tower_area_ids = ["sourth_endless_tower"]
 
 	lianli_area_ids = normal_area_ids + daily_area_ids + tower_area_ids
 	
@@ -997,7 +1376,7 @@ func _init_lianli_area_buttons():
 		if current_index < lianli_area_buttons.size():
 			var button = lianli_area_buttons[current_index]
 			var area_name = ""
-			if area_id == "endless_tower":
+			if area_id == "sourth_endless_tower":
 				area_name = "无尽塔 (第%d层)" % tower_floor
 			else:
 				area_name = lianli_area_data.get_area_name(area_id) if lianli_area_data else area_id
@@ -1009,7 +1388,7 @@ func _init_lianli_area_buttons():
 			for conn in connections:
 				button.pressed.disconnect(conn.callable)
 			if lianli_module:
-				if area_id == "endless_tower":
+				if area_id == "sourth_endless_tower":
 					button.pressed.connect(lianli_module.on_endless_tower_pressed)
 				else:
 					button.pressed.connect(lianli_module.on_lianli_area_pressed.bind(area_id))
@@ -1081,7 +1460,10 @@ func has_pending_test_tasks() -> bool:
 	var alchemy_pending := false
 	if alchemy_module and is_instance_valid(alchemy_module):
 		alchemy_pending = bool(alchemy_module.has_pending_test_tasks())
-	return _pending_refresh_all_player_data_count > 0 or alchemy_pending
+	var chuna_pending := false
+	if chuna_module and is_instance_valid(chuna_module) and chuna_module.has_method("has_pending_test_tasks"):
+		chuna_pending = bool(chuna_module.has_pending_test_tasks())
+	return _pending_refresh_all_player_data_count > 0 or alchemy_pending or chuna_pending
 
 func await_pending_test_tasks(max_frames: int = 120) -> void:
 	var remaining_frames = max_frames
@@ -1096,7 +1478,7 @@ func update_lianli_area_buttons_display():
 
 	var normal_area_ids = lianli_area_data.get_normal_area_ids()
 	var daily_area_ids = lianli_area_data.get_daily_area_ids()
-	var tower_area_ids = ["endless_tower"]
+	var tower_area_ids = ["sourth_endless_tower"]
 
 	var current_index = 0
 
@@ -1140,12 +1522,18 @@ func _on_craft_count_changed(count: int):
 	if alchemy_module:
 		alchemy_module.set_craft_count(count)
 
+func _on_craft_count_min():
+	if alchemy_module:
+		alchemy_module.set_craft_count_to_min()
+
+func _on_craft_count_delta(delta: int):
+	if alchemy_module:
+		alchemy_module.adjust_craft_count(delta)
+
 # 炼制数量Max
 func _on_craft_count_max():
 	if alchemy_module:
-		var max_count = alchemy_module.get_max_craft_count()
-		max_count = maxi(max_count, 1)  # 至少设置1个
-		alchemy_module.set_craft_count(max_count)
+		alchemy_module.set_craft_count_to_max()
 
 func update_ui():
 	if not player:
@@ -1216,7 +1604,6 @@ func update_account_ui():
 	# 更新头像显示
 	var avatar_id = account_info.get("avatar_id", "abstract")
 	if avatar_texture:
-		const AccountConfig = preload("res://scripts/core/account/AccountConfig.gd")
 		var avatar_path = AccountConfig.get_avatar_path(avatar_id)
 		var texture = load(avatar_path)
 		if texture:
@@ -1260,9 +1647,9 @@ func claim_offline_reward():
 					log_manager.add_system_log("离线时长: " + str(hours) + "小时" + str(minutes) + "分钟")
 					log_manager.add_system_log("获得离线奖励：")
 					if reward.has("spirit_energy"):
-						log_manager.add_system_log("  - 灵气: +" + str(int(reward.spirit_energy)))
+						log_manager.add_system_log("  - 灵气: +" + UIUtils.format_display_number(float(reward.spirit_energy)))
 					if reward.has("spirit_stones"):
-						log_manager.add_system_log("  - 灵石: +" + str(int(reward.spirit_stones)))
+						log_manager.add_system_log("  - 灵石: +" + UIUtils.format_display_number(float(reward.spirit_stones)))
 					log_manager.add_system_log("===================================")
 				# 刷新UI
 				update_ui()

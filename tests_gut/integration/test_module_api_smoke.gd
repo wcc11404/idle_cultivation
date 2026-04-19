@@ -40,10 +40,25 @@ func test_module_api_smoke_flow():
 
 	await harness.apply_preset_and_sync("lianli_ready")
 	var lianli_module = harness.game_ui.lianli_module
-	var sim_result = await harness.client.lianli_simulate("qi_refining_outer")
+	var sim_result = await harness.client.lianli_simulate("area_1")
 	assert_true(sim_result.get("success", false), "历练 smoke 应先拿到模拟结果")
-	lianli_module._start_timeline_from_simulation(sim_result, "qi_refining_outer")
+	lianli_module._start_timeline_from_simulation(sim_result, "area_1")
 	assert_true(harness.get_game_manager().get_lianli_system().is_in_lianli, "历练 smoke 应进入战斗")
+
+	await harness.apply_preset_and_sync("full_unlock")
+	var herb_module = harness.game_ui.herb_gather_module
+	harness.game_ui.show_herb_gather_panel()
+	await herb_module._refresh_points()
+	await herb_module._on_start_pressed("point_low_yield")
+	assert_true(herb_module._is_gathering, "采集 smoke 应进入采集状态")
+	await harness.client.test_post("/test/set_runtime_state", {
+		"is_gathering": true,
+		"current_herb_point_id": "point_low_yield",
+		"herb_elapsed_seconds": 10
+	})
+	await herb_module._do_report_once()
+	await herb_module._on_stop_pressed()
+	assert_false(herb_module._is_gathering, "采集 smoke 停止后应退出采集状态")
 
 	var settings_module = harness.game_ui.settings_module
 	await settings_module._load_rank_data()

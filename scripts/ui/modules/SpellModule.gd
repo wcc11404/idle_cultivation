@@ -1,6 +1,8 @@
 class_name SpellModule extends Node
 
 const ActionLockManager = preload("res://scripts/utils/flow/ActionLockManager.gd")
+const SpellThumbnailTemplate = preload("res://scripts/ui/common/SpellThumbnailTemplate.gd")
+const ActionButtonTemplate = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
 
 signal spell_equipped(spell_id: String)
 signal spell_unequipped(spell_id: String)
@@ -27,6 +29,7 @@ const MULTIPLIER_LABELS = ["x10", "x100", "Max"]
 var _card_pool: Array[Control] = []
 var _max_pool_size: int = 30
 var _signals_connected: bool = false
+var _scroll_vertical_step: float = 20.0
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
@@ -119,7 +122,17 @@ func initialize(ui: Node, _player_node: Node, spell_sys: Node, spell_dt: Node, g
 	spell_system = spell_sys
 	spell_data = spell_dt
 	api = game_api
+	_sync_scroll_step_with_log()
 	_setup_signals()
+
+func _sync_scroll_step_with_log():
+	if not game_ui:
+		return
+	var rich_text: RichTextLabel = game_ui.get("log_text")
+	if rich_text:
+		var log_font_size = int(rich_text.get_theme_font_size("normal_font_size"))
+		if log_font_size > 0:
+			_scroll_vertical_step = float(log_font_size)
 
 func _setup_signals():
 	if _signals_connected:
@@ -146,8 +159,8 @@ func cleanup():
 func show_tab():
 	if spell_panel:
 		spell_panel.visible = true
+	await _refresh_spell_from_server()
 	update_spell_ui()
-	call_deferred("_refresh_spell_from_server")
 
 func hide_tab():
 	if spell_panel:
@@ -197,6 +210,7 @@ func update_spell_ui():
 	
 	scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll_container.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	scroll_container.scroll_vertical_custom_step = _scroll_vertical_step
 	
 	var main_vbox = scroll_container.get_node_or_null("MainVBox")
 	if not main_vbox:
@@ -273,7 +287,9 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 	var vbox = card.get_child(0) as VBoxContainer
 	var name_label = vbox.get_node_or_null("NameLabel") as Label
 	var status_label = vbox.get_node_or_null("StatusLabel") as Label
-	var button_container = vbox.get_child(2) as HBoxContainer
+	var button_container = vbox.get_node_or_null("ButtonContainer") as HBoxContainer
+	if not button_container:
+		return card
 	var view_btn = button_container.get_node_or_null("ViewButton") as Button
 	var equip_btn = button_container.get_node_or_null("EquipButton") as Button
 	
@@ -294,11 +310,12 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 		else:
 			status_label.text = "Lv." + str(level)
 			if is_equipped:
-				status_label.add_theme_color_override("font_color", Color.GREEN)
+				status_label.add_theme_color_override("font_color", Color(0.12, 0.52, 0.2, 1.0))
 			else:
 				status_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))
 	
 	if view_btn:
+		ActionButtonTemplate.apply_spell_view_brown(view_btn)
 		for conn in view_btn.pressed.get_connections():
 			view_btn.pressed.disconnect(conn.callable)
 		view_btn.pressed.connect(_on_view_button_pressed.bind(spell_id))
@@ -317,23 +334,21 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 				else:
 					equip_btn.text = "装备"
 				equip_btn.disabled = false
+				ActionButtonTemplate.apply_cultivation_yellow(equip_btn)
 				equip_btn.pressed.connect(_on_equip_button_pressed.bind(spell_id))
 			else:
 				equip_btn.text = "装备"
 				equip_btn.disabled = true
+				ActionButtonTemplate.apply_cultivation_yellow(equip_btn)
 	
 	return card
 
 func _create_card_template() -> Control:
 	var card = PanelContainer.new()
 	card.custom_minimum_size = Vector2(130, 160)
-	
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.95, 0.95, 0.95, 0.9)
-	style.set_corner_radius_all(8)
-	style.set_border_width_all(2)
-	style.border_color = Color(0.7, 0.7, 0.7, 0.8)
-	card.add_theme_stylebox_override("panel", style)
+	SpellThumbnailTemplate.apply_to_card(card, {
+		"bg_color": SpellThumbnailTemplate.DEFAULT_BG_COLOR
+	})
 	
 	var vbox = VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -354,6 +369,7 @@ func _create_card_template() -> Control:
 	vbox.add_child(status_label)
 	
 	var button_container = HBoxContainer.new()
+	button_container.name = "ButtonContainer"
 	button_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	button_container.add_theme_constant_override("separation", 5)
 	vbox.add_child(button_container)
@@ -361,10 +377,14 @@ func _create_card_template() -> Control:
 	var view_button = Button.new()
 	view_button.name = "ViewButton"
 	view_button.text = "查看"
+	view_button.custom_minimum_size = Vector2(48, 30)
+	view_button.add_theme_font_size_override("font_size", 14)
 	button_container.add_child(view_button)
 	
 	var equip_button = Button.new()
 	equip_button.name = "EquipButton"
+	equip_button.custom_minimum_size = Vector2(48, 30)
+	equip_button.add_theme_font_size_override("font_size", 14)
 	button_container.add_child(equip_button)
 	
 	return card
@@ -396,8 +416,12 @@ func _show_spell_detail(spell_id: String):
 func _create_spell_detail_popup():
 	spell_detail_popup = SpellDetailPopup.new()
 	spell_detail_popup.name = "SpellDetailPopup"
-	add_child(spell_detail_popup)
-	spell_detail_popup.setup(self)
+	if game_ui and game_ui is Control:
+		game_ui.add_child(spell_detail_popup)
+		spell_detail_popup.setup(game_ui)
+	else:
+		add_child(spell_detail_popup)
+		spell_detail_popup.setup(self)
 	spell_detail_popup.close_requested.connect(_on_spell_detail_close_pressed)
 	spell_detail_popup.upgrade_requested.connect(_on_spell_upgrade_pressed)
 	spell_detail_popup.charge_requested.connect(_on_spell_charge_pressed)

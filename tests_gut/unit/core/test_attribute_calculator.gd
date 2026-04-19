@@ -50,7 +50,7 @@ func test_format_attack_defense_small():
 
 func test_format_attack_defense_large():
 	var result = AttributeCalculator.format_attack_defense(1500.7)
-	assert_eq(result, "1501", ">1000 应保留整数")
+	assert_eq(result, "1.5K", ">=1000 应转K/M并保留一位小数去尾0")
 
 func test_format_damage_small():
 	var result = AttributeCalculator.format_damage(999.5)
@@ -58,7 +58,7 @@ func test_format_damage_small():
 
 func test_format_damage_large():
 	var result = AttributeCalculator.format_damage(1000.5)
-	assert_eq(result, "1001", ">1000 伤害保留整数")
+	assert_eq(result, "1K", ">=1000 伤害应转K/M并保留一位小数去尾0")
 
 func test_format_for_save_trailing_zeros():
 	var result = AttributeCalculator.format_for_save(50.5000)
@@ -78,23 +78,23 @@ func test_format_for_save_small_decimal():
 
 func test_calculate_damage_basic():
 	var damage = AttributeCalculator.calculate_damage(100.0, 30.0)
-	assert_eq(damage, 70.0, "基础伤害 = 攻击 - 防御")
+	assert_true(abs(damage - 76.9230769) < 0.001, "应按减伤公式计算基础伤害")
 
 func test_calculate_damage_with_percent():
 	var damage = AttributeCalculator.calculate_damage(100.0, 30.0, 1.5)
-	assert_eq(damage, 105.0, "150%伤害 = (100-30) * 1.5")
+	assert_true(abs(damage - 115.3846154) < 0.001, "150%伤害应按减伤后结果放大")
 
 func test_calculate_damage_minimum():
 	var damage = AttributeCalculator.calculate_damage(10.0, 50.0)
-	assert_eq(damage, 1.0, "最小伤害应为1")
+	assert_true(abs(damage - 6.6666667) < 0.001, "应按减伤公式计算伤害")
 
 func test_calculate_damage_zero_defense():
 	var damage = AttributeCalculator.calculate_damage(100.0, 0.0)
-	assert_eq(damage, 100.0, "零防御时全额伤害")
+	assert_eq(damage, 100.0, "零防御时应为全额伤害")
 
 func test_calculate_damage_high_defense():
 	var damage = AttributeCalculator.calculate_damage(50.0, 100.0)
-	assert_eq(damage, 1.0, "防御高于攻击时最小伤害1")
+	assert_true(abs(damage - 25.0) < 0.001, "高防御场景仍应按减伤公式计算")
 
 func test_calculate_damage_with_small_percent():
 	var damage = AttributeCalculator.calculate_damage(100.0, 0.0, 0.5)

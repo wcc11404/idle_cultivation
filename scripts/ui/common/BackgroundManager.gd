@@ -1,7 +1,7 @@
 extends Control
 
-# 设置背景颜色为 RGB (239, 229, 205)
-var background_color: Color = Color(239.0/255.0, 229.0/255.0, 205.0/255.0)
+# 设置背景颜色为指定暖米色（#eadab9）
+var background_color: Color = Color(234.0/255.0, 218.0/255.0, 185.0/255.0)
 
 var background_rect: ColorRect = null
 

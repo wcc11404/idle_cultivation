@@ -26,6 +26,12 @@
 - `GET /game/dungeon/foundation_herb_cave`
 - `GET /game/tower/highest_floor`
 
+## 区域 ID 约定（当前硬编码）
+
+- 普通区：`area_1`、`area_2`、`area_3`、`area_4`
+- 每日区：`foundation_herb_cave`
+- 无尽塔：`sourth_endless_tower`
+
 ## 功能触发流转
 
 ### 1) 进入历练页
@@ -55,7 +61,10 @@
 
 ### 4) 结算（finish）
 
-1. 调 `lianli/finish(speed, index?)`。
+1. 调 `lianli/finish(speed, index?)`，`index` 语义如下：
+   - `null`：完整结算（请求体省略 index）。
+   - `-1`：首个战斗事件前主动退出，仅退出不结算。
+   - `>=0`：按已播放事件做部分结算。
 2. 成功：
    - 根据返回判断是否已完整结算。
    - 进入等待下一场或允许继续/退出。
@@ -67,6 +76,7 @@
 
 1. 连战开启时，等待计时后自动请求下一次 `simulate`。
 2. 点击退出时中断时间轴并清理本地历练态。
+3. 若在首个事件前退出，模块会上传 `index=-1`，避免被服务端误判为“过早完整结算”。
 
 ## reason_code 文案策略
 

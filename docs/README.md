@@ -28,6 +28,7 @@
 - [炼丹](./02-modules/05-alchemy.md)
 - [历练](./02-modules/06-lianli.md)
 - [设置与通用提示](./02-modules/07-settings-common.md)
+- [百草山采集](./02-modules/08-herb-gathering.md)
 
 ## 测试入口
 
@@ -36,3 +37,7 @@
 - 测试账号：`test / test123`
 
 详见：[客户端 GUT API 化测试说明](./03-testing/GUT_API_Testing.md)
+
+## UI 模板索引
+
+- [UI 模板索引（TabBar / 展示面板 / 术法缩略卡 / 弹窗）](./04-maintenance/UI_Templates_Index.md)

@@ -1,7 +1,9 @@
 class_name SettingsModule extends Node
 
-const RANK_BACK_FONT_SIZE := 20
-const RANK_BACK_TEXT_COLOR := Color(0.25, 0.22, 0.18, 1.0)
+const ActionButtonTemplate = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
+const SETTINGS_SAVE_PATH := "user://settings.cfg"
+const DEFAULT_FPS_LIMIT := 60
+const DEFAULT_MUSIC_VOLUME := 0.8
 
 signal save_requested
 signal load_requested
@@ -14,34 +16,27 @@ var api: Node = null
 var settings_panel: Control = null
 var save_button: Button = null
 var logout_button: Button = null
-var nickname_input: LineEdit = null
-var confirm_nickname_button: Button = null
 var rank_button: Button = null
+var mall_button: Button = null
+var guide_button: Button = null
+var mailbox_button: Button = null
+var redeem_confirm_button: Button = null
+var redeem_code_input: LineEdit = null
+var fps_30_button: Button = null
+var fps_60_button: Button = null
+var fps_120_button: Button = null
+var fps_144_button: Button = null
+var fps_unlimited_button: Button = null
+var fps_limit_option_button: OptionButton = null
+var music_mute_button: Button = null
+var music_volume_slider: HSlider = null
+var music_volume_value_label: Label = null
 var rank_panel: Control = null
 var rank_list: VBoxContainer = null
 var back_button: Button = null
-
-func _get_nickname_result_text(result: Dictionary, fallback: String = "昵称修改失败") -> String:
-	var reason_code = str(result.get("reason_code", ""))
-	match reason_code:
-		"ACCOUNT_NICKNAME_CHANGE_SUCCEEDED":
-			return "昵称修改成功"
-		"ACCOUNT_NICKNAME_EMPTY":
-			return "昵称不能为空"
-		"ACCOUNT_NICKNAME_LENGTH_INVALID":
-			return "昵称长度应在4-10位之间"
-		"ACCOUNT_NICKNAME_CONTAINS_SPACE":
-			return "昵称不能包含空格"
-		"ACCOUNT_NICKNAME_INVALID_CHARACTER":
-			return "昵称包含非法字符"
-		"ACCOUNT_NICKNAME_ALL_DIGITS":
-			return "昵称不能全是数字"
-		"ACCOUNT_NICKNAME_SENSITIVE":
-			return "昵称包含敏感词汇"
-		"ACCOUNT_NICKNAME_PLAYER_NOT_FOUND":
-			return "角色数据异常，请重新登录后再试"
-		_:
-			return api.network_manager.get_api_error_text_for_ui(result, fallback)
+var _music_bus_name: String = "Master"
+var _is_music_muted: bool = false
+var _last_music_linear_volume: float = DEFAULT_MUSIC_VOLUME
 
 func _get_logout_result_text(result: Dictionary, fallback: String = "登出失败") -> String:
 	var reason_code = str(result.get("reason_code", ""))
@@ -55,6 +50,12 @@ func initialize(ui: Node, player_node: Node, game_api: Node = null):
 	game_ui = ui
 	player = player_node
 	api = game_api
+	_load_local_settings()
+	_setup_frame_limit_options()
+	_setup_fps_preset_styles()
+	_refresh_fps_preset_visual(int(Engine.max_fps))
+	_apply_aux_button_templates()
+	_sync_audio_controls_from_state()
 	_setup_signals()
 	_style_rank_back_button()
 	if save_button:
@@ -63,38 +64,221 @@ func initialize(ui: Node, player_node: Node, game_api: Node = null):
 func _style_rank_back_button():
 	if not back_button:
 		return
-	back_button.custom_minimum_size = Vector2(60, 40)
-	back_button.add_theme_font_size_override("font_size", RANK_BACK_FONT_SIZE)
-	back_button.add_theme_color_override("font_color", RANK_BACK_TEXT_COLOR)
-
-	var normal_style = StyleBoxFlat.new()
-	normal_style.set_border_width_all(2)
-	normal_style.set_corner_radius_all(4)
-	normal_style.bg_color = Color(0.82, 0.78, 0.72, 1.0)
-	normal_style.border_color = Color(0.55, 0.50, 0.45, 1.0)
-	back_button.add_theme_stylebox_override("normal", normal_style)
-
-	var hover_style = normal_style.duplicate()
-	hover_style.bg_color = Color(0.75, 0.71, 0.65, 1.0)
-	back_button.add_theme_stylebox_override("hover", hover_style)
-
-	var pressed_style = normal_style.duplicate()
-	pressed_style.bg_color = Color(0.68, 0.64, 0.58, 1.0)
-	back_button.add_theme_stylebox_override("pressed", pressed_style)
-
-	var disabled_style = normal_style.duplicate()
-	disabled_style.bg_color = Color(0.88, 0.85, 0.80, 0.5)
-	back_button.add_theme_stylebox_override("disabled", disabled_style)
+	# 与炼丹房返回按钮保持一致
+	back_button.custom_minimum_size = Vector2(96, 40)
+	ActionButtonTemplate.apply_light_neutral(back_button, back_button.custom_minimum_size, 20)
 
 func _setup_signals():
 	if logout_button:
 		logout_button.pressed.connect(_on_logout_pressed)
-	if confirm_nickname_button:
-		confirm_nickname_button.pressed.connect(_on_confirm_nickname_pressed)
 	if rank_button:
 		rank_button.pressed.connect(_on_rank_pressed)
+	if mall_button:
+		mall_button.pressed.connect(_on_mall_pressed)
 	if back_button:
 		back_button.pressed.connect(_on_back_pressed)
+	if guide_button:
+		guide_button.pressed.connect(_on_guide_pressed)
+	if mailbox_button:
+		mailbox_button.pressed.connect(_on_mailbox_pressed)
+	if redeem_confirm_button:
+		redeem_confirm_button.pressed.connect(_on_redeem_confirm_pressed)
+	if fps_30_button:
+		fps_30_button.pressed.connect(func(): _on_fps_preset_pressed(30))
+	if fps_60_button:
+		fps_60_button.pressed.connect(func(): _on_fps_preset_pressed(60))
+	if fps_120_button:
+		fps_120_button.pressed.connect(func(): _on_fps_preset_pressed(120))
+	if fps_144_button:
+		fps_144_button.pressed.connect(func(): _on_fps_preset_pressed(144))
+	if fps_unlimited_button:
+		fps_unlimited_button.pressed.connect(func(): _on_fps_preset_pressed(0))
+	if fps_limit_option_button:
+		fps_limit_option_button.item_selected.connect(_on_fps_limit_selected)
+	if music_mute_button:
+		music_mute_button.pressed.connect(_on_music_mute_toggled)
+	if music_volume_slider:
+		music_volume_slider.value_changed.connect(_on_music_volume_changed)
+
+func _setup_frame_limit_options():
+	if not fps_limit_option_button:
+		return
+	fps_limit_option_button.clear()
+	fps_limit_option_button.add_item("不限帧率", 0)
+	fps_limit_option_button.add_item("30 FPS", 30)
+	fps_limit_option_button.add_item("60 FPS", 60)
+	fps_limit_option_button.add_item("120 FPS", 120)
+	fps_limit_option_button.add_item("144 FPS", 144)
+
+	var current_limit := int(Engine.max_fps)
+	var target_index := 0
+	for i in range(fps_limit_option_button.item_count):
+		if fps_limit_option_button.get_item_id(i) == DEFAULT_FPS_LIMIT:
+			target_index = i
+			break
+	for i in range(fps_limit_option_button.item_count):
+		if fps_limit_option_button.get_item_id(i) == current_limit:
+			target_index = i
+			break
+	fps_limit_option_button.select(target_index)
+	_refresh_fps_preset_visual(current_limit)
+
+func _setup_fps_preset_styles():
+	var buttons: Array = [fps_30_button, fps_60_button, fps_120_button, fps_144_button, fps_unlimited_button]
+	for btn_variant in buttons:
+		var btn: Button = btn_variant
+		if not btn:
+			continue
+		ActionButtonTemplate.apply_light_neutral(btn, btn.custom_minimum_size, 16)
+
+func _apply_aux_button_templates():
+	if music_mute_button:
+		ActionButtonTemplate.apply_light_neutral(music_mute_button, music_mute_button.custom_minimum_size, 16)
+	if redeem_confirm_button:
+		ActionButtonTemplate.apply_light_neutral(redeem_confirm_button, redeem_confirm_button.custom_minimum_size, 16)
+
+func _refresh_fps_preset_visual(current_limit: int):
+	var mapping := {
+		30: fps_30_button,
+		60: fps_60_button,
+		120: fps_120_button,
+		144: fps_144_button,
+		0: fps_unlimited_button
+	}
+	for key in mapping.keys():
+		var btn: Button = mapping[key]
+		if not btn:
+			continue
+		var is_selected := int(key) == current_limit
+		if is_selected:
+			ActionButtonTemplate.apply_light_neutral_selected(btn, btn.custom_minimum_size, 16)
+		else:
+			ActionButtonTemplate.apply_light_neutral(btn, btn.custom_minimum_size, 16)
+
+func _find_music_bus_name() -> String:
+	if AudioServer.get_bus_index("Music") != -1:
+		return "Music"
+	return "Master"
+
+func _sync_audio_controls_from_state():
+	_music_bus_name = _find_music_bus_name()
+	if music_volume_slider:
+		music_volume_slider.min_value = 0.0
+		music_volume_slider.max_value = 1.0
+		music_volume_slider.step = 0.01
+		music_volume_slider.set_value_no_signal(_last_music_linear_volume)
+	_update_music_volume_label()
+	if music_mute_button:
+		music_mute_button.text = "🔇" if _is_music_muted else "🔊"
+	_apply_music_volume_to_bus()
+
+func _update_music_volume_label():
+	if not music_volume_value_label:
+		return
+	var percent_value := int(round(_last_music_linear_volume * 100.0))
+	music_volume_value_label.text = str(percent_value) + "%"
+
+func _apply_music_volume_to_bus():
+	var bus_index := AudioServer.get_bus_index(_music_bus_name)
+	if bus_index == -1:
+		return
+	if _is_music_muted:
+		AudioServer.set_bus_volume_db(bus_index, -80.0)
+		return
+	var safe_linear: float = max(_last_music_linear_volume, 0.0001)
+	AudioServer.set_bus_volume_db(bus_index, linear_to_db(safe_linear))
+
+func _load_local_settings():
+	var config := ConfigFile.new()
+	var err := config.load(SETTINGS_SAVE_PATH)
+	if err != OK:
+		Engine.max_fps = DEFAULT_FPS_LIMIT
+		_is_music_muted = false
+		_last_music_linear_volume = DEFAULT_MUSIC_VOLUME
+		# 首次启动即写入默认设置，确保本地缓存与 UI 默认值一致
+		_save_local_settings()
+		return
+
+	var needs_save := false
+
+	if config.has_section_key("graphics", "fps_limit"):
+		Engine.max_fps = int(config.get_value("graphics", "fps_limit", DEFAULT_FPS_LIMIT))
+	else:
+		Engine.max_fps = DEFAULT_FPS_LIMIT
+		needs_save = true
+
+	if config.has_section_key("audio", "music_muted"):
+		_is_music_muted = bool(config.get_value("audio", "music_muted", false))
+	else:
+		_is_music_muted = false
+		needs_save = true
+
+	if config.has_section_key("audio", "music_volume"):
+		var raw_volume = float(config.get_value("audio", "music_volume", DEFAULT_MUSIC_VOLUME))
+		var clamped_volume = clampf(raw_volume, 0.0, 1.0)
+		_last_music_linear_volume = clamped_volume
+		if not is_equal_approx(raw_volume, clamped_volume):
+			needs_save = true
+	else:
+		_last_music_linear_volume = DEFAULT_MUSIC_VOLUME
+		needs_save = true
+
+	if needs_save:
+		_save_local_settings()
+
+func _save_local_settings():
+	var config := ConfigFile.new()
+	config.set_value("graphics", "fps_limit", int(Engine.max_fps))
+	config.set_value("audio", "music_muted", _is_music_muted)
+	config.set_value("audio", "music_volume", _last_music_linear_volume)
+	config.save(SETTINGS_SAVE_PATH)
+
+func _on_fps_limit_selected(index: int):
+	if not fps_limit_option_button:
+		return
+	var selected_fps := int(fps_limit_option_button.get_item_id(index))
+	Engine.max_fps = selected_fps
+	_refresh_fps_preset_visual(selected_fps)
+	_save_local_settings()
+
+func _on_fps_preset_pressed(fps_limit: int):
+	Engine.max_fps = fps_limit
+	if fps_limit_option_button:
+		for i in range(fps_limit_option_button.item_count):
+			if fps_limit_option_button.get_item_id(i) == fps_limit:
+				fps_limit_option_button.select(i)
+				break
+	_refresh_fps_preset_visual(fps_limit)
+	_save_local_settings()
+
+func _on_music_mute_toggled():
+	_is_music_muted = not _is_music_muted
+	if music_mute_button:
+		music_mute_button.text = "🔇" if _is_music_muted else "🔊"
+	_apply_music_volume_to_bus()
+	_save_local_settings()
+
+func _on_music_volume_changed(value: float):
+	_last_music_linear_volume = clampf(value, 0.0, 1.0)
+	if _is_music_muted and _last_music_linear_volume > 0.0:
+		_is_music_muted = false
+		if music_mute_button:
+			music_mute_button.text = "🔊"
+	_update_music_volume_label()
+	_apply_music_volume_to_bus()
+	_save_local_settings()
+
+func _on_redeem_confirm_pressed():
+	log_message.emit("兑换码功能暂未开放")
+
+func _on_mailbox_pressed():
+	log_message.emit("邮箱功能暂未开放")
+
+func _on_mall_pressed():
+	log_message.emit("商城功能暂未开放")
+
+func _on_guide_pressed():
+	log_message.emit("游戏说明功能暂未开放")
 
 func show_tab():
 	if settings_panel:
@@ -119,43 +303,6 @@ func _on_logout_pressed():
 	if api and api.network_manager and api.network_manager.has_method("clear_token"):
 		api.network_manager.clear_token()
 	get_tree().change_scene_to_file("res://scenes/app/Login.tscn")
-
-func _on_confirm_nickname_pressed():
-	if not nickname_input:
-		return
-	if not api:
-		log_message.emit("API未初始化")
-		return
-
-	var new_nickname = nickname_input.text.strip_edges()
-	if new_nickname.is_empty():
-		log_message.emit("昵称不能为空")
-		return
-	if new_nickname.length() < 4 or new_nickname.length() > 10:
-		log_message.emit("昵称长度应在4-10位之间")
-		return
-	if " " in new_nickname:
-		log_message.emit("昵称不能包含空格")
-		return
-	if new_nickname.is_valid_int():
-		log_message.emit("昵称不能全是数字")
-		return
-
-	var result = await api.change_nickname(new_nickname)
-	if result.get("success", false):
-		log_message.emit(_get_nickname_result_text(result, "昵称修改成功"))
-		var game_manager = get_node_or_null("/root/GameManager")
-		if game_manager:
-			var account_info = game_manager.get_account_info()
-			account_info["nickname"] = new_nickname
-			game_manager.set_account_info(account_info)
-		if game_ui and game_ui.has_method("update_account_ui"):
-			game_ui.update_account_ui()
-		nickname_input.text = ""
-	else:
-		var err_msg = _get_nickname_result_text(result, "昵称修改失败")
-		if not err_msg.is_empty():
-			log_message.emit(err_msg)
 
 func _on_rank_pressed():
 	if not rank_panel:
