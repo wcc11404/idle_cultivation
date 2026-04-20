@@ -38,13 +38,13 @@ func test_breakthrough_related_action_flushes_pending_report_and_formats_success
 
 	await module.on_cultivate_button_pressed()
 	await get_tree().create_timer(4.2).timeout
-	assert_true(module._pending_count >= 3, "应先累计待上报修炼tick")
+	assert_true(module._pending_elapsed_seconds >= 3.0, "应先累计待上报修炼秒数")
 
 	harness.client.clear_call_counts()
 	var settled = await module.flush_pending_and_then(func(): pass)
 	assert_true(settled, "突破相关操作前应能成功同步修炼增量")
 
-	assert_eq(module._pending_count, 0, "突破前应先同步完待上报tick")
+	assert_true(module._pending_elapsed_seconds < 1.0, "突破前应清空已达整秒的待上报累计")
 	assert_eq(harness.client.get_call_count("cultivation_report"), 1, "突破前应调用一次修炼上报")
 	var breakthrough_result = await harness.client.player_breakthrough()
 	assert_true(breakthrough_result.get("success", false), "突破预设应允许真实突破成功")
@@ -69,7 +69,7 @@ func test_cultivation_repeat_start_and_unsynced_stop_have_client_copy():
 	assert_false(start_again.get("success", true), "重复开始修炼应被服务端拒绝")
 	assert_eq(module._resolve_cultivation_result_message(start_again, ""), "已在修炼状态", "重复开始修炼应使用客户端固定文案")
 
-	module._pending_count = 2
+	module._pending_elapsed_seconds = 2.0
 	module._flush_in_flight = true
 	harness.clear_logs()
 	await module._stop_cultivation_internal(false)
@@ -92,11 +92,11 @@ func test_cultivation_time_invalid_logs_once_per_invalid_report():
 	harness.get_player().cultivation_active = true
 
 	harness.clear_logs()
-	module._pending_count = 5
+	module._pending_elapsed_seconds = 5.0
 	var first_flush_ok = await module._flush_pending_report()
 	assert_false(first_flush_ok, "立即上报应触发时间校验失败")
 
-	module._pending_count = 5
+	module._pending_elapsed_seconds = 5.0
 	var second_flush_ok = await module._flush_pending_report()
 	assert_false(second_flush_ok, "连续立即上报应继续失败")
 
@@ -113,11 +113,11 @@ func test_cultivation_invalid_report_waits_for_next_window_without_immediate_ret
 	harness.get_player().cultivation_active = true
 
 	harness.client.clear_call_counts()
-	module._pending_count = 5
+	module._pending_elapsed_seconds = 5.0
 	var first_flush_ok = await module._flush_pending_report()
 	assert_false(first_flush_ok, "立即上报应触发时间校验失败")
 	assert_eq(harness.client.get_call_count("cultivation_report"), 1, "失败后应只有本次上报请求")
-	assert_true(module._pending_count >= 5, "失败后 pending 不应被清空")
+	assert_true(module._pending_elapsed_seconds >= 5.0, "失败后 pending 不应被清空")
 
 	# 在下一次 5 秒窗口到达前，process 不应立即再次上报。
 	await module._process(0.1)

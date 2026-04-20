@@ -94,7 +94,34 @@ func _format_drops_preview(drops: Array) -> String:
 			int(drop.get("max", 0)),
 			chance
 		])
-	return "、".join(parts)
+	return "，".join(parts)
+
+func _format_seconds_text(value: float) -> String:
+	return UIUtils.format_decimal(value, 1) + "秒"
+
+func _format_percent_text(value: float) -> String:
+	return UIUtils.format_decimal(value * 100.0, 0) + "%"
+
+func _build_point_info_bbcode(point: Dictionary) -> String:
+	var base_interval = float(point.get("base_report_interval_seconds", point.get("report_interval_seconds", 0.0)))
+	var effective_interval = float(point.get("report_interval_seconds", 0.0))
+	var interval_delta = effective_interval - base_interval
+	var interval_sign = "-" if interval_delta < 0 else "+"
+	var interval_delta_text = interval_sign + _format_seconds_text(abs(interval_delta))
+
+	var base_success_rate = float(point.get("base_success_rate", point.get("success_rate", 0.0)))
+	var effective_success_rate = float(point.get("success_rate", 0.0))
+	var success_delta = effective_success_rate - base_success_rate
+	var success_sign = "+" if success_delta >= 0 else "-"
+	var success_delta_text = success_sign + _format_percent_text(abs(success_delta))
+
+	return "耗时: %s [color=#c24639]（%s）[/color]   成功率: %s [color=#c24639]（%s）[/color]\n掉落: %s" % [
+		_format_seconds_text(effective_interval),
+		interval_delta_text,
+		_format_percent_text(effective_success_rate),
+		success_delta_text,
+		_format_drops_preview(point.get("drops", []))
+	]
 
 func _build_reason_text(result: Dictionary, fallback: String = "") -> String:
 	var reason_code = str(result.get("reason_code", ""))
@@ -136,7 +163,7 @@ func _drop_map_to_text(drops: Dictionary) -> String:
 	var parts: Array = []
 	for item_id in ids:
 		parts.append("%s x%d" % [_get_item_name(item_id), int(drops[item_id])])
-	return "、".join(parts)
+	return "，".join(parts)
 
 func _report_log_message(result: Dictionary):
 	var drops = result.get("drops_gained", {})
@@ -192,15 +219,14 @@ func _render_cards():
 		desc_label.add_theme_color_override("font_color", Color(0.35, 0.33, 0.3, 1.0))
 		vbox.add_child(desc_label)
 
-		var info_label = Label.new()
-		info_label.text = "速度: %.1fs/次   成功率: %.0f%%\n掉落: %s" % [
-			float(point.get("report_interval_seconds", 0.0)),
-			float(point.get("success_rate", 0.0)) * 100.0,
-			_format_drops_preview(point.get("drops", []))
-		]
+		var info_label = RichTextLabel.new()
+		info_label.bbcode_enabled = true
+		info_label.fit_content = true
+		info_label.scroll_active = false
+		info_label.text = _build_point_info_bbcode(point)
 		info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		info_label.add_theme_font_size_override("font_size", 17)
-		info_label.add_theme_color_override("font_color", Color(0.25, 0.23, 0.2, 1.0))
+		info_label.add_theme_font_size_override("normal_font_size", 17)
+		info_label.add_theme_color_override("default_color", Color(0.25, 0.23, 0.2, 1.0))
 		vbox.add_child(info_label)
 
 		var progress_bar = ProgressBar.new()

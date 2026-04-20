@@ -37,7 +37,7 @@ func after_each():
 	await get_tree().process_frame
 
 func test_cultivation_report_does_not_enable_retry():
-	var result = await api.cultivation_report(5)
+	var result = await api.cultivation_report(5.0)
 	assert_true(result.get("success", false), "mock 请求应返回成功")
 	assert_eq(mock_network_manager.calls.size(), 1, "应只发起一次请求")
 

@@ -118,6 +118,19 @@ func test_lianli_local_health_check_blocks_entry():
 	assert_eq(harness.last_log(), "气血值不足，无法进入历练区域！请先修炼恢复气血值。", "本地气血校验应先于服务端请求拦截")
 
 func test_lianli_daily_dungeon_limit_uses_reason_code_copy():
+	var runtime = await harness.client.test_post(
+		"/test/set_runtime_state",
+		{"is_cultivating": false}
+	)
+	assert_true(runtime.get("success", false), "应能确保非修炼态，避免前置 flush 干扰本用例")
+	var cultivation_module = harness.game_ui.cultivation_module
+	if cultivation_module:
+		cultivation_module._pending_elapsed_seconds = 0.0
+		cultivation_module._last_optimistic_update_at = 0.0
+		cultivation_module._optimistic_tick_accumulator = 0.0
+	var player = harness.get_game_manager().get_player()
+	if player:
+		player.cultivation_active = false
 	var progress = await harness.client.test_post(
 		"/test/set_progress_state",
 		{"daily_dungeon_remaining_counts": {"foundation_herb_cave": 0}}

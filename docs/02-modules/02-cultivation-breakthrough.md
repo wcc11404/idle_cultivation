@@ -7,8 +7,9 @@
 
 ## 关键状态
 
-- 计时与上报：`_accumulated_seconds`、`_pending_count`、`_flush_in_flight`
+- 计时与上报：`_pending_elapsed_seconds`（上报累计秒）、`_optimistic_tick_accumulator`（乐观整秒累计）、`_flush_in_flight`、`_last_optimistic_update_at`
 - 乐观回血累积：`_optimistic_health_regen_accumulator`
+- 乐观术法次数累积：`_optimistic_spell_use_accumulator`
 - 下次自动上报窗口：`_next_auto_flush_at`
 - 玩家状态：`player.is_cultivating`
 
@@ -25,23 +26,25 @@
 
 1. UI 按钮触发 `cultivation/start`。
 2. 服务端成功后，玩家进入修炼态，按钮与状态文案更新。
-3. 之后 `process` 每秒触发一次乐观 tick。
+3. 之后 `process` 按真实经过时间持续推进乐观结算。
 
-### 2) 修炼中每秒 tick（乐观更新）
+### 2) 修炼中乐观 tick（按整秒结算）
 
-1. 计算并本地增加灵气（按当前属性/加成）。
-2. 计算并本地恢复气血（带累积器，避免小数损失）。
-3. 呼吸类术法次数进行乐观累计。
-4. `_pending_count += 1`，并刷新 UI。
-5. 达到阈值后触发自动 flush（上报 report）。
+1. 基于“当前时间 - 上次乐观更新时间”得到本次 `elapsed_seconds`。
+2. `_pending_elapsed_seconds += elapsed_seconds`（上报累计）。
+3. `_optimistic_tick_accumulator += elapsed_seconds`。
+4. 当 `_optimistic_tick_accumulator >= 1.0` 时循环整秒结算（每次按 1 秒更新灵气/回血/术法次数），并扣减 1 秒。
+5. 刷新 UI。
+6. 达到 5 秒阈值后触发自动 flush（上报 report）。
 
 ### 3) flush 上报（`cultivation/report`）
 
-1. 若存在 pending 且未在 flush 中，发起 report。
-2. 成功：扣除 pending，并把下个自动上报窗口设为 5 秒后。
-3. 失败：保留 pending，不做立即重试，等待下一次 5 秒窗口再合并上报。
-4. `CULTIVATION_REPORT_TIME_INVALID` 按“每次非法上报返回一次提示”输出“修炼同步异常，请稍后重试”。
-5. 不直接把技术细节透出给玩家。
+1. 若存在 pending 且未在 flush 中，发起 report（请求字段为 `elapsed_seconds`）。
+2. 只有“本地已发生过至少 1 次整秒乐观结算”才会上报；当 pending `< 1.0` 秒时不发请求，直接返回（保留累计到下一次）。
+3. 成功：仅扣除已上报的 pending 秒数，并把下个自动上报窗口设为 5 秒后。
+4. 失败：保留 pending 秒数，不做立即重试，等待下一次 5 秒窗口再合并上报。
+5. `CULTIVATION_REPORT_TIME_INVALID` 按“每次非法上报返回一次提示”输出“修炼同步异常，请稍后重试”。
+6. 不直接把技术细节透出给玩家。
 
 ### 4) 点击停止修炼
 
@@ -53,11 +56,12 @@
 ### 5) 点击突破
 
 1. 先执行 flush，避免“未上报增量影响突破判断”。
-2. 执行本地前置检查（资源/条件）。
-3. 调用 `player/breakthrough`。
-4. 成功：读取 `reason_data.consumed_resources` 组装“突破成功，消耗了…”。
-5. 失败：读取 `missing_resources`（或本地预检）组装“突破失败，缺少…”。
-6. 最后走全量刷新，保证境界/层数与属性显示一致。
+2. flush 前会先即时结算一次“从上次乐观更新到当前点击时刻”的本地增量。
+3. 执行本地前置检查（资源/条件）。
+4. 调用 `player/breakthrough`。
+5. 成功：读取 `reason_data.consumed_resources` 组装“突破成功，消耗了…”。
+6. 失败：读取 `missing_resources`（或本地预检）组装“突破失败，缺少…”。
+7. 最后走全量刷新，保证境界/层数与属性显示一致。
 
 ## reason_code 文案策略
 
@@ -71,6 +75,7 @@
 - report 失败后不立即重试，按固定 5 秒窗口继续合并上报。
 - stop/breakthrough 前尽量 flush，降低状态回滚感知。
 - 失败反馈优先给出玩家可操作的信息（缺什么、为何阻断）。
+- 当全量刷新结果为“未在修炼”时，会主动清空本地修炼运行态累计（防止登出重登后残留乐观更新）。
 
 ## 测试覆盖点
 
@@ -89,6 +94,8 @@
 - 对齐约束：
   - 面板内部内容左侧必须与标题首字左侧对齐。
   - 标题与下方内容留白固定为同一节奏，避免不同面板视觉漂移。
+- 交互细节：
+  - 突破按钮不展示悬停 tooltip，突破条件信息仅通过面板与日志提示。
 - 布局调优记录：
   - 属性面板已上移，突破面板与中间修炼形象按“上下间距趋于对称”做过位置微调。
   - 字号对齐：属性区 `气血/灵气/攻击/防御/速度` 统一字号。
@@ -97,9 +104,10 @@
 
 以“修炼中点击突破”为例：
 
-1. `CultivationModule.on_breakthrough_button_pressed` 先调用 `_flush_pending_report_if_needed`。
-2. flush 内部调用 `api.cultivation_report(count)`，成功则扣减 pending，失败则保留并计入重试。
-3. flush 收敛后执行 `api.breakthrough`。
-4. 按 `reason_code + reason_data` 组装“消耗了/缺少了”文案并写日志。
-5. 触发 `game_ui.refresh_all_player_data` 拉全量状态，覆盖最终境界/层数/属性显示。
-6. 全流程不移除乐观更新机制，仅在关键动作前后做状态收敛。
+1. `CultivationModule.on_breakthrough_button_pressed` 先调用 `flush_pending_and_then(...)`。
+2. `flush_pending_and_then` 会先做 `_settle_pending_optimistic_progress_now` 再进入 flush。
+3. flush 内部调用 `api.cultivation_report(elapsed_seconds)`，仅当累计达到 `>=1.0` 秒才会上报；成功仅扣减上报累计，不清乐观整秒余量。
+4. flush 收敛后执行 `api.breakthrough`。
+5. 按 `reason_code + reason_data` 组装“消耗了/缺少了”文案并写日志。
+6. 触发 `game_ui.refresh_all_player_data` 拉全量状态，覆盖最终境界/层数/属性显示。
+7. 全流程不移除乐观更新机制，仅在关键动作前后做状态收敛。

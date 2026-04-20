@@ -5,8 +5,8 @@ signal item_removed(item_id: String, count: int)
 signal inventory_full()
 signal capacity_changed(new_capacity: int)
 
-const DEFAULT_SIZE = 50
-const MAX_SIZE = 200
+const DEFAULT_SIZE = 40
+const MAX_SIZE = 40
 const EXPAND_STEP = 10
 
 var slots: Array = []

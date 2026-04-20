@@ -683,7 +683,7 @@ func _format_special_drop_list(special_drops: Dictionary) -> String:
 		if amount <= 0:
 			continue
 		drops_text.append(_get_item_name(item_id) + " x" + UIUtils.format_display_number(float(amount)))
-	return "、".join(drops_text)
+	return "，".join(drops_text)
 
 func _format_drop_table(drops: Dictionary) -> String:
 	var parts: Array[String] = []
@@ -699,7 +699,7 @@ func _format_drop_table(drops: Dictionary) -> String:
 		if chance < 0.9999:
 			chance_text = "（" + str(int(round(chance * 100.0))) + "%）"
 		parts.append(_get_item_name(item_id) + " x" + amount_text + chance_text)
-	return "、".join(parts)
+	return "，".join(parts)
 
 func _get_current_drop_table() -> Dictionary:
 	if _current_enemy_data.has("drops"):

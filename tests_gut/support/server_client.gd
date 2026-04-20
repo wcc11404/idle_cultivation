@@ -66,9 +66,9 @@ func cultivation_start() -> Dictionary:
 	_count("cultivation_start")
 	return await api.cultivation_start()
 
-func cultivation_report(count: int) -> Dictionary:
+func cultivation_report(elapsed_seconds: float) -> Dictionary:
 	_count("cultivation_report")
-	return await api.cultivation_report(count)
+	return await api.cultivation_report(elapsed_seconds)
 
 func cultivation_stop() -> Dictionary:
 	_count("cultivation_stop")

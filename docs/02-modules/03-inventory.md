@@ -10,6 +10,7 @@
 - 当前选中物品：`current_selected_item_id`、`current_selected_index`
 - 背包容量与格子内容：来自 `inventory` 节点
 - 模块依赖：`item_data`、`spell_data`、`recipe_data`（用于中文名和解锁文案）
+- 容量规则：初始40格，最大40格（当前版本不再提供可增长容量）
 
 ## API 交互
 
@@ -42,7 +43,7 @@
    - 立即刷新本地背包显示。
    - 对礼包类读取 `reason_data.contents` 展示奖励明细。
 4. 失败：
-   - 统一按 reason_code 映射失败文案（数量不足/不可使用/已使用过等）。
+   - 统一按 reason_code 映射失败文案（数量不足/不可使用/已使用过/等级条件不足等）。
 
 ### 4) 点击丢弃
 
@@ -75,6 +76,7 @@
   - 礼包：展示开包奖励汇总
   - 解锁类：展示术法/丹方/丹炉中文名
 - 重复使用统一文案：`xx已经使用过了，无法重复使用`。
+- 礼包等级门槛：`INVENTORY_USE_REQUIREMENT_NOT_MET` 时，按 `reason_data.requirement.realm_min` 输出“需达到炼气X层后才能打开”。
 
 ## 储纳 UI 结构（当前实现）
 

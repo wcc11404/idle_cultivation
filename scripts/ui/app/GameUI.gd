@@ -107,7 +107,7 @@ const REALM_FRAME_TEXTURES = {
 @onready var tab_settings: Button = $VBoxContainer/TabBar/SettingsButton
 @onready var tab_bar: HBoxContainer = $VBoxContainer/TabBar
 @onready var neishi_tab_bar: HBoxContainer = $VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar
-@onready var bottom_spacer: Control = $VBoxContainer/BottomSpacer
+@onready var bottom_spacer: Control = get_node_or_null("VBoxContainer/BottomSpacer")
 @onready var status_header_row: HBoxContainer = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsHeaderRow")
 @onready var breakthrough_header_row: HBoxContainer = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughHeaderRow")
 @onready var status_header_bottom_spacer: Control = get_node_or_null("VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HeaderBottomSpacer")
@@ -310,14 +310,7 @@ func _setup_status_header_style():
 	if not status_header_row:
 		return
 	DisplayPanelTemplate.apply_to_row(status_header_row, {
-		"title_text": "属性面板",
-		"accent_color": Color(0.870588, 0.705882, 0.207843, 1.0),
-		"title_color": Color(0.22, 0.2, 0.18, 1.0),
-		"line_color": Color(0.82, 0.78, 0.71, 1.0),
-		"title_font_size": 22,
-		"accent_width": 4.0,
-		"accent_height": 24.0,
-		"row_separation": 8
+		"title_text": "属性面板"
 	})
 	# 展示面板模板约束：内容左侧与标题首字左侧对齐，标题下留白固定
 	DisplayPanelTemplate.apply_content_layout(
@@ -330,14 +323,7 @@ func _setup_breakthrough_panel_style():
 	if not breakthrough_header_row:
 		return
 	DisplayPanelTemplate.apply_to_row(breakthrough_header_row, {
-		"title_text": "突破详情",
-		"accent_color": Color(0.870588, 0.705882, 0.207843, 1.0),
-		"title_color": Color(0.22, 0.2, 0.18, 1.0),
-		"line_color": Color(0.82, 0.78, 0.71, 1.0),
-		"title_font_size": 22,
-		"accent_width": 4.0,
-		"accent_height": 24.0,
-		"row_separation": 8
+		"title_text": "突破详情"
 	})
 	# 展示面板模板约束：内容左侧与标题首字左侧对齐，标题下留白固定
 	DisplayPanelTemplate.apply_content_layout(
@@ -373,9 +359,11 @@ func _setup_settings_scroll_behavior():
 func _setup_bottom_tab_layout():
 	if not tab_bar:
 		return
+	var tab_bar_height: float = max(62.0, tab_bar.custom_minimum_size.y)
 	TabBarStyleTemplate.apply_to_bar(tab_bar, {
-		"bar_height": 62.0,
-		"font_size": 19,
+		"bar_height": tab_bar_height,
+		"font_size": 23,
+		"text_raise": 20.0,
 		"line_position": "top",
 		"line_width": 2,
 		"selected_line_width": 3,
@@ -394,9 +382,10 @@ func _setup_bottom_tab_layout():
 func _setup_neishi_sub_tab_layout():
 	if not neishi_tab_bar:
 		return
+	var neishi_tab_height: float = max(58.0, neishi_tab_bar.custom_minimum_size.y)
 	TabBarStyleTemplate.apply_to_bar(neishi_tab_bar, {
-		"bar_height": 58.0,
-		"font_size": 18,
+		"bar_height": neishi_tab_height,
+		"font_size": 20,
 		"line_position": "bottom",
 		"line_width": 2,
 		"selected_line_width": 3,
@@ -442,7 +431,7 @@ func update_font_sizes():
 		log_text.add_theme_font_size_override("normal_font_size", int(base_font_sizes["log"] * scale_factor))
 	
 	# 更新按钮字体
-	var buttons = [cultivate_button, breakthrough_button, tab_neishi, tab_chuna, tab_lianli, tab_settings]
+	var buttons = [cultivate_button, breakthrough_button]
 	for button in buttons:
 		if button:
 			button.add_theme_font_size_override("font_size", int(base_font_sizes["button"] * scale_factor))
@@ -1069,6 +1058,8 @@ func refresh_all_player_data():
 	# 3. 分发并应用数据到各个核心系统
 	if data.has("player") and player:
 		player.apply_save_data(data["player"])
+		if cultivation_module and not player.get_is_cultivating() and cultivation_module.has_method("reset_local_runtime_state"):
+			cultivation_module.reset_local_runtime_state(true)
 		
 	if data.has("inventory") and inventory:
 		inventory.apply_save_data(data["inventory"])

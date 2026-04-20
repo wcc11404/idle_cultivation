@@ -169,7 +169,7 @@ func _sync_audio_controls_from_state():
 		music_volume_slider.set_value_no_signal(_last_music_linear_volume)
 	_update_music_volume_label()
 	if music_mute_button:
-		music_mute_button.text = "🔇" if _is_music_muted else "🔊"
+		music_mute_button.text = "静音" if _is_music_muted else "开音"
 	_apply_music_volume_to_bus()
 
 func _update_music_volume_label():
@@ -254,7 +254,7 @@ func _on_fps_preset_pressed(fps_limit: int):
 func _on_music_mute_toggled():
 	_is_music_muted = not _is_music_muted
 	if music_mute_button:
-		music_mute_button.text = "🔇" if _is_music_muted else "🔊"
+		music_mute_button.text = "静音" if _is_music_muted else "开音"
 	_apply_music_volume_to_bus()
 	_save_local_settings()
 
@@ -263,7 +263,7 @@ func _on_music_volume_changed(value: float):
 	if _is_music_muted and _last_music_linear_volume > 0.0:
 		_is_music_muted = false
 		if music_mute_button:
-			music_mute_button.text = "🔊"
+			music_mute_button.text = "开音"
 	_update_music_volume_label()
 	_apply_music_volume_to_bus()
 	_save_local_settings()

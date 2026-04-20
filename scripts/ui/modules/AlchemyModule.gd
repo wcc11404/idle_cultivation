@@ -104,7 +104,7 @@ func _format_alchemy_items(items: Dictionary) -> String:
 	var parts: Array = []
 	for item_id in item_ids:
 		parts.append("%s x%d" % [_get_item_name(item_id), int(items[item_id])])
-	return "、".join(parts)
+	return "，".join(parts)
 
 func _get_alchemy_result_message(result: Dictionary, fallback: String = "") -> String:
 	var reason_code = str(result.get("reason_code", ""))

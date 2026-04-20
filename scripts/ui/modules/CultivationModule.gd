@@ -37,13 +37,17 @@ var status_label: Label = null
 var cultivation_figure: TextureRect = null
 var cultivation_figure_particles: TextureRect = null
 
-var _accumulated_seconds: float = 0.0
-var _pending_count: int = 0
+var _pending_elapsed_seconds: float = 0.0
 var _flush_in_flight: bool = false
 var _optimistic_health_regen_accumulator: float = 0.0
+var _optimistic_spell_use_accumulator: float = 0.0
+var _last_optimistic_update_at: float = 0.0
+var _optimistic_tick_accumulator: float = 0.0
 var _next_auto_flush_at: float = 0.0
 
 const REPORT_INTERVAL_SECONDS: float = 5.0
+const FLUSH_WAIT_MAX_FRAMES: int = 180
+const MIN_FLUSH_SECONDS: float = 1.0
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ActionLockManager.new()
@@ -67,58 +71,78 @@ func initialize(
 	realm_system_ref = realm_sys_ref
 	set_process(true)
 
-func _process(delta: float):
+func _process(_delta: float):
 	if not player or not player.get_is_cultivating():
 		return
-
-	_accumulated_seconds += delta
-	while _accumulated_seconds >= 1.0:
-		_accumulated_seconds -= 1.0
-		_optimistic_tick_once()
+	var elapsed_seconds = _consume_elapsed_since_last_tick()
+	if elapsed_seconds <= 0.0:
+		return
+	_pending_elapsed_seconds += elapsed_seconds
+	_optimistic_tick_accumulator += elapsed_seconds
+	_apply_optimistic_whole_seconds_from_accumulator()
 
 	var now_sec = Time.get_unix_time_from_system()
-	if _pending_count >= 5 and not _flush_in_flight and now_sec >= _next_auto_flush_at:
+	if _pending_elapsed_seconds >= REPORT_INTERVAL_SECONDS and not _flush_in_flight and now_sec >= _next_auto_flush_at:
 		call_deferred("_auto_flush_report")
 
-func _optimistic_tick_once():
+func _consume_elapsed_since_last_tick() -> float:
+	var now_sec = Time.get_unix_time_from_system()
+	if _last_optimistic_update_at <= 0.0:
+		_last_optimistic_update_at = now_sec
+		return 0.0
+	var elapsed_seconds = maxf(0.0, now_sec - _last_optimistic_update_at)
+	_last_optimistic_update_at = now_sec
+	return elapsed_seconds
+
+func _apply_optimistic_progress(elapsed_seconds: float):
 	if not player:
 		return
-	
-	# 灵气乐观更新
-	var spirit_gain = CultivationLogic.calculate_spirit_gain_per_second(player)
+
+	# 灵气乐观更新（按真实经过时间结算）
+	var spirit_gain = CultivationLogic.calculate_spirit_gain_per_second(player) * elapsed_seconds
 	if spirit_gain > 0:
 		player.add_spirit(spirit_gain)
-	
+
 	# 生命乐观更新
-	_optimistic_heal_once()
-	
+	_optimistic_heal_by_elapsed(elapsed_seconds)
+
 	# 术法次数乐观更新
-	_optimistic_spell_use_once()
-	
-	_pending_count += 1
-	
+	_optimistic_spell_use_by_elapsed(elapsed_seconds)
+
 	if game_ui and game_ui.has_method("update_ui"):
 		game_ui.update_ui()
 
-func _optimistic_heal_once():
+func _apply_optimistic_whole_seconds_from_accumulator() -> void:
+	while _optimistic_tick_accumulator >= 1.0:
+		_optimistic_tick_accumulator -= 1.0
+		_apply_optimistic_progress(1.0)
+
+func _optimistic_heal_by_elapsed(elapsed_seconds: float):
 	var exact_regen = CultivationLogic.calculate_health_regen_per_second(player, _get_spell_system())
 	var before_whole = int(_optimistic_health_regen_accumulator)
-	_optimistic_health_regen_accumulator += exact_regen
+	_optimistic_health_regen_accumulator += exact_regen * elapsed_seconds
 	var after_whole = int(_optimistic_health_regen_accumulator)
 	var heal_gain = float(maxi(0, after_whole - before_whole))
 	if heal_gain > 0.0:
 		player.heal(heal_gain)
 
-func _optimistic_spell_use_once():
+func _optimistic_spell_use_by_elapsed(elapsed_seconds: float):
 	var spell_system = _get_spell_system()
 	if not spell_system:
 		return
-	
+
+	_optimistic_spell_use_accumulator += elapsed_seconds
+	var gained_use_count = int(floor(_optimistic_spell_use_accumulator))
+	if gained_use_count <= 0:
+		return
+	_optimistic_spell_use_accumulator -= float(gained_use_count)
+
 	var breathing_spells = spell_system.equipped_spells.get("breathing", []) if spell_system.get("equipped_spells") else []
 	if not breathing_spells.is_empty():
 		var spell_id = str(breathing_spells[0])
 		if spell_system.has_method("add_spell_use_count"):
-			spell_system.add_spell_use_count(spell_id)
+			for _i in range(gained_use_count):
+				spell_system.add_spell_use_count(spell_id)
 
 func _get_spell_system() -> Node:
 	var spell_system = null
@@ -232,7 +256,7 @@ func _build_breakthrough_resource_text(resources: Dictionary) -> String:
 	var parts: Array = []
 	for resource_id in _get_ordered_resource_ids(resources):
 		parts.append(_format_breakthrough_cost_entry(resource_id, resources[resource_id]))
-	return _join_text_parts(parts, "、")
+	return _join_text_parts(parts, "，")
 
 func _build_breakthrough_success_message(result: Dictionary) -> String:
 	var reason_data = result.get("reason_data", {})
@@ -306,7 +330,7 @@ func _build_breakthrough_preview_text(preview: Dictionary) -> String:
 
 	var missing_parts = _get_breakthrough_missing_parts(preview)
 	if not missing_parts.is_empty():
-		return "缺少" + _join_text_parts(missing_parts, "、")
+		return "缺少" + _join_text_parts(missing_parts, "，")
 
 	return "暂不可突破"
 
@@ -394,27 +418,30 @@ func _get_local_breakthrough_block_message() -> String:
 func _auto_flush_report():
 	await _flush_pending_report()
 
-func _flush_pending_report(max_batch: int = -1) -> bool:
+func _flush_pending_report(max_elapsed_seconds: float = -1.0) -> bool:
 	if _flush_in_flight:
-		return false
+		return await _wait_for_existing_flush_and_check_pending(max_elapsed_seconds)
 	if not api:
 		return false
-	if _pending_count <= 0:
+	if _pending_elapsed_seconds <= 0.0:
 		return true
 
 	_flush_in_flight = true
-	var report_count = _pending_count if max_batch <= 0 else mini(_pending_count, max_batch)
-	var result = await api.cultivation_report(report_count)
+	var pending_window = _pending_elapsed_seconds if max_elapsed_seconds <= 0.0 else minf(_pending_elapsed_seconds, max_elapsed_seconds)
+	if pending_window < MIN_FLUSH_SECONDS:
+		# 仅当本地已经发生过至少 1 次整秒乐观结算时才执行 flush。
+		# 小于 1 秒的累计不触发同步，留待后续继续累计。
+		_flush_in_flight = false
+		return true
+	var report_elapsed_seconds = pending_window
+	var result = await api.cultivation_report(report_elapsed_seconds)
 	_flush_in_flight = false
 
 	if result.get("success", false):
-		_pending_count = maxi(0, _pending_count - report_count)
+		# 只清已上报的 report 累计，不清乐观累计余量。
+		_pending_elapsed_seconds = maxf(0.0, _pending_elapsed_seconds - report_elapsed_seconds)
 		_next_auto_flush_at = Time.get_unix_time_from_system() + REPORT_INTERVAL_SECONDS
-		if _pending_count == 0:
-			# 服务端按单次上报批次独立结算回血取整，当前批次结算完成后，
-			# 下一批乐观回血不能继续沿用上一批的小数尾数。
-			_optimistic_health_regen_accumulator = 0.0
-		_apply_report_result(result, report_count)
+		_apply_report_result(result, report_elapsed_seconds)
 		return true
 
 	_next_auto_flush_at = Time.get_unix_time_from_system() + REPORT_INTERVAL_SECONDS
@@ -423,7 +450,21 @@ func _flush_pending_report(max_batch: int = -1) -> bool:
 		log_message.emit(err_msg)
 	return false
 
-func _apply_report_result(result: Dictionary, _report_count: int):
+func _wait_for_existing_flush_and_check_pending(max_elapsed_seconds: float = -1.0) -> bool:
+	var remaining_frames = FLUSH_WAIT_MAX_FRAMES
+	while _flush_in_flight and remaining_frames > 0:
+		remaining_frames -= 1
+		await get_tree().process_frame
+	if _flush_in_flight:
+		return false
+	var pending_window = _pending_elapsed_seconds if max_elapsed_seconds <= 0.0 else minf(_pending_elapsed_seconds, max_elapsed_seconds)
+	if pending_window < MIN_FLUSH_SECONDS:
+		return true
+	# 前一轮 flush 结束后若仍有可上报整秒，继续补一次 flush，
+	# 避免调用方误判为“同步失败”。
+	return await _flush_pending_report(max_elapsed_seconds)
+
+func _apply_report_result(result: Dictionary, _report_elapsed_seconds: float):
 	if not player:
 		return
 
@@ -435,7 +476,8 @@ func _apply_report_result(result: Dictionary, _report_count: int):
 		game_ui.update_ui()
 
 func flush_pending_and_then(action: Callable) -> bool:
-	if _pending_count > 0:
+	_settle_pending_optimistic_progress_now()
+	if _pending_elapsed_seconds > 0.0:
 		var ok = await _flush_pending_report()
 		if not ok:
 			return false
@@ -487,10 +529,12 @@ func on_cultivate_button_pressed():
 	var result = await api.cultivation_start()
 	if result.get("success", false):
 		player.cultivation_active = true
-		_pending_count = 0
-		_accumulated_seconds = 0.0
+		_pending_elapsed_seconds = 0.0
+		_last_optimistic_update_at = Time.get_unix_time_from_system()
+		_optimistic_tick_accumulator = 0.0
 		_next_auto_flush_at = Time.get_unix_time_from_system() + REPORT_INTERVAL_SECONDS
 		_optimistic_health_regen_accumulator = 0.0
+		_optimistic_spell_use_accumulator = 0.0
 		if game_ui and game_ui.has_method("set_active_mode"):
 			game_ui.set_active_mode("cultivation")
 		cultivate_button.text = "停止修炼"
@@ -507,7 +551,8 @@ func _stop_cultivation_internal(by_failure: bool):
 	if not player or not api:
 		return
 
-	if _pending_count > 0:
+	_settle_pending_optimistic_progress_now()
+	if _pending_elapsed_seconds > 0.0:
 		var flush_ok = await _flush_pending_report()
 		if not flush_ok and not by_failure:
 			log_message.emit("修炼同步异常，正在尝试停止修炼")
@@ -515,9 +560,11 @@ func _stop_cultivation_internal(by_failure: bool):
 	var result = await api.cultivation_stop()
 	if result.get("success", false):
 		player.cultivation_active = false
-		_pending_count = 0
-		_accumulated_seconds = 0.0
+		_pending_elapsed_seconds = 0.0
+		_last_optimistic_update_at = 0.0
+		_optimistic_tick_accumulator = 0.0
 		_optimistic_health_regen_accumulator = 0.0
+		_optimistic_spell_use_accumulator = 0.0
 		_next_auto_flush_at = 0.0
 		if game_ui and game_ui.has_method("clear_active_mode"):
 			game_ui.clear_active_mode("cultivation")
@@ -567,6 +614,26 @@ func on_breakthrough_button_pressed():
 		breakthrough_failed.emit(result)
 
 	_end_action_lock("breakthrough")
+
+func _settle_pending_optimistic_progress_now() -> void:
+	if not player or not player.get_is_cultivating():
+		return
+	var elapsed_seconds = _consume_elapsed_since_last_tick()
+	if elapsed_seconds <= 0.0:
+		return
+	_pending_elapsed_seconds += elapsed_seconds
+	_optimistic_tick_accumulator += elapsed_seconds
+	_apply_optimistic_whole_seconds_from_accumulator()
+
+func reset_local_runtime_state(clear_pending: bool = true) -> void:
+	_last_optimistic_update_at = 0.0
+	_optimistic_tick_accumulator = 0.0
+	_optimistic_health_regen_accumulator = 0.0
+	_optimistic_spell_use_accumulator = 0.0
+	_next_auto_flush_at = 0.0
+	_flush_in_flight = false
+	if clear_pending:
+		_pending_elapsed_seconds = 0.0
 
 
 func update_display(status: Dictionary = {}):
@@ -624,7 +691,7 @@ func update_display(status: Dictionary = {}):
 		else:
 			breakthrough_button.text = "突破"
 		var preview = _get_breakthrough_preview()
-		breakthrough_button.tooltip_text = _build_breakthrough_preview_text(preview)
+		breakthrough_button.tooltip_text = ""
 		if not breakthrough_material_labels.is_empty():
 			var entries = _build_breakthrough_panel_material_entries(preview)
 			for i in range(breakthrough_material_labels.size()):

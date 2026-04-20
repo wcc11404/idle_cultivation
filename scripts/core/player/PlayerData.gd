@@ -277,7 +277,8 @@ func get_save_data() -> Dictionary:
 		"realm_level": realm_level,
 		"health": health,
 		"spirit_energy": spirit_energy,
-		"max_spirit_energy": max_spirit_energy
+		"max_spirit_energy": max_spirit_energy,
+		"is_cultivating": cultivation_active
 	}
 
 func apply_save_data(data: Dictionary):
@@ -291,6 +292,10 @@ func apply_save_data(data: Dictionary):
 		spirit_energy = float(data["spirit_energy"])
 	if data.has("max_spirit_energy"):
 		max_spirit_energy = float(data["max_spirit_energy"])
+	if data.has("is_cultivating"):
+		cultivation_active = bool(data["is_cultivating"])
+	else:
+		cultivation_active = false
 
 	# 重新计算可计算属性
 	apply_realm_stats()

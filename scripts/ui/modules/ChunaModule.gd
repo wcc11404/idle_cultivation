@@ -36,7 +36,7 @@ var sort_button: Button = null
 
 # 常量
 const GRID_COLS = 5
-const MAX_SLOTS = 200
+const MAX_SLOTS = 40
 const SLOT_BG_EMPTY := Color(0.82, 0.78, 0.70, 1.0)
 const SLOT_BG_OCCUPIED := Color(0.88, 0.84, 0.76, 1.0)
 const SLOT_BG_SELECTED := Color(0.95, 0.90, 0.80, 1.0)
@@ -136,7 +136,7 @@ func _format_inventory_contents(contents: Dictionary) -> String:
 	var parts: Array = []
 	for item_id in item_ids:
 		parts.append("%s x%d" % [_get_item_name(item_id), int(contents[item_id])])
-	return "、".join(parts)
+	return "，".join(parts)
 
 func _get_inventory_result_message(result: Dictionary, fallback: String = "") -> String:
 	var reason_code = str(result.get("reason_code", ""))
@@ -191,6 +191,13 @@ func _get_inventory_result_message(result: Dictionary, fallback: String = "") ->
 			return item_name + "已经使用过了，无法重复使用"
 		"INVENTORY_USE_SYSTEM_ERROR":
 			return item_name + "使用失败，请稍后重试"
+		"INVENTORY_USE_REQUIREMENT_NOT_MET":
+			var requirement = effect.get("requirement", reason_data.get("requirement", {}))
+			if requirement is Dictionary and requirement.has("realm_min"):
+				var need_level = int(requirement.get("realm_min", 0))
+				if need_level > 0:
+					return item_name + "需要炼气" + str(need_level) + "层才能打开"
+			return item_name + "暂不满足使用条件"
 		"INVENTORY_DISCARD_SUCCEEDED":
 			return item_name + "丢弃成功"
 		"INVENTORY_DISCARD_ITEM_NOT_ENOUGH":
@@ -412,7 +419,7 @@ func setup_inventory_grid():
 		child.queue_free()
 	
 	# 获取当前容量，限制最大格子数
-	var current_capacity = 50
+	var current_capacity = 40
 	if inventory:
 		current_capacity = min(inventory.get_capacity(), MAX_SLOTS)
 	

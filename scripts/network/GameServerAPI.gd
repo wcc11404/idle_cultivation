@@ -69,9 +69,9 @@ func get_rank(server_id: String = "default") -> Dictionary:
 func cultivation_start() -> Dictionary:
 	return await network_manager.request("POST", "/game/player/cultivation/start", {}, _critical_options())
 
-func cultivation_report(count: int) -> Dictionary:
+func cultivation_report(elapsed_seconds: float) -> Dictionary:
 	return await network_manager.request("POST", "/game/player/cultivation/report", {
-		"count": count
+		"elapsed_seconds": elapsed_seconds
 	}, _critical_options())
 
 func cultivation_stop() -> Dictionary:

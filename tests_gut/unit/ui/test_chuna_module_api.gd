@@ -100,7 +100,7 @@ func test_inventory_expand_and_organize_use_reason_code_copy():
 
 	harness.clear_logs()
 	await module._on_expand_button_pressed()
-	assert_true(harness.last_log().contains("纳戒扩容成功"), "扩容应输出结构化成功文案")
+	assert_eq(harness.last_log(), "纳戒已达到最大容量", "容量上限为40时应提示已达上限")
 
 	harness.clear_logs()
 	await module._on_sort_button_pressed()

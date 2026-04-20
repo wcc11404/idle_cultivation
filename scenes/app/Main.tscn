@@ -244,25 +244,29 @@ corner_radius_bottom_left = 6
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_log"]
 bg_color = Color(0.94902, 0.898039, 0.8, 1)
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bottom_tab_normal"]
-bg_color = Color(0.9, 0.87, 0.81, 1)
-border_width_top = 2
-border_color = Color(0.52, 0.49, 0.45, 1)
+bg_color = Color(0.94902, 0.898039, 0.8, 1)
+border_width_top = 0
+border_color = Color(0.94902, 0.898039, 0.8, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bottom_tab_pressed"]
-bg_color = Color(0.88, 0.85, 0.79, 1)
-border_width_top = 2
-border_color = Color(0.52, 0.49, 0.45, 1)
+bg_color = Color(0.94902, 0.898039, 0.8, 1)
+border_width_top = 0
+border_color = Color(0.94902, 0.898039, 0.8, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bottom_tab_hover"]
-bg_color = Color(0.93, 0.9, 0.84, 1)
-border_width_top = 2
-border_color = Color(0.52, 0.49, 0.45, 1)
+bg_color = Color(0.94902, 0.898039, 0.8, 1)
+border_width_top = 0
+border_color = Color(0.94902, 0.898039, 0.8, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bottom_tab_selected"]
 bg_color = Color(0.95, 0.92, 0.85, 1)
@@ -293,20 +297,15 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = -20.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="TopSpacer" type="Control" parent="VBoxContainer" unique_id=992490503]
-custom_minimum_size = Vector2(0, 20)
-layout_mode = 2
-size_flags_vertical = 0
-
 [node name="TopBar" type="Control" parent="VBoxContainer" unique_id=992490502]
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 110)
 layout_mode = 2
 
 [node name="TopBarBackground" type="TextureRect" parent="VBoxContainer/TopBar" unique_id=674857305]
@@ -321,11 +320,11 @@ stretch_mode = 6
 
 [node name="TopBarContent" type="HBoxContainer" parent="VBoxContainer/TopBar" unique_id=1314718613]
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 10
 anchor_right = 1.0
-anchor_bottom = 1.0
+offset_top = 30.0
+offset_bottom = 110.0
 grow_horizontal = 2
-grow_vertical = 2
 alignment = 1
 
 [node name="PlayerInfo" type="HBoxContainer" parent="VBoxContainer/TopBar/TopBarContent" unique_id=790674460]
@@ -386,8 +385,8 @@ alignment = 1
 [node name="SpiritStoneIcon" type="Label" parent="VBoxContainer/TopBar/TopBarContent/SpiritStoneContainer" unique_id=175024947]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
-theme_override_font_sizes/font_size = 24
-text = "💎"
+theme_override_font_sizes/font_size = 20
+text = "灵石:"
 horizontal_alignment = 1
 
 [node name="SpiritStoneLabel" type="Label" parent="VBoxContainer/TopBar/TopBarContent/SpiritStoneContainer" unique_id=172021799]
@@ -411,14 +410,14 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="NeishiTabBar" type="HBoxContainer" parent="VBoxContainer/ContentPanel/NeishiPanel" unique_id=1352927155]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 10.0
 offset_top = 10.0
 offset_right = -10.0
-offset_bottom = 58.0
+offset_bottom = 78.0
 grow_horizontal = 2
 alignment = 1
 
@@ -798,7 +797,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 18
-text = "0/50"
+text = "0/40"
 vertical_alignment = 1
 
 [node name="ExpandButton" type="Button" parent="VBoxContainer/ContentPanel/ChunaPanel/TopBar" unique_id=1012295766]
@@ -1553,7 +1552,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-text = "🔊"
+text = "开音"
 
 [node name="MusicVolumeSlider" type="HSlider" parent="VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/AudioSection/MusicRow"]
 custom_minimum_size = Vector2(0, 52)
@@ -1982,15 +1981,16 @@ text = "欢迎来到修仙世界！
 scroll_following = true
 
 [node name="TabBar" type="HBoxContainer" parent="VBoxContainer" unique_id=1586396813]
-custom_minimum_size = Vector2(0, 50)
+custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
 theme_override_constants/separation = 0
 alignment = 1
 
 [node name="NeishiButton" type="Button" parent="VBoxContainer/TabBar" unique_id=857891154]
-custom_minimum_size = Vector2(0, 50)
+custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 0
 theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
 theme_override_colors/font_disabled_color = Color(0.45, 0.36, 0.17, 1)
 theme_override_font_sizes/font_size = 18
@@ -2001,9 +2001,10 @@ theme_override_styles/disabled = SubResource("StyleBoxFlat_bottom_tab_selected")
 text = "内视"
 
 [node name="ChunaButton" type="Button" parent="VBoxContainer/TabBar" unique_id=685655892]
-custom_minimum_size = Vector2(0, 50)
+custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 0
 theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
 theme_override_colors/font_disabled_color = Color(0.45, 0.36, 0.17, 1)
 theme_override_font_sizes/font_size = 18
@@ -2014,9 +2015,10 @@ theme_override_styles/disabled = SubResource("StyleBoxFlat_bottom_tab_selected")
 text = "储纳"
 
 [node name="RegionButton" type="Button" parent="VBoxContainer/TabBar" unique_id=685655893]
-custom_minimum_size = Vector2(0, 50)
+custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 0
 theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
 theme_override_colors/font_disabled_color = Color(0.45, 0.36, 0.17, 1)
 theme_override_font_sizes/font_size = 18
@@ -2027,9 +2029,10 @@ theme_override_styles/disabled = SubResource("StyleBoxFlat_bottom_tab_selected")
 text = "地区"
 
 [node name="BattleButton" type="Button" parent="VBoxContainer/TabBar" unique_id=822891400]
-custom_minimum_size = Vector2(0, 50)
+custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 0
 theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
 theme_override_colors/font_disabled_color = Color(0.45, 0.36, 0.17, 1)
 theme_override_font_sizes/font_size = 18
@@ -2040,9 +2043,10 @@ theme_override_styles/disabled = SubResource("StyleBoxFlat_bottom_tab_selected")
 text = "历练"
 
 [node name="SettingsButton" type="Button" parent="VBoxContainer/TabBar" unique_id=1653514296]
-custom_minimum_size = Vector2(0, 50)
+custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 0
 theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
 theme_override_colors/font_disabled_color = Color(0.45, 0.36, 0.17, 1)
 theme_override_font_sizes/font_size = 18
@@ -2051,8 +2055,3 @@ theme_override_styles/pressed = SubResource("StyleBoxFlat_bottom_tab_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_bottom_tab_hover")
 theme_override_styles/disabled = SubResource("StyleBoxFlat_bottom_tab_selected")
 text = "设置"
-
-[node name="BottomSpacer" type="Control" parent="VBoxContainer" unique_id=1586396814]
-custom_minimum_size = Vector2(0, 20)
-layout_mode = 2
-size_flags_vertical = 0
