@@ -38,6 +38,13 @@ func _task_card_titles(list_root: VBoxContainer) -> Array:
 	return names
 
 
+func _is_badge_visible(target: Control, key: String) -> bool:
+	if not target:
+		return false
+	var badge = target.get_node_or_null("NotificationBadge_" + key)
+	return badge != null and badge.visible
+
+
 func test_task_panel_renders_and_claim_refreshes():
 	await harness.client.reset_account()
 	await harness.sync_full_state()
@@ -52,9 +59,13 @@ func test_task_panel_renders_and_claim_refreshes():
 	await module._refresh_task_list()
 	module._on_newbie_tab_pressed()
 	assert_gt(module.task_list.get_child_count(), 0, "任务列表应渲染卡片")
+	assert_true(_is_badge_visible(harness.game_ui.xianwu_office_button, "task_claimable"), "存在可领奖任务时仙务司按钮红点应点亮")
+	assert_true(_is_badge_visible(harness.game_ui.tab_region, "region_tab_badge"), "存在可领奖任务时地区页签红点应点亮")
 
 	await module._on_claim_pressed("newbie_open_starter_pack_1")
 	assert_true(harness.last_log().contains("领取成功"), "领取成功后应有日志提示")
+	assert_false(_is_badge_visible(harness.game_ui.xianwu_office_button, "task_claimable"), "领取完成且无剩余可领奖任务时仙务司按钮红点应熄灭")
+	assert_false(_is_badge_visible(harness.game_ui.tab_region, "region_tab_badge"), "领取完成且无剩余可领奖任务时地区页签红点应熄灭")
 
 
 func test_task_panel_sort_unclaimed_first_claimed_last():

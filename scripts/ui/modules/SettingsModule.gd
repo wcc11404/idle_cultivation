@@ -9,6 +9,7 @@ const DEFAULT_MUSIC_VOLUME := 0.8
 signal save_requested
 signal load_requested
 signal log_message(message: String)
+signal mailbox_requested
 
 var game_ui: Node = null
 var player: Node = null
@@ -307,7 +308,7 @@ func _on_redeem_confirm_pressed():
 	log_message.emit("兑换码功能暂未开放")
 
 func _on_mailbox_pressed():
-	log_message.emit("邮箱功能暂未开放")
+	mailbox_requested.emit()
 
 func _on_mall_pressed():
 	log_message.emit("商城功能暂未开放")
@@ -335,6 +336,8 @@ func _on_logout_pressed():
 			if not err_msg.is_empty():
 				log_message.emit(err_msg + "，已执行本地退出")
 
+	if game_ui and game_ui.has_method("clear_notification_badges"):
+		game_ui.clear_notification_badges()
 	if api and api.network_manager and api.network_manager.has_method("clear_token"):
 		api.network_manager.clear_token()
 	get_tree().change_scene_to_file("res://scenes/app/Login.tscn")

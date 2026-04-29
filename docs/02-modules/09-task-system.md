@@ -11,6 +11,7 @@
 - 当前页签：`_active_tab`（`daily` / `newbie`）
 - 任务缓存：`_daily_tasks`、`_newbie_tasks`
 - 列表容器：`task_list`（滚动可用，滚动轴隐藏）
+- 红点摘要：可领奖数量由 `TaskModule` 计算后，通过 `task_state_changed(claimable_count)` 上报给 `GameUI` 的统一红点聚合器。
 
 ## API 交互
 
@@ -42,6 +43,23 @@
    - 输出奖励日志文案；
    - 重新请求 `task/list`，以服务端状态重绘；
    - 刷新顶部货币（灵石/仙晶）。
+   - 重新计算可领奖数量；若已无可领奖任务，`仙务司` 与 `地区 Tab` 红点应立即熄灭。
+
+## 红点规则（一）
+
+- 真值来源：`GET /game/task/list`
+- 点亮条件：存在至少一个任务满足 `completed = true && claimed = false`
+- 显示位置：
+  - `地区 -> 仙务司` 按钮：大号数字红点，显示 `task_claimable_count`
+  - 主 `地区 Tab`：小红点透传，不显示数字
+- 聚合边界：
+  - `TaskModule` 只负责上报摘要状态，不直接操作任何红点节点
+  - `GameUI` 负责统一渲染入口按钮和 Tab 红点
+- 数字显示约定：
+  - `1-99` 显示实际数量
+  - `>99` 显示 `99+`
+- 轮询失败：
+  - 保持上一次成功状态，不主动清空红点
 
 ## reason_code 文案策略
 
@@ -58,6 +76,6 @@
 ## 测试覆盖点
 
 - `tests_gut/unit/ui/TestTaskModuleApi.gd`
-  - 任务渲染、领奖刷新、已领取下沉排序。
+  - 任务渲染、领奖刷新、已领取下沉排序、红点即时刷新。
 - `tests_gut/integration/TestModuleApiSmoke.gd`
-  - 地区入口进入仙务司 + 新手任务领奖主链路。
+  - 地区入口进入仙务司 + 新手任务领奖主链路 + 地区红点熄灭校验。

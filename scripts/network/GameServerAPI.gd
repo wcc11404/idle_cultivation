@@ -203,3 +203,22 @@ func task_claim(task_id: String) -> Dictionary:
 	return await network_manager.request("POST", "/game/task/claim", {
 		"task_id": task_id
 	}, _critical_options())
+
+# ==================== 邮箱 ====================
+
+func mail_list() -> Dictionary:
+	return await network_manager.request("GET", "/game/mail/list", {}, _critical_options())
+
+func mail_detail(mail_id: String) -> Dictionary:
+	return await network_manager.request("GET", "/game/mail/detail?mail_id=" + mail_id.uri_encode(), {}, _critical_options())
+
+func mail_claim(mail_id: String) -> Dictionary:
+	return await network_manager.request("POST", "/game/mail/claim", {
+		"mail_id": mail_id
+	}, _critical_options())
+
+func mail_delete(delete_mode: String, mail_ids: Array = []) -> Dictionary:
+	return await network_manager.request("POST", "/game/mail/delete", {
+		"delete_mode": delete_mode,
+		"mail_ids": mail_ids
+	}, _critical_options())

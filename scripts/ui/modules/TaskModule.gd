@@ -7,6 +7,7 @@ const DISPLAY_PANEL_TEMPLATE = preload("res://scripts/ui/common/DisplayPanelTemp
 
 signal log_message(message: String)
 signal back_to_region_requested
+signal task_state_changed(claimable_count: int)
 
 var game_ui: Node = null
 var api: Node = null
@@ -102,8 +103,20 @@ func _refresh_task_list() -> void:
 		return
 	_daily_tasks = result.get("daily_tasks", [])
 	_newbie_tasks = result.get("newbie_tasks", [])
+	_emit_task_state_changed()
 	_update_tab_state()
 	_render_active_tasks()
+
+
+func refresh_indicator_only() -> void:
+	if not api:
+		return
+	var result: Dictionary = await api.task_list()
+	if not result.get("success", false):
+		return
+	_daily_tasks = result.get("daily_tasks", [])
+	_newbie_tasks = result.get("newbie_tasks", [])
+	_emit_task_state_changed()
 
 
 func _render_active_tasks() -> void:
@@ -331,3 +344,19 @@ func _build_reward_text(rewards: Dictionary) -> String:
 			item_name = game_ui.item_data_ref.get_item_name(str(item_id))
 		parts.append("%s x%s" % [item_name, UIUtils.format_display_number_integer(float(amount))])
 	return "、".join(parts)
+
+
+func _emit_task_state_changed() -> void:
+	task_state_changed.emit(_count_claimable_tasks())
+
+
+func _count_claimable_tasks() -> int:
+	var count := 0
+	for task_group in [_daily_tasks, _newbie_tasks]:
+		for task_variant in task_group:
+			if not (task_variant is Dictionary):
+				continue
+			var task := task_variant as Dictionary
+			if bool(task.get("completed", false)) and not bool(task.get("claimed", false)):
+				count += 1
+	return count

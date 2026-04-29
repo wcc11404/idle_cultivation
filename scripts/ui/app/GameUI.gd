@@ -11,11 +11,13 @@ const CULTIVATION_MODULE_SCRIPT = preload("res://scripts/ui/modules/CultivationM
 const LIANLI_MODULE_SCRIPT = preload("res://scripts/ui/modules/LianliModule.gd")
 const HERB_GATHER_MODULE_SCRIPT = preload("res://scripts/ui/modules/HerbGatherModule.gd")
 const TASK_MODULE_SCRIPT = preload("res://scripts/ui/modules/TaskModule.gd")
+const MAIL_MODULE_SCRIPT = preload("res://scripts/ui/modules/MailModule.gd")
 const PROFILE_EDIT_POPUP_SCRIPT = preload("res://scripts/ui/modules/ProfileEditPopup.gd")
 const GAME_SERVER_API_SCRIPT = preload("res://scripts/network/GameServerAPI.gd")
 const TAB_BAR_STYLE_TEMPLATE = preload("res://scripts/ui/common/TabBarStyleTemplate.gd")
 const DISPLAY_PANEL_TEMPLATE = preload("res://scripts/ui/common/DisplayPanelTemplate.gd")
 const ACTION_BUTTON_TEMPLATE = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
+const NOTIFICATION_BADGE_STATE_SCRIPT = preload("res://scripts/ui/common/NotificationBadgeState.gd")
 const ACCOUNT_CONFIG_SCRIPT = preload("res://scripts/core/account/AccountConfig.gd")
 const UI_FONT_PROVIDER = preload("res://scripts/ui/common/UIFontProvider.gd")
 const UI_ICON_PROVIDER = preload("res://scripts/ui/common/UIIconProvider.gd")
@@ -40,6 +42,9 @@ var profile_edit_popup: ProfileEditPopup = null
 var region_module = null
 var herb_gather_module = null
 var task_module = null
+var mail_module = null
+var notification_badge_state = null
+var _notification_badges: Dictionary = {}
 
 # 储纳模块
 var chuna_module = null
@@ -258,6 +263,10 @@ var log_manager: LogManager = null
 const GRID_COLS = 5
 const DESIGN_CONTENT_SIZE := Vector2(720.0, 1280.0)
 const LOG_MAX_COUNT_DEFAULT := 500
+const SYSTEM_REFRESH_INTERVAL_SECONDS := 30.0
+const BADGE_COLOR := Color(0.9059, 0.2980, 0.2353, 1.0)
+const BADGE_BORDER_COLOR := Color(1.0, 0.9608, 0.9412, 1.0)
+const BADGE_TEXT_COLOR := Color(1.0, 0.9804, 0.9725, 1.0)
 
 var item_data_ref: Node = null
 var spell_data_ref: Node = null
@@ -269,7 +278,10 @@ var active_mode: String = "none"
 var allow_background_server_refresh: bool = true
 var _test_shutdown_requested: bool = false
 var _pending_refresh_all_player_data_count: int = 0
+var _pending_notification_refresh_count: int = 0
 var _network_ui_last_log_at: float = 0.0
+var _system_refresh_timer: Timer = null
+var _system_refresh_inflight: bool = false
 const NETWORK_UI_LOG_THROTTLE_SECONDS := 2.0
 
 func _ready():
@@ -278,6 +290,7 @@ func _ready():
 		spirit_stone_icon.texture = UI_ICON_PROVIDER.load_svg_texture(UI_ICON_PROVIDER.ICON_SPIRIT_STONE)
 	# 安全获取可选节点
 	_setup_optional_nodes()
+	_setup_notification_badges()
 	_setup_bottom_tab_layout()
 	_setup_neishi_sub_tab_layout()
 	
@@ -296,6 +309,7 @@ func _ready():
 	setup_region_module()
 	setup_herb_gather_module()
 	setup_task_module()
+	setup_mail_module()
 	setup_chuna_module()
 	setup_spell_module()
 	setup_neishi_module()
@@ -317,6 +331,7 @@ func _ready():
 	
 	# 游戏加载完成后获取离线奖励
 	await claim_offline_reward()
+	await _refresh_notification_badges_from_server()
 
 func _setup_optional_nodes():
 	view_button = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/MainHBox/ButtonContainer/ButtonVBox/ViewButton")
@@ -331,6 +346,123 @@ func _setup_optional_nodes():
 	# 监听屏幕大小变化
 	if get_viewport() and not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
 		get_viewport().size_changed.connect(_on_viewport_size_changed)
+
+
+func _setup_notification_badges() -> void:
+	if not notification_badge_state:
+		notification_badge_state = NOTIFICATION_BADGE_STATE_SCRIPT.new()
+		notification_badge_state.name = "NotificationBadgeState"
+		add_child(notification_badge_state)
+	if not notification_badge_state.state_changed.is_connected(_on_notification_badge_state_changed):
+		notification_badge_state.state_changed.connect(_on_notification_badge_state_changed)
+
+	_notification_badges.clear()
+	_register_notification_badge("region_tab_badge", tab_region, Vector2(12.0, 12.0), Vector2(-18.0, 6.0))
+	_register_notification_badge("settings_tab_badge", tab_settings, Vector2(12.0, 12.0), Vector2(-18.0, 6.0))
+	_register_notification_badge("task_claimable", xianwu_office_button, Vector2(30.0, 30.0), Vector2(-20.0, 4.0), true, "task_claimable_count")
+	_register_notification_badge("mail_unread", mailbox_button, Vector2(30.0, 30.0), Vector2(-20.0, 4.0), true, "mail_unread_count")
+	_apply_notification_badge_state(notification_badge_state.get_state())
+
+
+func _register_notification_badge(
+	key: String,
+	target: Control,
+	size: Vector2,
+	top_right_offset: Vector2,
+	show_count: bool = false,
+	count_key: String = ""
+) -> void:
+	if not target:
+		return
+	var badge := Control.new()
+	badge.name = "NotificationBadge_" + key
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.visible = false
+	badge.anchor_left = 1.0
+	badge.anchor_right = 1.0
+	badge.anchor_top = 0.0
+	badge.anchor_bottom = 0.0
+	badge.offset_left = top_right_offset.x - size.x
+	badge.offset_right = top_right_offset.x
+	badge.offset_top = top_right_offset.y
+	badge.offset_bottom = top_right_offset.y + size.y
+
+	var badge_panel := Panel.new()
+	badge_panel.name = "BadgePanel"
+	badge_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge_panel.anchor_left = 0.0
+	badge_panel.anchor_right = 1.0
+	badge_panel.anchor_top = 0.0
+	badge_panel.anchor_bottom = 1.0
+	badge_panel.offset_left = 0.0
+	badge_panel.offset_right = 0.0
+	badge_panel.offset_top = 0.0
+	badge_panel.offset_bottom = 0.0
+
+	var badge_style := StyleBoxFlat.new()
+	badge_style.bg_color = BADGE_COLOR
+	badge_style.border_color = BADGE_BORDER_COLOR
+	badge_style.set_border_width_all(1)
+	badge_style.set_corner_radius_all(int(minf(size.x, size.y) * 0.5))
+	badge_panel.add_theme_stylebox_override("panel", badge_style)
+	badge.add_child(badge_panel)
+
+	var badge_info := {
+		"root": badge,
+		"show_count": show_count,
+		"count_key": count_key,
+	}
+
+	if show_count:
+		var count_label := Label.new()
+		count_label.name = "CountLabel"
+		count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		count_label.anchor_left = 0.0
+		count_label.anchor_right = 1.0
+		count_label.anchor_top = 0.0
+		count_label.anchor_bottom = 1.0
+		count_label.offset_left = 0.0
+		count_label.offset_right = 0.0
+		count_label.offset_top = -1.0
+		count_label.offset_bottom = 0.0
+		count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		count_label.add_theme_font_size_override("font_size", 16)
+		count_label.add_theme_color_override("font_color", BADGE_TEXT_COLOR)
+		count_label.text = ""
+		badge.add_child(count_label)
+		badge_info["label"] = count_label
+
+	target.add_child(badge)
+	_notification_badges[key] = badge_info
+
+
+func _on_notification_badge_state_changed(state: Dictionary) -> void:
+	_apply_notification_badge_state(state)
+
+
+func _apply_notification_badge_state(state: Dictionary) -> void:
+	for key in _notification_badges.keys():
+		var badge_info: Dictionary = _notification_badges[key]
+		var badge: Control = badge_info.get("root", null)
+		if not badge:
+			continue
+		var visible := bool(state.get(key, false))
+		badge.visible = visible
+		if not bool(badge_info.get("show_count", false)):
+			continue
+		var count_label: Label = badge_info.get("label", null)
+		if count_label:
+			var count_key := str(badge_info.get("count_key", ""))
+			count_label.text = _format_notification_badge_count(int(state.get(count_key, 0))) if visible else ""
+
+
+func _format_notification_badge_count(count: int) -> String:
+	if count <= 0:
+		return ""
+	if count > 99:
+		return "99+"
+	return str(count)
 
 func _setup_action_button_templates():
 	if cultivate_button:
@@ -711,6 +843,35 @@ func setup_settings_module():
 	
 	# 连接信号
 	settings_module.log_message.connect(_on_module_log)
+	if not settings_module.mailbox_requested.is_connected(_on_mailbox_requested):
+		settings_module.mailbox_requested.connect(_on_mailbox_requested)
+
+func setup_mail_module():
+	mail_module = MAIL_MODULE_SCRIPT.new()
+	mail_module.name = "MailModule"
+	add_child(mail_module)
+	mail_module.initialize(self, api, item_data_ref)
+	mail_module.log_message.connect(_on_module_log)
+	mail_module.back_requested.connect(_on_mail_back_requested)
+	if not mail_module.mail_state_changed.is_connected(_on_mail_state_changed):
+		mail_module.mail_state_changed.connect(_on_mail_state_changed)
+	_setup_system_refresh_timer()
+
+func _on_mailbox_requested():
+	show_mail_panel()
+
+func _on_mail_back_requested():
+	show_settings_tab()
+
+
+func _on_task_state_changed(claimable_count: int) -> void:
+	if notification_badge_state:
+		notification_badge_state.update_task_claimable_count(claimable_count)
+
+
+func _on_mail_state_changed(unread_count: int, _total_count: int) -> void:
+	if notification_badge_state:
+		notification_badge_state.update_mail_unread_count(unread_count)
 
 func setup_profile_edit_popup():
 	if profile_edit_popup:
@@ -886,6 +1047,8 @@ func setup_task_module():
 	task_module.initialize(self, api)
 	task_module.log_message.connect(_on_module_log)
 	task_module.back_to_region_requested.connect(_on_back_to_region_requested)
+	if not task_module.task_state_changed.is_connected(_on_task_state_changed):
+		task_module.task_state_changed.connect(_on_task_state_changed)
 
 func _on_herb_gather_requested():
 	show_herb_gather_panel()
@@ -1168,6 +1331,8 @@ func set_item_data(item_data_node: Node):
 		alchemy_module.item_data = item_data_node
 	if chuna_module:
 		chuna_module.item_data = item_data_node
+	if mail_module:
+		mail_module.item_data_ref = item_data_node
 	if cultivation_module:
 		cultivation_module.item_data = item_data_node
 	if herb_gather_module:
@@ -1287,6 +1452,8 @@ func show_neishi_tab():
 		herb_gather_panel.visible = false
 	if task_panel:
 		task_panel.visible = false
+	if mail_module and mail_module.panel:
+		mail_module.panel.visible = false
 	lianli_panel.visible = false
 	settings_panel.visible = false
 	# 隐藏炼丹房
@@ -1316,6 +1483,8 @@ func show_chuna_tab():
 		herb_gather_panel.visible = false
 	if task_panel:
 		task_panel.visible = false
+	if mail_module and mail_module.panel:
+		mail_module.panel.visible = false
 	lianli_panel.visible = false
 	settings_panel.visible = false
 	# 隐藏炼丹房
@@ -1343,6 +1512,8 @@ func show_region_tab():
 		herb_gather_panel.visible = false
 	if task_panel:
 		task_panel.visible = false
+	if mail_module and mail_module.panel:
+		mail_module.panel.visible = false
 	lianli_panel.visible = false
 	settings_panel.visible = false
 	# 隐藏炼丹房
@@ -1367,6 +1538,8 @@ func show_lianli_tab():
 		herb_gather_panel.visible = false
 	if task_panel:
 		task_panel.visible = false
+	if mail_module and mail_module.panel:
+		mail_module.panel.visible = false
 	lianli_panel.visible = true
 	settings_panel.visible = false
 	# 隐藏炼丹房
@@ -1405,6 +1578,8 @@ func show_settings_tab():
 		herb_gather_panel.visible = false
 	if task_panel:
 		task_panel.visible = false
+	if mail_module and mail_module.panel:
+		mail_module.panel.visible = false
 	lianli_panel.visible = false
 	settings_panel.visible = true
 	# 隐藏炼丹房
@@ -1419,6 +1594,28 @@ func show_settings_tab():
 		tab_region.disabled = false
 	tab_lianli.disabled = false
 	tab_settings.disabled = true
+
+func show_mail_panel():
+	neishi_panel.visible = false
+	chuna_panel.visible = false
+	if region_panel:
+		region_panel.visible = false
+	if herb_gather_panel:
+		herb_gather_panel.visible = false
+	if task_panel:
+		task_panel.visible = false
+	lianli_panel.visible = false
+	settings_panel.visible = false
+	if alchemy_module:
+		alchemy_module.hide_alchemy_room()
+	tab_neishi.disabled = false
+	tab_chuna.disabled = false
+	if tab_region:
+		tab_region.disabled = false
+	tab_lianli.disabled = false
+	tab_settings.disabled = true
+	if mail_module:
+		mail_module.show_tab()
 
 func show_herb_gather_panel():
 	neishi_panel.visible = false
@@ -1478,6 +1675,63 @@ func _on_tab_lianli_pressed():
 
 func _on_tab_settings_pressed():
 	show_settings_tab()
+
+func _setup_system_refresh_timer():
+	if _system_refresh_timer:
+		return
+	_system_refresh_timer = Timer.new()
+	_system_refresh_timer.wait_time = SYSTEM_REFRESH_INTERVAL_SECONDS
+	_system_refresh_timer.one_shot = false
+	_system_refresh_timer.autostart = true
+	add_child(_system_refresh_timer)
+	_system_refresh_timer.timeout.connect(_on_system_refresh_timer_timeout)
+
+func _on_system_refresh_timer_timeout():
+	if _system_refresh_inflight:
+		return
+	if not api:
+		return
+	_system_refresh_inflight = true
+	await _refresh_notification_badges_from_server()
+	_system_refresh_inflight = false
+
+
+func _refresh_notification_badges_from_server() -> void:
+	if _test_shutdown_requested:
+		return
+	_pending_notification_refresh_count += 1
+	if task_module:
+		await task_module.refresh_indicator_only()
+	elif api:
+		var task_result: Dictionary = await api.task_list()
+		if task_result.get("success", false):
+			_on_task_state_changed(_count_claimable_tasks_from_result(task_result))
+
+	if mail_module:
+		await mail_module.refresh_indicator_only()
+	elif api:
+		var mail_result: Dictionary = await api.mail_list()
+		if mail_result.get("success", false):
+			_on_mail_state_changed(int(mail_result.get("unread_count", 0)), int(mail_result.get("count", 0)))
+	_pending_notification_refresh_count = maxi(0, _pending_notification_refresh_count - 1)
+
+
+func clear_notification_badges() -> void:
+	if notification_badge_state:
+		notification_badge_state.reset()
+
+
+func _count_claimable_tasks_from_result(result: Dictionary) -> int:
+	var count := 0
+	for list_key in ["daily_tasks", "newbie_tasks"]:
+		var tasks: Array = result.get(list_key, [])
+		for task_variant in tasks:
+			if not (task_variant is Dictionary):
+				continue
+			var task := task_variant as Dictionary
+			if bool(task.get("completed", false)) and not bool(task.get("claimed", false)):
+				count += 1
+	return count
 
 func set_active_mode(mode: String):
 	active_mode = mode
@@ -1643,6 +1897,7 @@ func set_background_server_refresh_enabled(enabled: bool) -> void:
 func begin_test_shutdown() -> void:
 	_test_shutdown_requested = true
 	allow_background_server_refresh = false
+	clear_notification_badges()
 
 func has_pending_test_tasks() -> bool:
 	var alchemy_pending := false
@@ -1651,7 +1906,7 @@ func has_pending_test_tasks() -> bool:
 	var chuna_pending := false
 	if chuna_module and is_instance_valid(chuna_module) and chuna_module.has_method("has_pending_test_tasks"):
 		chuna_pending = bool(chuna_module.has_pending_test_tasks())
-	return _pending_refresh_all_player_data_count > 0 or alchemy_pending or chuna_pending
+	return _pending_refresh_all_player_data_count > 0 or _pending_notification_refresh_count > 0 or alchemy_pending or chuna_pending
 
 func await_pending_test_tasks(max_frames: int = 120) -> void:
 	var remaining_frames = max_frames

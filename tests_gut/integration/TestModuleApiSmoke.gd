@@ -16,6 +16,13 @@ func after_each():
 		harness = null
 	await get_tree().process_frame
 
+
+func _is_badge_visible(target: Control, key: String) -> bool:
+	if not target:
+		return false
+	var badge = target.get_node_or_null("NotificationBadge_" + key)
+	return badge != null and badge.visible
+
 func test_module_api_smoke_flow():
 	await harness.apply_preset_and_sync("breakthrough_ready")
 	var cultivation_module = harness.game_ui.cultivation_module
@@ -71,5 +78,9 @@ func test_module_api_smoke_flow():
 	harness.game_ui.show_task_panel()
 	var task_module = harness.game_ui.task_module
 	await task_module._refresh_task_list()
+	assert_true(_is_badge_visible(harness.game_ui.xianwu_office_button, "task_claimable"), "任务 smoke 在领奖前应点亮仙务司按钮红点")
+	assert_true(_is_badge_visible(harness.game_ui.tab_region, "region_tab_badge"), "任务 smoke 在领奖前应点亮地区页签红点")
 	await task_module._on_claim_pressed("newbie_open_starter_pack_1")
 	assert_true(harness.last_log().contains("领取成功"), "任务 smoke 应能完成领奖")
+	assert_false(_is_badge_visible(harness.game_ui.xianwu_office_button, "task_claimable"), "任务 smoke 领奖后应及时熄灭仙务司按钮红点")
+	assert_false(_is_badge_visible(harness.game_ui.tab_region, "region_tab_badge"), "任务 smoke 领奖后应及时熄灭地区页签红点")
