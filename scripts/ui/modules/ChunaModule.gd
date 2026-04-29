@@ -30,6 +30,7 @@ var capacity_label: Label = null
 var item_detail_panel: Panel = null
 var view_button: Button = null
 var use_button: Button = null
+var batch_use_button: Button = null
 var discard_button: Button = null
 var expand_button: Button = null
 var sort_button: Button = null
@@ -42,10 +43,16 @@ const SLOT_BG_OCCUPIED := Color(0.88, 0.84, 0.76, 1.0)
 const SLOT_BG_SELECTED := Color(0.95, 0.90, 0.80, 1.0)
 const SLOT_BORDER_DEFAULT := Color(0.71, 0.64, 0.51, 1.0)
 const SLOT_BORDER_SELECTED := Color(0.87, 0.71, 0.21, 1.0)
+const SLOT_TOUCH_SLOP_PX := 14.0
 
 # 当前选中的物品
 var current_selected_item_id: String = ""
 var current_selected_index: int = -1
+var _slot_press_active: bool = false
+var _slot_press_index: int = -1
+var _slot_press_start_pos := Vector2.ZERO
+var _slot_press_touch_id: int = -1
+var _slot_press_moved: bool = false
 
 # 信号连接状态标记
 var _signals_connected: bool = false
@@ -55,6 +62,15 @@ var _discard_confirm_panel: Panel = null
 var _discard_confirm_line1: Label = null
 var _discard_confirm_line2: Label = null
 var _discard_confirm_button: Button = null
+var _batch_use_overlay_host: Control = null
+var _batch_use_overlay: ColorRect = null
+var _batch_use_panel: Panel = null
+var _batch_use_slider: HSlider = null
+var _batch_use_count_label: Label = null
+var _batch_use_title_label: Label = null
+var _batch_use_confirm_button: Button = null
+var _batch_use_close_button: Button = null
+var _batch_use_total_count: int = 1
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ACTION_LOCK_MANAGER.new()
@@ -87,13 +103,16 @@ func initialize(
 	_setup_signals()
 	_setup_viewport_listener()
 	_setup_discard_confirm_popup()
+	_setup_batch_use_popup()
 	setup_inventory_grid()
 
 func _apply_action_button_templates():
 	if use_button:
-		ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(use_button, use_button.custom_minimum_size)
+		ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(use_button, use_button.custom_minimum_size, 20)
+	if batch_use_button:
+		ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(batch_use_button, batch_use_button.custom_minimum_size, 20)
 	if discard_button:
-		ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(discard_button, discard_button.custom_minimum_size)
+		ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(discard_button, discard_button.custom_minimum_size, 20)
 	if expand_button:
 		ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(expand_button, expand_button.custom_minimum_size)
 	if sort_button:
@@ -169,6 +188,14 @@ func _get_inventory_result_message(result: Dictionary, fallback: String = "") ->
 			if content_text.is_empty():
 				return item_name + "打开成功"
 			return item_name + "打开成功，获得" + content_text
+		"INVENTORY_USE_PARTIAL_SUCCEEDED":
+			var completed_count = int(reason_data.get("completed_count", 0))
+			var requested_count = int(reason_data.get("requested_count", completed_count))
+			var partial_reason_code = str(reason_data.get("partial_stop_reason_code", ""))
+			var suffix = ""
+			if not partial_reason_code.is_empty():
+				suffix = "（中断原因：" + partial_reason_code + "）"
+			return "%s批量使用部分成功（%d/%d）%s" % [item_name, completed_count, requested_count, suffix]
 		"INVENTORY_USE_UNLOCK_SPELL_SUCCEEDED":
 			return "学会术法【%s】" % _get_spell_name(str(effect.get("spell_id", "")))
 		"INVENTORY_USE_UNLOCK_RECIPE_SUCCEEDED":
@@ -221,6 +248,8 @@ func _check_required_nodes():
 		push_warning("ChunaModule: use_button 未设置")
 	if not discard_button:
 		push_warning("ChunaModule: discard_button 未设置")
+	if not batch_use_button:
+		push_warning("ChunaModule: batch_use_button 未设置")
 
 func _setup_signals():
 	"""连接按钮信号，防止重复连接"""
@@ -232,6 +261,8 @@ func _setup_signals():
 		view_button.pressed.connect(_on_view_button_pressed)
 	if use_button and not use_button.pressed.is_connected(_on_use_button_pressed):
 		use_button.pressed.connect(_on_use_button_pressed)
+	if batch_use_button and not batch_use_button.pressed.is_connected(_on_batch_use_button_pressed):
+		batch_use_button.pressed.connect(_on_batch_use_button_pressed)
 	if discard_button and not discard_button.pressed.is_connected(_on_discard_button_pressed):
 		discard_button.pressed.connect(_on_discard_button_pressed)
 	if expand_button and not expand_button.pressed.is_connected(_on_expand_button_pressed):
@@ -249,6 +280,8 @@ func cleanup():
 		view_button.pressed.disconnect(_on_view_button_pressed)
 	if use_button and use_button.pressed.is_connected(_on_use_button_pressed):
 		use_button.pressed.disconnect(_on_use_button_pressed)
+	if batch_use_button and batch_use_button.pressed.is_connected(_on_batch_use_button_pressed):
+		batch_use_button.pressed.disconnect(_on_batch_use_button_pressed)
 	if discard_button and discard_button.pressed.is_connected(_on_discard_button_pressed):
 		discard_button.pressed.disconnect(_on_discard_button_pressed)
 	if expand_button and expand_button.pressed.is_connected(_on_expand_button_pressed):
@@ -266,6 +299,17 @@ func cleanup():
 	_discard_confirm_line2 = null
 	_discard_confirm_button = null
 	_discard_overlay_host = null
+	_hide_batch_use_popup()
+	if _batch_use_overlay and is_instance_valid(_batch_use_overlay):
+		_batch_use_overlay.queue_free()
+	_batch_use_overlay = null
+	_batch_use_panel = null
+	_batch_use_slider = null
+	_batch_use_count_label = null
+	_batch_use_title_label = null
+	_batch_use_confirm_button = null
+	_batch_use_close_button = null
+	_batch_use_overlay_host = null
 
 func _setup_discard_confirm_popup():
 	if _discard_confirm_overlay:
@@ -352,11 +396,120 @@ func _setup_discard_confirm_popup():
 	_discard_confirm_button.pressed.connect(_on_discard_confirmed)
 	vbox.add_child(_discard_confirm_button)
 
+func _setup_batch_use_popup():
+	if _batch_use_overlay:
+		return
+	_batch_use_overlay_host = game_ui as Control
+	if not _batch_use_overlay_host:
+		_batch_use_overlay_host = chuna_panel
+	if not _batch_use_overlay_host:
+		return
+
+	_batch_use_overlay = ColorRect.new()
+	_batch_use_overlay.name = "BatchUseOverlay"
+	_batch_use_overlay.visible = false
+	_batch_use_overlay.color = Color(0, 0, 0, 0.45)
+	_batch_use_overlay.z_index = 1200
+	_batch_use_overlay.layout_mode = 1
+	_batch_use_overlay.anchors_preset = 15
+	_batch_use_overlay.anchor_right = 1.0
+	_batch_use_overlay.anchor_bottom = 1.0
+	_batch_use_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_batch_use_overlay.gui_input.connect(_on_batch_use_overlay_input)
+	_batch_use_overlay_host.add_child(_batch_use_overlay)
+
+	_batch_use_panel = Panel.new()
+	_batch_use_panel.name = "BatchUsePanel"
+	_batch_use_panel.z_index = 1201
+	_batch_use_panel.layout_mode = 1
+	_batch_use_panel.anchors_preset = 8
+	_batch_use_panel.anchor_left = 0.5
+	_batch_use_panel.anchor_top = 0.5
+	_batch_use_panel.anchor_right = 0.5
+	_batch_use_panel.anchor_bottom = 0.5
+	_batch_use_panel.offset_left = -190
+	_batch_use_panel.offset_top = -95
+	_batch_use_panel.offset_right = 190
+	_batch_use_panel.offset_bottom = 95
+	_batch_use_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_batch_use_panel.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed:
+			_batch_use_panel.accept_event()
+	)
+	_batch_use_panel.add_theme_stylebox_override("panel", POPUP_STYLE_TEMPLATE.build_panel_style({
+		"bg_color": POPUP_STYLE_TEMPLATE.POPUP_BG_COLOR,
+		"border_color": POPUP_STYLE_TEMPLATE.POPUP_BORDER_COLOR,
+		"corner_radius": 12,
+		"border_width": 2
+	}))
+	_batch_use_overlay.add_child(_batch_use_panel)
+
+	var margin := MarginContainer.new()
+	margin.layout_mode = 1
+	margin.anchors_preset = 15
+	margin.anchor_right = 1.0
+	margin.anchor_bottom = 1.0
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	_batch_use_panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	_batch_use_title_label = Label.new()
+	_batch_use_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_batch_use_title_label.add_theme_font_size_override("font_size", 24)
+	_batch_use_title_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2, 1.0))
+	_batch_use_title_label.text = "批量使用"
+	vbox.add_child(_batch_use_title_label)
+
+	_batch_use_count_label = Label.new()
+	_batch_use_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_batch_use_count_label.add_theme_font_size_override("font_size", 20)
+	_batch_use_count_label.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1.0))
+	vbox.add_child(_batch_use_count_label)
+
+	_batch_use_slider = HSlider.new()
+	_batch_use_slider.min_value = 1
+	_batch_use_slider.max_value = 1
+	_batch_use_slider.step = 1
+	_batch_use_slider.value = 1
+	_batch_use_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_batch_use_slider.value_changed.connect(_on_batch_use_slider_changed)
+	vbox.add_child(_batch_use_slider)
+
+	var button_row := HBoxContainer.new()
+	button_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	button_row.add_theme_constant_override("separation", 14)
+	vbox.add_child(button_row)
+
+	_batch_use_confirm_button = Button.new()
+	_batch_use_confirm_button.text = "使用"
+	_batch_use_confirm_button.custom_minimum_size = Vector2(140, 44)
+	ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(_batch_use_confirm_button, _batch_use_confirm_button.custom_minimum_size, 18)
+	_batch_use_confirm_button.pressed.connect(_on_batch_use_confirm_pressed)
+	button_row.add_child(_batch_use_confirm_button)
+
+	_batch_use_close_button = Button.new()
+	_batch_use_close_button.text = "关闭"
+	_batch_use_close_button.custom_minimum_size = Vector2(140, 44)
+	ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(_batch_use_close_button, _batch_use_close_button.custom_minimum_size, 18)
+	_batch_use_close_button.pressed.connect(_hide_batch_use_popup)
+	button_row.add_child(_batch_use_close_button)
+
 func _on_discard_overlay_input(event: InputEvent):
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_hide_discard_confirm_popup()
 		_on_discard_cancelled()
 		_discard_confirm_overlay.accept_event()
+
+func _on_batch_use_overlay_input(event: InputEvent):
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_hide_batch_use_popup()
+		_batch_use_overlay.accept_event()
 
 func _show_discard_confirm_popup(item_name: String):
 	if not _discard_confirm_overlay:
@@ -367,11 +520,38 @@ func _show_discard_confirm_popup(item_name: String):
 		_discard_confirm_line1.text = "确定要丢弃 %s 吗？" % item_name
 	_discard_confirm_overlay.visible = true
 
+func _show_batch_use_popup(total_count: int, item_name: String):
+	if not _batch_use_overlay:
+		_setup_batch_use_popup()
+	if not _batch_use_overlay:
+		return
+	if _batch_use_title_label:
+		_batch_use_title_label.text = "%s" % item_name
+	_batch_use_total_count = maxi(1, total_count)
+	if _batch_use_slider:
+		_batch_use_slider.min_value = 1
+		_batch_use_slider.max_value = _batch_use_total_count
+		_batch_use_slider.step = 1
+		_batch_use_slider.value = 1
+	_update_batch_use_count_label(1)
+	_batch_use_overlay.visible = true
+
 func _hide_discard_confirm_popup(clear_log: bool = false):
 	if _discard_confirm_overlay:
 		_discard_confirm_overlay.visible = false
 	if clear_log:
 		_on_discard_cancelled()
+
+func _hide_batch_use_popup():
+	if _batch_use_overlay:
+		_batch_use_overlay.visible = false
+
+func _on_batch_use_slider_changed(value: float):
+	_update_batch_use_count_label(int(value))
+
+func _update_batch_use_count_label(selected_count: int):
+	if _batch_use_count_label:
+		_batch_use_count_label.text = "%d / %d" % [selected_count, _batch_use_total_count]
 
 func _setup_viewport_listener():
 	"""设置屏幕大小变化监听"""
@@ -400,6 +580,7 @@ func show_tab():
 func hide_tab():
 	if chuna_panel:
 		chuna_panel.visible = false
+	_reset_slot_press_state()
 	_clear_item_detail_panel()
 
 # 设置物品格子
@@ -440,6 +621,7 @@ func _create_slot(index: int) -> Control:
 	slot.layout_mode = 2
 	slot.size_flags_horizontal = 3
 	slot.size_flags_vertical = 3
+	slot.mouse_filter = Control.MOUSE_FILTER_PASS
 	
 	# 初始大小，会在_update_slot_sizes中更新
 	slot.custom_minimum_size = Vector2(100, 80)
@@ -513,8 +695,49 @@ func _update_slot_sizes():
 
 # 格子输入事件
 func _on_slot_input(event: InputEvent, index: int):
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_select_slot(index)
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_slot_press_active = true
+			_slot_press_index = index
+			_slot_press_start_pos = event.position
+			_slot_press_touch_id = -1
+			_slot_press_moved = false
+		else:
+			if _slot_press_active and _slot_press_index == index and not _slot_press_moved:
+				_select_slot(index)
+			_reset_slot_press_state()
+		return
+
+	if event is InputEventMouseMotion:
+		if _slot_press_active and _slot_press_index == index:
+			if event.position.distance_to(_slot_press_start_pos) > SLOT_TOUCH_SLOP_PX:
+				_slot_press_moved = true
+		return
+
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_slot_press_active = true
+			_slot_press_index = index
+			_slot_press_start_pos = event.position
+			_slot_press_touch_id = event.index
+			_slot_press_moved = false
+		else:
+			if _slot_press_active and _slot_press_index == index and _slot_press_touch_id == event.index and not _slot_press_moved:
+				_select_slot(index)
+			_reset_slot_press_state()
+		return
+
+	if event is InputEventScreenDrag:
+		if _slot_press_active and _slot_press_index == index and _slot_press_touch_id == event.index:
+			if event.position.distance_to(_slot_press_start_pos) > SLOT_TOUCH_SLOP_PX:
+				_slot_press_moved = true
+
+func _reset_slot_press_state():
+	_slot_press_active = false
+	_slot_press_index = -1
+	_slot_press_start_pos = Vector2.ZERO
+	_slot_press_touch_id = -1
+	_slot_press_moved = false
 
 # 选择格子
 func _select_slot(index: int):
@@ -697,12 +920,20 @@ func _show_item_detail(index: int):
 			# 礼包类，显示打开按钮
 			use_button.visible = true
 			use_button.text = "打开"
+			if batch_use_button:
+				batch_use_button.visible = count > 1
 		elif (item_type == ItemData.ItemType.CONSUMABLE or item_type == ItemData.ItemType.UNLOCK_SPELL or item_type == ItemData.ItemType.UNLOCK_RECIPE or item_type == ItemData.ItemType.UNLOCK_FURNACE) and has_effect:
 			# 消耗品类或解锁类，且有effect，显示使用按钮
 			use_button.visible = true
 			use_button.text = "使用"
+			if batch_use_button:
+				batch_use_button.visible = count > 1
 		else:
 			use_button.visible = false
+			if batch_use_button:
+				batch_use_button.visible = false
+	elif batch_use_button:
+		batch_use_button.visible = false
 	
 	# 丢弃按钮始终显示
 	if discard_button:
@@ -747,6 +978,8 @@ func _clear_item_detail_panel():
 		view_button.visible = false
 	if use_button:
 		use_button.visible = false
+	if batch_use_button:
+		batch_use_button.visible = false
 	if discard_button:
 		discard_button.visible = false
 	
@@ -846,16 +1079,8 @@ func _on_use_button_pressed():
 	if not _begin_action_lock("inventory_use"):
 		return
 
-	var settle_ok = true
-	if game_ui and game_ui.cultivation_module and game_ui.cultivation_module.has_method("flush_pending_and_then"):
-		settle_ok = await game_ui.cultivation_module.flush_pending_and_then(func(): pass)
-	if not settle_ok:
-		_add_log("修炼增量同步失败，暂无法使用物品")
-		_end_action_lock("inventory_use")
-		return
-
 	var item_id = current_selected_item_id
-	var result = await api.inventory_use(item_id)
+	var result = await _use_item_once(item_id, true)
 	if not result.get("success", false):
 		var err_msg = _get_inventory_result_message(result, "使用失败")
 		if not err_msg.is_empty():
@@ -871,6 +1096,78 @@ func _on_use_button_pressed():
 
 	_end_action_lock("inventory_use")
 
+func _on_batch_use_button_pressed():
+	if current_selected_item_id.is_empty() or current_selected_index < 0:
+		return
+	if not inventory:
+		return
+	var item_list = inventory.get_item_list()
+	if current_selected_index < 0 or current_selected_index >= item_list.size():
+		return
+	var selected_item = item_list[current_selected_index]
+	var total_count = int(selected_item.get("count", 0))
+	if total_count <= 1:
+		return
+	var item_name = _get_item_name(current_selected_item_id)
+	_show_batch_use_popup(total_count, item_name)
+
+func _on_batch_use_confirm_pressed():
+	if current_selected_item_id.is_empty() or not api:
+		return
+	var selected_count = 1
+	if _batch_use_slider:
+		selected_count = int(_batch_use_slider.value)
+	selected_count = maxi(1, mini(selected_count, _batch_use_total_count))
+	_hide_batch_use_popup()
+	await _perform_batch_use(selected_count)
+
+func _perform_batch_use(use_count: int):
+	if use_count <= 0:
+		return
+	if not _begin_action_lock("inventory_batch_use"):
+		return
+
+	var item_id = current_selected_item_id
+	var settle_ok = true
+	if game_ui and game_ui.cultivation_module and game_ui.cultivation_module.has_method("flush_pending_and_then"):
+		settle_ok = await game_ui.cultivation_module.flush_pending_and_then(func(): pass)
+	if not settle_ok:
+		_add_log("修炼同步异常，请稍后重试")
+		_end_action_lock("inventory_batch_use")
+		return
+
+	var result = await api.inventory_use(item_id, use_count)
+	var success_count = int(result.get("reason_data", {}).get("completed_count", 0))
+	var first_error := ""
+	if not result.get("success", false):
+		first_error = _get_inventory_result_message(result, "使用失败")
+	else:
+		for i in range(success_count):
+			item_used.emit(item_id)
+		_apply_local_unlock_result(result)
+
+	await _refresh_after_inventory_action(true)
+
+	if success_count > 0:
+		var item_name = _get_item_name(item_id)
+		_add_log("%s批量使用成功 x%s" % [item_name, UIUtils.format_display_number_integer(float(success_count))])
+	if not first_error.is_empty():
+		_add_log(first_error)
+
+	_end_action_lock("inventory_batch_use")
+
+func _use_item_once(item_id: String, need_flush: bool) -> Dictionary:
+	if need_flush:
+		var settle_ok = true
+		if game_ui and game_ui.cultivation_module and game_ui.cultivation_module.has_method("flush_pending_and_then"):
+			settle_ok = await game_ui.cultivation_module.flush_pending_and_then(func(): pass)
+		if not settle_ok:
+			return {
+				"success": false,
+				"reason_code": "CLIENT_CULTIVATION_FLUSH_FAILED"
+			}
+	return await api.inventory_use(item_id, 1)
+
 func _on_discard_button_pressed():
 	if current_selected_item_id.is_empty() or current_selected_index < 0:
 		return
@@ -878,12 +1175,8 @@ func _on_discard_button_pressed():
 	var item_info = item_data.get_item_data(current_selected_item_id) if item_data else {}
 	var item_name = item_info.get("name", "未知")
 
-	# 检查是否为重要物品（需要二次确认）
-	if item_data and item_data.is_important(current_selected_item_id):
-		_show_discard_confirm_dialog(item_name)
-	else:
-		# 直接丢弃
-		_perform_discard()
+	# 所有物品都需要二次确认
+	_show_discard_confirm_dialog(item_name)
 
 # 显示丢弃确认对话框
 func _show_discard_confirm_dialog(item_name: String):

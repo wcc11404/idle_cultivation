@@ -126,3 +126,41 @@ func test_spell_detail_popup_upgrade_conditions_sync_after_unlock_and_charge():
 	await get_tree().process_frame
 
 	assert_eq(spirit_amount_label.text, "1 / 1", "充灵后弹窗应实时反映充灵进度")
+
+func test_spell_detail_popup_unobtained_spell_uses_level_one_preview():
+	await harness.reset_and_sync()
+	var module = harness.game_ui.spell_module
+
+	# 确保基础吐纳未解锁（只校验“未获得术法”分支展示）
+	var set_items = await harness.client.test_post("/test/set_inventory_items", {
+		"items": {
+			"spell_basic_breathing": 0
+		}
+	})
+	assert_true(set_items.get("success", false), "应能清空术法解锁道具")
+	await harness.sync_full_state()
+
+	module.current_viewing_spell = "basic_breathing"
+	module._show_spell_detail("basic_breathing")
+	await get_tree().process_frame
+
+	var popup = module.spell_detail_popup
+	assert_not_null(popup, "应创建术法详情弹窗")
+
+	var level_label = popup.vbox.get_node_or_null("LevelLabel") if popup and popup.vbox else null
+	var attr_value = popup.vbox.get_node_or_null("AttributeValue") if popup and popup.vbox else null
+	var effect_value = popup.vbox.get_node_or_null("EffectValue") if popup and popup.vbox else null
+	var use_count_label = popup.vbox.get_node_or_null("UpgradeConditionsBox/UseCountRow/UseCountValueLabel") if popup and popup.vbox else null
+	var spirit_amount_label = popup.vbox.get_node_or_null("UpgradeConditionsBox/SpiritChargeRow/SpiritAmountLabel") if popup and popup.vbox else null
+
+	assert_not_null(level_label, "弹窗应包含等级标签")
+	assert_not_null(attr_value, "弹窗应包含属性加成标签")
+	assert_not_null(effect_value, "弹窗应包含术法效果标签")
+	assert_not_null(use_count_label, "弹窗应包含使用次数标签")
+	assert_not_null(spirit_amount_label, "弹窗应包含所需灵气标签")
+
+	assert_eq(level_label.text, "等级：未解锁", "未获得术法应显示未解锁等级文案")
+	assert_true(not attr_value.text.is_empty(), "未获得术法时属性加成应按1级数据展示")
+	assert_true(not effect_value.text.is_empty(), "未获得术法时术法效果应按1级数据展示")
+	assert_eq(use_count_label.text, "- / -", "未获得术法升级条件应保持未解锁占位文案")
+	assert_eq(spirit_amount_label.text, "- / -", "未获得术法充灵条件应保持未解锁占位文案")

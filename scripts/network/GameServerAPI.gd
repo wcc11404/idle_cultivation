@@ -82,9 +82,10 @@ func player_breakthrough() -> Dictionary:
 
 # ==================== 背包 ====================
 
-func inventory_use(item_id: String) -> Dictionary:
+func inventory_use(item_id: String, count: int = 1) -> Dictionary:
 	return await network_manager.request("POST", "/game/inventory/use", {
-		"item_id": item_id
+		"item_id": item_id,
+		"count": maxi(1, count)
 	}, _critical_options())
 
 func inventory_discard(item_id: String, count: int) -> Dictionary:

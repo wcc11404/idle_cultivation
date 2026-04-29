@@ -61,9 +61,18 @@ func _is_spell_obtained(spell_id: String) -> bool:
 		return false
 	return bool(spell_info.get("obtained", false)) or int(spell_info.get("level", 0)) > 0
 
+func _has_any_learned_recipe() -> bool:
+	if not game_ui or not is_instance_valid(game_ui):
+		return false
+	var alchemy_sys = game_ui.get("alchemy_system")
+	if not alchemy_sys or not alchemy_sys.has_method("get_learned_recipes"):
+		return false
+	var learned_recipes = alchemy_sys.get_learned_recipes()
+	return learned_recipes is Array and not learned_recipes.is_empty()
+
 func _on_alchemy_workshop_pressed():
-	if not _is_spell_obtained("alchemy"):
-		log_message.emit("需先学会炼丹术，才可进入炼丹坊")
+	if not _has_any_learned_recipe():
+		log_message.emit("需先学会任意丹方，才可进入炼丹坊")
 		return
 	# 隐藏地区面板
 	if region_panel:

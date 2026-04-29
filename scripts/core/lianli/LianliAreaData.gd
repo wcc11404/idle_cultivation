@@ -191,7 +191,7 @@ func is_tower_area(area_id: String) -> bool:
 
 func get_tower_name() -> String:
 	var config = TOWER_CONFIG.get("config", {})
-	return config.get("name", "无尽塔")
+	return config.get("name", "南麓试练塔")
 
 func get_tower_description() -> String:
 	var config = TOWER_CONFIG.get("config", {})

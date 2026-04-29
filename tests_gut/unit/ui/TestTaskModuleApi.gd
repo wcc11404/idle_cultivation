@@ -70,8 +70,11 @@ func test_task_panel_sort_unclaimed_first_claimed_last():
 	module._on_newbie_tab_pressed()
 
 	var titles := _task_card_titles(module.task_list)
-	assert_eq(titles.size(), 3, "新手任务卡片数应为3")
+	assert_eq(titles.size(), 7, "新手任务卡片数应与配置一致")
 	assert_eq(titles[0], "打开新手礼包Ⅱ", "未领取任务应在上方")
 	assert_eq(titles[1], "打开新手礼包Ⅲ", "未领取任务应在上方")
-	assert_eq(titles[2], "打开新手礼包Ⅰ", "已领取任务应下沉到底部")
-
+	assert_eq(titles[2], "采集10次", "未领取任务应在上方")
+	assert_eq(titles[3], "采集20次", "未领取任务应在上方")
+	assert_eq(titles[4], "炼成20颗补血丹", "未领取任务应在上方")
+	assert_eq(titles[5], "炼成1颗筑基丹", "未领取任务应在上方")
+	assert_eq(titles[6], "打开新手礼包Ⅰ", "已领取任务应下沉到底部")

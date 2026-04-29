@@ -78,9 +78,9 @@ func player_breakthrough() -> Dictionary:
 	_count("player_breakthrough")
 	return await api.player_breakthrough()
 
-func inventory_use(item_id: String) -> Dictionary:
+func inventory_use(item_id: String, count: int = 1) -> Dictionary:
 	_count("inventory_use")
-	return await api.inventory_use(item_id)
+	return await api.inventory_use(item_id, count)
 
 func inventory_discard(item_id: String, count: int) -> Dictionary:
 	_count("inventory_discard")

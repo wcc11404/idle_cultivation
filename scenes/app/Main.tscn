@@ -252,6 +252,102 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stat_badge_attack"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.776471, 0.647059, 0.223529, 1)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stat_badge_defense"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.32549, 0.552941, 0.803922, 1)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stat_badge_speed"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.717647, 0.423529, 0.14902, 1)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stat_badge_spirit_gain"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.27451, 0.611765, 0.396078, 1)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stat_badge_penetration"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.556863, 0.380392, 0.8, 1)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stat_badge_crit"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.784314, 0.290196, 0.45098, 1)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stat_badge_crit_damage"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.792157, 0.392157, 0.313726, 1)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stat_badge_health_regen"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.819608, 0.321569, 0.321569, 1)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bottom_tab_normal"]
 bg_color = Color(0.94902, 0.898039, 0.8, 1)
 border_width_top = 0
@@ -317,15 +413,14 @@ layout_mode = 1
 anchors_preset = 0
 mouse_filter = 2
 
-[node name="TopFill" type="TextureRect" parent="SafeTop" unique_id=1799001002]
+[node name="TopFill" type="ColorRect" parent="SafeTop" unique_id=1799001002]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-expand_mode = 1
-stretch_mode = 6
+color = Color(0, 0, 0, 1)
 
 [node name="ContentFrame" type="Control" parent="." unique_id=1799001003]
 layout_mode = 1
@@ -575,6 +670,7 @@ custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
 
 [node name="HealthRow" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=458812414]
+custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
 
 [node name="HealthLeftPad" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HealthRow" unique_id=458812416]
@@ -582,14 +678,15 @@ custom_minimum_size = Vector2(12, 0)
 layout_mode = 2
 
 [node name="HealthLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HealthRow" unique_id=458812415]
-custom_minimum_size = Vector2(40, 0)
+custom_minimum_size = Vector2(40, 24)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 20
 text = "气血"
+vertical_alignment = 1
 
 [node name="HealthBar" type="ProgressBar" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HealthRow" unique_id=1061263608]
-custom_minimum_size = Vector2(150, 20)
+custom_minimum_size = Vector2(150, 24)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/background = SubResource("StyleBoxFlat_progress_background")
@@ -599,14 +696,16 @@ value = 1000.0
 show_percentage = false
 
 [node name="HealthValue" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/HealthRow" unique_id=671186878]
-custom_minimum_size = Vector2(96, 0)
+custom_minimum_size = Vector2(96, 24)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 20
 text = "500 / 500"
 horizontal_alignment = 2
+vertical_alignment = 1
 
 [node name="SpiritRow" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=671186877]
+custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
 
 [node name="SpiritLeftPad" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritRow" unique_id=671186881]
@@ -614,14 +713,15 @@ custom_minimum_size = Vector2(12, 0)
 layout_mode = 2
 
 [node name="SpiritLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritRow" unique_id=671186879]
-custom_minimum_size = Vector2(40, 0)
+custom_minimum_size = Vector2(40, 24)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 20
 text = "灵气"
+vertical_alignment = 1
 
 [node name="SpiritBar" type="ProgressBar" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritRow" unique_id=1061263609]
-custom_minimum_size = Vector2(150, 20)
+custom_minimum_size = Vector2(150, 24)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/background = SubResource("StyleBoxFlat_progress_background")
@@ -629,54 +729,318 @@ theme_override_styles/fill = SubResource("StyleBoxFlat_progress_spirit_fill")
 show_percentage = false
 
 [node name="SpiritValue" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritRow" unique_id=671186880]
-custom_minimum_size = Vector2(96, 0)
+custom_minimum_size = Vector2(96, 24)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 20
 text = "0 / 100"
 horizontal_alignment = 2
+vertical_alignment = 1
 
 [node name="SeparatorMargin" type="MarginContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=1352927165]
 layout_mode = 2
 theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_bottom = 8
 
 [node name="Separator" type="HSeparator" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SeparatorMargin" unique_id=1352927159]
 layout_mode = 2
 
 [node name="StatsRow" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=1352927160]
 layout_mode = 2
-alignment = 1
+alignment = 0
+theme_override_constants/separation = 8
 
-[node name="AttackLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow" unique_id=1352927161]
+[node name="StatsRowLeftPad" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow"]
+custom_minimum_size = Vector2(12, 0)
+layout_mode = 2
+
+[node name="AttackItem" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 0
+theme_override_constants/separation = 6
+
+[node name="AttackBadge" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/AttackItem"]
+custom_minimum_size = Vector2(26, 26)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_stat_badge_attack")
+
+[node name="AttackBadgeLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/AttackItem/AttackBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.776471, 0.647059, 0.223529, 1)
+theme_override_font_sizes/font_size = 16
+text = "攻"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="AttackNameLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/AttackItem"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "攻击"
+
+[node name="AttackValueLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/AttackItem"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 20
-text = "攻击: 50"
+text = "50"
 horizontal_alignment = 1
 
-[node name="DefenseLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow" unique_id=1352927162]
+[node name="DefenseItem" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 0
+theme_override_constants/separation = 6
+
+[node name="DefenseBadge" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/DefenseItem"]
+custom_minimum_size = Vector2(26, 26)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_stat_badge_defense")
+
+[node name="DefenseBadgeLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/DefenseItem/DefenseBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.32549, 0.552941, 0.803922, 1)
+theme_override_font_sizes/font_size = 16
+text = "防"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DefenseNameLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/DefenseItem"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "防御"
+
+[node name="DefenseValueLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/DefenseItem"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 20
-text = "防御: 25"
+text = "25"
 horizontal_alignment = 1
 
-[node name="SpeedLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow" unique_id=1352927163]
+[node name="SpeedItem" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 0
+theme_override_constants/separation = 6
+
+[node name="SpeedBadge" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/SpeedItem"]
+custom_minimum_size = Vector2(26, 26)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_stat_badge_speed")
+
+[node name="SpeedBadgeLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/SpeedItem/SpeedBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.717647, 0.423529, 0.14902, 1)
+theme_override_font_sizes/font_size = 16
+text = "速"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SpeedNameLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/SpeedItem"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "速度"
+
+[node name="SpeedValueLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/SpeedItem"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 20
-text = "速度: 10"
+text = "10"
 horizontal_alignment = 1
 
-[node name="SpiritGainLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer" unique_id=1352927164]
+[node name="StatsRow2" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer"]
+layout_mode = 2
+alignment = 0
+theme_override_constants/separation = 8
+
+[node name="StatsRow2LeftPad" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2"]
+custom_minimum_size = Vector2(12, 0)
+layout_mode = 2
+
+[node name="PenetrationItem" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 0
+theme_override_constants/separation = 6
+
+[node name="PenetrationBadge" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/PenetrationItem"]
+custom_minimum_size = Vector2(26, 26)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_stat_badge_penetration")
+
+[node name="PenetrationBadgeLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/PenetrationItem/PenetrationBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.556863, 0.380392, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+text = "穿"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PenetrationNameLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/PenetrationItem"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/font_size = 20
-text = "灵气获取: 5/秒"
+text = "穿透"
+
+[node name="PenetrationValueLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/PenetrationItem"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "0"
 horizontal_alignment = 1
+
+[node name="CritItem" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 0
+theme_override_constants/separation = 6
+
+[node name="CritBadge" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritItem"]
+custom_minimum_size = Vector2(26, 26)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_stat_badge_crit")
+
+[node name="CritBadgeLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritItem/CritBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.784314, 0.290196, 0.45098, 1)
+theme_override_font_sizes/font_size = 16
+text = "暴"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CritNameLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritItem"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "暴击"
+
+[node name="CritValueLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritItem"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "0"
+horizontal_alignment = 1
+
+[node name="CritDamageItem" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 0
+theme_override_constants/separation = 6
+
+[node name="CritDamageBadge" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritDamageItem"]
+custom_minimum_size = Vector2(26, 26)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_stat_badge_crit_damage")
+
+[node name="CritDamageBadgeLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritDamageItem/CritDamageBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.792157, 0.392157, 0.313726, 1)
+theme_override_font_sizes/font_size = 16
+text = "爆"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CritDamageNameLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritDamageItem"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "爆伤"
+
+[node name="CritDamageValueLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritDamageItem"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "0"
+horizontal_alignment = 1
+
+[node name="StatsRow3" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer"]
+layout_mode = 2
+alignment = 0
+theme_override_constants/separation = 8
+
+[node name="StatsRow3LeftPad" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3"]
+custom_minimum_size = Vector2(12, 0)
+layout_mode = 2
+
+[node name="SpiritGainItem" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 0
+theme_override_constants/separation = 6
+
+[node name="SpiritGainBadge" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/SpiritGainItem"]
+custom_minimum_size = Vector2(26, 26)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_stat_badge_spirit_gain")
+
+[node name="SpiritGainBadgeLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/SpiritGainItem/SpiritGainBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.27451, 0.611765, 0.396078, 1)
+theme_override_font_sizes/font_size = 16
+text = "灵"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SpiritGainNameLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/SpiritGainItem"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "灵气获取"
+
+[node name="SpiritGainValueLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/SpiritGainItem"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "5/秒"
+horizontal_alignment = 1
+
+[node name="StatsRow3Spacer" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HealthRegenItem" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 0
+theme_override_constants/separation = 6
+
+[node name="HealthRegenBadge" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/HealthRegenItem"]
+custom_minimum_size = Vector2(26, 26)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_stat_badge_health_regen")
+
+[node name="HealthRegenBadgeLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/HealthRegenItem/HealthRegenBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.819608, 0.321569, 0.321569, 1)
+theme_override_font_sizes/font_size = 16
+text = "恢"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HealthRegenNameLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/HealthRegenItem"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "生命恢复"
+
+[node name="HealthRegenValueLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/HealthRegenItem"]
+custom_minimum_size = Vector2(72, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "1/秒"
+horizontal_alignment = 1
+
 
 [node name="CultivationVisual" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer" unique_id=408833440]
 layout_mode = 1
@@ -686,9 +1050,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -162.0
-offset_top = -126.0
+offset_top = -121.0
 offset_right = 162.0
-offset_bottom = 198.0
+offset_bottom = 203.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -887,6 +1251,7 @@ custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
 
 [node name="TopBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/ChunaPanel" unique_id=137317974]
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 
 [node name="CapacityLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/ChunaPanel/TopBar" unique_id=2033629295]
@@ -911,7 +1276,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 
 [node name="SortButton" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/ChunaPanel/TopBar" unique_id=1081617033]
-custom_minimum_size = Vector2(80, 35)
+custom_minimum_size = Vector2(88, 44)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
 theme_override_font_sizes/font_size = 16
@@ -935,7 +1300,7 @@ theme_override_constants/v_separation = 5
 columns = 5
 
 [node name="ItemDetailPanel" type="Panel" parent="ContentFrame/VBoxContainer/ContentPanel/ChunaPanel" unique_id=510795323]
-custom_minimum_size = Vector2(0, 180)
+custom_minimum_size = Vector2(0, 210)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_detail")
 
@@ -1052,16 +1417,28 @@ layout_mode = 2
 custom_minimum_size = Vector2(148, 0)
 size_flags_vertical = 3
 theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
 
 [node name="ButtonVBox" type="VBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/MainHBox/ButtonContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 alignment = 1
-theme_override_constants/separation = 10
+theme_override_constants/separation = 16
+
+[node name="BatchUseButton" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/MainHBox/ButtonContainer/ButtonVBox" unique_id=1203519981]
+custom_minimum_size = Vector2(84, 44)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+text = "批量使用"
 
 [node name="UseButton" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/MainHBox/ButtonContainer/ButtonVBox" unique_id=351503503]
-custom_minimum_size = Vector2(84, 36)
+custom_minimum_size = Vector2(84, 44)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
 theme_override_font_sizes/font_size = 14
@@ -1349,7 +1726,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-text = "炼气期历练场"
+text = "青梧林地外围"
 
 [node name="Area2Button" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=718509521]
 custom_minimum_size = Vector2(0, 80)
@@ -1359,7 +1736,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-text = "炼气期内围山谷"
+text = "白石丘原外围"
 
 [node name="Area3Button" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=718509522]
 custom_minimum_size = Vector2(0, 80)
@@ -1369,7 +1746,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-text = "筑基期外围荒原"
+text = "青梧林地深处"
 
 [node name="Area4Button" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=718509523]
 custom_minimum_size = Vector2(0, 80)
@@ -1379,7 +1756,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-text = "筑基期内围沼泽"
+text = "白石丘原中心"
 
 [node name="SpecialAreaSeparator" type="HSeparator" parent="ContentFrame/VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=1410065407]
 custom_minimum_size = Vector2(0, 20)
@@ -1404,7 +1781,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
-text = "无尽塔 (第1层)"
+text = "南麓试练塔 (第1层)"
 
 [node name="DailyDungeonSeparator" type="HSeparator" parent="ContentFrame/VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer" unique_id=1410065409]
 custom_minimum_size = Vector2(0, 20)
@@ -2233,8 +2610,42 @@ size_flags_vertical = 3
 size_flags_stretch_ratio = 1.1
 theme_override_styles/panel = SubResource("StyleBoxFlat_log")
 
-[node name="LogText" type="RichTextLabel" parent="ContentFrame/VBoxContainer/LogArea" unique_id=699068195]
+[node name="LogVBox" type="VBoxContainer" parent="ContentFrame/VBoxContainer/LogArea"]
 layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="LogFilterTabBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/LogArea/LogVBox"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="LogFilterAllButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "全部"
+
+[node name="LogFilterSystemButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "系统"
+
+[node name="LogFilterBattleButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "战斗"
+
+[node name="LogFilterProductionButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "生产"
+
+[node name="LogText" type="RichTextLabel" parent="ContentFrame/VBoxContainer/LogArea/LogVBox" unique_id=699068195]
+layout_mode = 2
+size_flags_vertical = 3
 theme_override_colors/default_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_font_sizes/normal_font_size = 20
 text = "欢迎来到修仙世界！

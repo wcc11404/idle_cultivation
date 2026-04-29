@@ -72,6 +72,7 @@ var _simulated_player_max_health: float = 0.0
 var _enemy_hp_tween: Tween = null
 var _player_hp_tween: Tween = null
 var _finish_time_invalid_prompted: bool = false
+var _continuous_default_applied: bool = false
 
 # 等待状态
 var _is_waiting: bool = false
@@ -157,6 +158,7 @@ func initialize(ui: Node, player_node: Node, lianli_sys: Node,
 	api = game_api
 	spell_data = spell_data_node
 	spell_system = spell_system_node
+	_continuous_default_applied = false
 	_update_lianli_speed_button_text()
 	_update_battle_info()
 
@@ -347,7 +349,6 @@ func _start_timeline_from_simulation(sim_result: Dictionary, area_id: String):
 	# 进入战斗场景后立即刷新一次区域/奖励信息，避免首次进入显示为空。
 	_update_battle_info()
 
-	_set_continuous_default()
 	_update_button_container()
 	_is_timeline_running = true
 
@@ -394,15 +395,13 @@ func _finish_current_battle(full_settle: bool):
 		var battle_victory = _simulate_victory
 
 		# 战斗结果日志
-		if battle_victory:
+		if not battle_victory:
 			if log_manager:
-				log_manager.add_battle_log("战斗胜利！")
-		else:
-			if log_manager:
-				log_manager.add_battle_log("气血不足，停止战斗")
+				log_manager.add_battle_log("战斗失败，气血不足")
 
-		# 掉落奖励日志
+		# 掉落奖励日志（战斗专属，不走储纳“获得物品”文案）
 		if battle_victory and not settle_loot.is_empty():
+			var loot_parts: Array = []
 			for loot_item in settle_loot:
 				var item_id = loot_item.get("item_id", "")
 				var amount = loot_item.get("amount", 0)
@@ -412,20 +411,21 @@ func _finish_current_battle(full_settle: bool):
 					var item_name = item_id
 					if item_data_ref and item_data_ref.has_method("get_item_name"):
 						item_name = item_data_ref.get_item_name(item_id)
-					if log_manager:
-						log_manager.add_battle_log("获得奖励: " + item_name + " x" + UI_UTILS.format_display_number(float(amount_int)))
+					loot_parts.append(item_name + " x" + UI_UTILS.format_display_number(float(amount_int)))
+			if log_manager and not loot_parts.is_empty():
+				log_manager.add_battle_log("战斗胜利，获得" + "、".join(loot_parts))
 
 		# 特殊区域通关日志
 		if battle_victory and lianli_area_data:
 			if lianli_area_data.is_single_boss_area(current_lianli_area_id):
 				if log_manager:
-					log_manager.add_battle_log("通关成功！")
+					log_manager.add_battle_log("战斗胜利，通关成功")
 			elif lianli_area_data.is_tower_area(current_lianli_area_id):
 				# 无尽塔层数从 lianli_system 获取
 				if lianli_system:
 					var current_floor = lianli_system.get_current_tower_floor()
 					if log_manager:
-						log_manager.add_battle_log("挑战第" + str(current_floor) + "层成功")
+						log_manager.add_battle_log("战斗胜利，挑战第" + str(current_floor) + "层成功")
 
 		on_battle_ended(battle_victory, settle_loot if battle_victory else [], str(_current_enemy_data.get("name", "敌人")))
 		if battle_victory and is_continuous_checked():
@@ -572,7 +572,7 @@ func update_endless_tower_button_text(button: Button):
 	if not button:
 		return
 	
-	var tower_name = "无尽塔"
+	var tower_name = "南麓试练塔"
 	var current_floor = 1
 	var max_floor = 51
 	
@@ -631,6 +631,7 @@ func on_lianli_speed_pressed():
 	_action_lock.end("lianli_speed_switch", 0.0)
 
 func on_tab_entered():
+	_ensure_continuous_default_applied()
 	_update_lianli_speed_button_text()
 	call_deferred("_refresh_speed_options_on_tab_enter")
 
@@ -659,7 +660,8 @@ func _update_battle_info():
 	# 更新区域名称
 	if area_name_label:
 		if lianli_system.is_in_endless_tower():
-			area_name_label.text = "无尽塔 - 第 " + str(lianli_system.get_current_tower_floor()) + " 层"
+			var tower_name = lianli_area_data.get_tower_name() if lianli_area_data else "南麓试练塔"
+			area_name_label.text = tower_name + " - 第 " + str(lianli_system.get_current_tower_floor()) + " 层"
 		elif current_lianli_area_id != "":
 			area_name_label.text = lianli_area_data.get_area_name(current_lianli_area_id) if lianli_area_data else ""
 		else:
@@ -854,6 +856,12 @@ func _set_continuous_default():
 		return
 	var area_id = current_lianli_area_id if not current_lianli_area_id.is_empty() else "area_1"
 	continuous_checkbox.button_pressed = lianli_area_data.get_default_continuous(area_id)
+
+func _ensure_continuous_default_applied() -> void:
+	if _continuous_default_applied:
+		return
+	_set_continuous_default()
+	_continuous_default_applied = true
 
 # 战斗结束
 func on_battle_ended(victory: bool, loot: Array, enemy_name: String):

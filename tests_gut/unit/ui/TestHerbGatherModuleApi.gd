@@ -60,7 +60,7 @@ func test_herb_start_report_and_stop_flow():
 
 	var log_text = harness.last_log()
 	assert_true(
-		log_text == "采集获得" or log_text == "本轮采集失败",
+		log_text.begins_with("采集成功，获得") or log_text == "采集失败，本轮未获得产物",
 		"上报后应输出采集结果文案，实际: %s" % log_text
 	)
 

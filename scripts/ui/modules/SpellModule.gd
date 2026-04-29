@@ -351,6 +351,7 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 func _create_card_template() -> Control:
 	var card = PanelContainer.new()
 	card.custom_minimum_size = Vector2(130, 160)
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	SPELL_THUMBNAIL_TEMPLATE.apply_to_card(card, {
 		"bg_color": SPELL_THUMBNAIL_TEMPLATE.DEFAULT_BG_COLOR
 	})
@@ -391,8 +392,17 @@ func _create_card_template() -> Control:
 	equip_button.custom_minimum_size = Vector2(48, 30)
 	equip_button.add_theme_font_size_override("font_size", 14)
 	button_container.add_child(equip_button)
+	_set_non_button_mouse_filter_ignore(card)
 	
 	return card
+
+func _set_non_button_mouse_filter_ignore(root: Control) -> void:
+	if root is Button:
+		return
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in root.get_children():
+		if child is Control:
+			_set_non_button_mouse_filter_ignore(child)
 
 func _return_card_to_pool(card: Control):
 	if card.get_parent():

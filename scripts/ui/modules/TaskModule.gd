@@ -42,8 +42,10 @@ func _setup_ui_styles() -> void:
 			"font_size": 20
 		})
 	if task_scroll:
-		task_scroll.horizontal_scroll_mode = 3
+		task_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		task_scroll.vertical_scroll_mode = 3
+	if task_list:
+		task_list.mouse_filter = Control.MOUSE_FILTER_PASS
 
 
 func _setup_signals() -> void:
@@ -138,6 +140,7 @@ func _build_task_card(task: Dictionary) -> PanelContainer:
 	card.custom_minimum_size = Vector2(0, 140)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
 
 	var card_style := StyleBoxFlat.new()
 	card_style.bg_color = Color(0.95, 0.90, 0.80, 1.0)
@@ -247,17 +250,27 @@ func _build_task_card(task: Dictionary) -> PanelContainer:
 	claim_button.text = "已领取" if claimed else ("领取" if completed else "未完成")
 	if claimed:
 		claim_button.disabled = true
-		ACTION_BUTTON_TEMPLATE.apply_light_neutral(claim_button, Vector2(112, 42), 18)
+		ACTION_BUTTON_TEMPLATE.apply_light_neutral(claim_button, Vector2(112, 44), 20)
 	elif completed:
 		claim_button.disabled = false
-		ACTION_BUTTON_TEMPLATE.apply_alchemy_green(claim_button, Vector2(112, 42), 18)
+		ACTION_BUTTON_TEMPLATE.apply_alchemy_green(claim_button, Vector2(112, 44), 20)
 		claim_button.pressed.connect(_on_claim_pressed.bind(task_id))
 	else:
 		claim_button.disabled = true
-		ACTION_BUTTON_TEMPLATE.apply_light_neutral(claim_button, Vector2(112, 42), 18)
+		ACTION_BUTTON_TEMPLATE.apply_light_neutral(claim_button, Vector2(112, 44), 20)
 	right_vbox.add_child(claim_button)
+	_set_non_button_mouse_filter_ignore(card)
 
 	return card
+
+
+func _set_non_button_mouse_filter_ignore(root: Control) -> void:
+	if root is Button:
+		return
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in root.get_children():
+		if child is Control:
+			_set_non_button_mouse_filter_ignore(child)
 
 
 func _on_claim_pressed(task_id: String) -> void:

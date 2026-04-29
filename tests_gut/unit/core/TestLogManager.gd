@@ -41,10 +41,11 @@ func test_add_log():
 	log_manager.clear_logs()
 	
 	log_manager.add_system_log("测试日志1")
-	log_manager.add_system_log("测试日志2")
+	log_manager.add_battle_log("战斗日志")
+	log_manager.add_production_log("生产日志")
 	
 	var logs = log_manager.get_logs()
-	assert_eq(logs.size(), 2, "添加2条日志")
+	assert_eq(logs.size(), 3, "添加3条分类日志")
 
 func test_add_log_structure():
 	log_manager.clear_logs()
@@ -133,12 +134,29 @@ func test_keyword_highlighting_offline():
 
 func test_max_log_count():
 	log_manager.clear_logs()
+	log_manager.set_max_log_count(500)
 	
 	for i in range(600):
 		log_manager.add_system_log("日志" + str(i))
 	
 	var logs = log_manager.get_logs()
 	assert_eq(logs.size(), 500, "最大保留500条日志")
+
+func test_log_filtering():
+	log_manager.clear_logs()
+	log_manager.set_rich_text_label(test_label)
+	log_manager.add_system_log("系统A")
+	log_manager.add_battle_log("战斗B")
+	log_manager.add_production_log("生产C")
+
+	log_manager.set_filter("battle")
+	assert_true(test_label.text.contains("战斗B"), "战斗筛选应显示战斗日志")
+	assert_false(test_label.text.contains("系统A"), "战斗筛选不应显示系统日志")
+	assert_false(test_label.text.contains("生产C"), "战斗筛选不应显示生产日志")
+
+	log_manager.set_filter("production")
+	assert_true(test_label.text.contains("生产C"), "生产筛选应显示生产日志")
+	assert_false(test_label.text.contains("战斗B"), "生产筛选不应显示战斗日志")
 
 #endregion
 

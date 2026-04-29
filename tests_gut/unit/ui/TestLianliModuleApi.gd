@@ -186,6 +186,38 @@ func test_lianli_continuous_waiting_flow_advances_to_next_simulation():
 
 	assert_eq(fake_api.simulate_calls, 1, "等待结束后应自动发起下一场模拟")
 	assert_false(module._is_waiting, "下一场模拟启动后应退出等待态")
+	assert_true(module.continuous_checkbox.button_pressed, "连续战斗勾选在进入下一场后不应被默认值覆盖")
+
+func test_lianli_continuous_choice_kept_after_next_battle_start():
+	var module = harness.game_ui.lianli_module
+	var fake_api = FakeLianliApi.new()
+	module.add_child(fake_api)
+	module.api = fake_api
+
+	module.current_lianli_area_id = "area_1"
+	module.continuous_checkbox.button_pressed = true
+	module.on_continuous_toggled(true)
+
+	module._start_timeline_from_simulation(
+		{
+			"battle_timeline": [],
+			"total_time": 0.0,
+			"victory": true,
+			"loot": [],
+			"enemy_data": {"name": "测试敌人", "level": 1, "health": 100},
+			"player_health_after": 100
+		},
+		"area_1"
+	)
+
+	await module._finish_current_battle(true)
+	module._wait_interval = 0.01
+	module._wait_timer = 0.0
+	await module._process(0.02)
+
+	assert_eq(fake_api.simulate_calls, 1, "连战应进入下一场模拟")
+	assert_true(module._is_timeline_running, "下一场模拟后应进入时间轴播放态")
+	assert_true(module.continuous_checkbox.button_pressed, "仅首次进入历练按配置加载，后续应保持用户勾选")
 
 func test_lianli_exit_before_first_event_uses_minus_one_index():
 	var module = harness.game_ui.lianli_module
@@ -255,7 +287,7 @@ func test_tower_reward_panel_shows_current_floor_reward_when_current_floor_is_re
 
 	assert_eq(
 		module.reward_info_label.text,
-		"距离奖励层还需挑战 0 层（第5层）\n奖励：10灵石、3补血丹",
+		"距离奖励层还需挑战 0 层（第5层）\n奖励：10灵石、1补血丹、1基础吐纳",
 		"当前挑战层本身就是奖励层时，应显示当前层奖励而不是下一奖励层"
 	)
 

@@ -20,6 +20,7 @@ const COLOR_INDICATOR := Color(0.3, 0.55, 0.3, 1.0)
 const COLOR_BUTTON_RED := Color(0.6, 0.35, 0.35, 1.0)
 const COLOR_PROGRESS_BG := Color(0.5, 0.47, 0.43, 1.0)
 const COLOR_PROGRESS_FILL := Color(0.3, 0.6, 0.3, 1.0)
+const RECIPE_CARD_TOUCH_SLOP_PX := 14.0
 
 const FONT_SIZE_TITLE := 24
 const FONT_SIZE_NORMAL := 18
@@ -83,6 +84,7 @@ var _material_entry_order: Array = []
 var _progress_margin_added: bool = false
 var _signals_connected: bool = false
 var _ui_style_setup_done: bool = false
+var _recipe_card_press_states: Dictionary = {}
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ACTION_LOCK_MANAGER.new()
@@ -332,7 +334,10 @@ func _restore_pending_cost() -> Dictionary:
 
 func _get_alchemy_tick_message(report_result: Dictionary) -> String:
 	if int(report_result.get("success_count", 0)) > 0:
-		return ""
+		var products = report_result.get("products", {})
+		if products is Dictionary and not products.is_empty():
+			return "炼制成功，获得" + _format_alchemy_items(products)
+		return "炼制成功"
 	var returned_materials = report_result.get("returned_materials", {})
 	if returned_materials is Dictionary and not returned_materials.is_empty():
 		return "炼制失败，返还材料" + _format_alchemy_items(returned_materials)
@@ -545,7 +550,7 @@ func _update_count_button_styles():
 		btn.disabled = bool(config.disabled)
 
 func _apply_count_button_style(btn: Button, _is_selected: bool):
-	btn.custom_minimum_size = Vector2(54, 40)
+	btn.custom_minimum_size = Vector2(58, 42)
 	ACTION_BUTTON_TEMPLATE.apply_spell_view_brown(btn, btn.custom_minimum_size, FONT_SIZE_NORMAL)
 
 func _style_craft_button():
@@ -702,6 +707,7 @@ func _ensure_empty_recipe_tip():
 	recipe_list_container.add_child(label)
 
 func _sync_recipe_cards(sorted_recipes: Array):
+	_recipe_card_press_states.clear()
 	var new_set := {}
 	for recipe_id_variant in sorted_recipes:
 		var recipe_id = str(recipe_id_variant)
@@ -749,14 +755,15 @@ func _update_recipe_card_name(card: Control, recipe_name: String):
 
 func _create_recipe_card(recipe_id: String, recipe_name: String) -> Control:
 	var card = PanelContainer.new()
-	card.custom_minimum_size = Vector2(0, 44)
+	card.custom_minimum_size = Vector2(0, 66)
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	
 	var style = StyleBoxFlat.new()
 	style.bg_color = COLOR_BG_LIGHT
-	style.content_margin_left = 8
-	style.content_margin_right = 8
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
 	card.add_theme_stylebox_override("panel", style)
 	
 	var hbox = HBoxContainer.new()
@@ -764,31 +771,86 @@ func _create_recipe_card(recipe_id: String, recipe_name: String) -> Control:
 	
 	var indicator = ColorRect.new()
 	indicator.name = "SelectedIndicator"
-	indicator.custom_minimum_size = Vector2(4, 24)
+	indicator.custom_minimum_size = Vector2(6, 36)
 	indicator.color = Color(0.3, 0.5, 0.3, 0.0)
 	hbox.add_child(indicator)
 	
 	var spacer = Control.new()
-	spacer.custom_minimum_size = Vector2(4, 0)
+	spacer.custom_minimum_size = Vector2(6, 0)
 	hbox.add_child(spacer)
 	
 	var name_label = Label.new()
 	name_label.name = "RecipeNameLabel"
 	name_label.text = recipe_name
 	name_label.add_theme_color_override("font_color", COLOR_TEXT_DARK)
-	name_label.add_theme_font_size_override("font_size", FONT_SIZE_SMALL_TEXT)
+	name_label.add_theme_font_size_override("font_size", FONT_SIZE_NORMAL)
 	hbox.add_child(name_label)
-	
-	var button = Button.new()
-	button.name = "ClickButton"
-	button.modulate = Color(1, 1, 1, 0)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	button.pressed.connect(func(): _on_recipe_card_clicked(recipe_id))
-	card.add_child(button)
+	_set_non_button_mouse_filter_ignore(card)
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
+	card.gui_input.connect(_on_recipe_card_input.bind(card, recipe_id))
 	
 	card.set_meta("recipe_id", recipe_id)
 	return card
+
+func _on_recipe_card_input(event: InputEvent, card: Control, recipe_id: String) -> void:
+	if not is_instance_valid(card):
+		return
+	var key := str(card.get_instance_id())
+	var state: Dictionary = _recipe_card_press_states.get(key, {
+		"active": false,
+		"touch_id": -1,
+		"start_pos": Vector2.ZERO,
+		"moved": false,
+	})
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			state["active"] = true
+			state["touch_id"] = -1
+			state["start_pos"] = event.position
+			state["moved"] = false
+		else:
+			if bool(state.get("active", false)) and not bool(state.get("moved", false)):
+				_on_recipe_card_clicked(recipe_id)
+			state["active"] = false
+			state["touch_id"] = -1
+			state["moved"] = false
+		_recipe_card_press_states[key] = state
+		return
+	if event is InputEventMouseMotion:
+		if bool(state.get("active", false)):
+			var start_pos: Vector2 = state.get("start_pos", Vector2.ZERO)
+			if event.position.distance_to(start_pos) > RECIPE_CARD_TOUCH_SLOP_PX:
+				state["moved"] = true
+				_recipe_card_press_states[key] = state
+		return
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			state["active"] = true
+			state["touch_id"] = event.index
+			state["start_pos"] = event.position
+			state["moved"] = false
+		else:
+			if bool(state.get("active", false)) and int(state.get("touch_id", -1)) == event.index and not bool(state.get("moved", false)):
+				_on_recipe_card_clicked(recipe_id)
+			state["active"] = false
+			state["touch_id"] = -1
+			state["moved"] = false
+		_recipe_card_press_states[key] = state
+		return
+	if event is InputEventScreenDrag:
+		if bool(state.get("active", false)) and int(state.get("touch_id", -1)) == event.index:
+			var drag_start_pos: Vector2 = state.get("start_pos", Vector2.ZERO)
+			if event.position.distance_to(drag_start_pos) > RECIPE_CARD_TOUCH_SLOP_PX:
+				state["moved"] = true
+				_recipe_card_press_states[key] = state
+
+func _set_non_button_mouse_filter_ignore(root: Control) -> void:
+	if root is Button:
+		return
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in root.get_children():
+		if child is Control:
+			_set_non_button_mouse_filter_ignore(child)
 
 func _on_recipe_card_clicked(recipe_id: String):
 	if _is_alchemizing:
@@ -1126,6 +1188,7 @@ func _on_stop_pressed():
 		return
 	if not _begin_action_lock("alchemy_stop"):
 		return
+	log_message.emit("停止炼制")
 	await _finish_alchemy_session(false)
 
 func _finish_alchemy_session(natural_finished: bool):
@@ -1203,6 +1266,7 @@ func _on_alchemy_crafting_finished(recipe_id: String, success_count: int, fail_c
 		craft_progress_bar.value = 0
 
 	_render_alchemy_ui(true)
+	log_message.emit("炼制完成：" + recipe_data.get_recipe_name(recipe_id))
 	log_message.emit(_build_alchemy_summary_message(success_count, fail_count))
 
 func _on_alchemy_crafting_stopped(success_count: int, fail_count: int):

@@ -43,6 +43,8 @@ export GODOT_TEST_HOME="$(pwd)/.godot_test_home"
   - 非法后等待下一次 5 秒窗口再合并上报（不立即重试）
 - 储纳与道具使用
   - 重要物品丢弃确认弹窗（确认/取消）
+  - 批量使用走单请求 `inventory/use + count`（非客户端循环 N 次请求）
+  - 批量返回支持部分成功语义（`INVENTORY_USE_PARTIAL_SUCCEEDED`）
 - 术法操作与战斗锁定
 - 炼丹开炉/上报/停火
   - report 失败后的预扣回滚

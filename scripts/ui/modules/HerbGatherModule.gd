@@ -17,6 +17,7 @@ var spell_system: Node = null
 var herb_gather_panel: Control = null
 var point_list: VBoxContainer = null
 var back_button: Button = null
+var point_scroll: ScrollContainer = null
 
 var _points_config: Dictionary = {}
 var _card_refs: Dictionary = {}
@@ -36,7 +37,10 @@ func initialize(ui: Node, player_node: Node, inventory_node: Node, item_data_nod
 	inventory = inventory_node
 	item_data = item_data_node
 	api = game_api
+	if point_list and point_list.get_parent() is ScrollContainer:
+		point_scroll = point_list.get_parent()
 	_setup_back_button_style()
+	_setup_scroll_behavior()
 	if back_button and not back_button.pressed.is_connected(_on_back_pressed):
 		back_button.pressed.connect(_on_back_pressed)
 
@@ -61,6 +65,18 @@ func _setup_back_button_style():
 	back_button.text = "< 返回"
 	back_button.custom_minimum_size = Vector2(96, 40)
 	ACTION_BUTTON_TEMPLATE.apply_light_neutral(back_button, back_button.custom_minimum_size, 20)
+
+func _setup_scroll_behavior():
+	if not point_scroll:
+		return
+	point_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	point_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	var v_scrollbar := point_scroll.get_v_scroll_bar()
+	if v_scrollbar:
+		v_scrollbar.modulate = Color(1, 1, 1, 0)
+		v_scrollbar.self_modulate = Color(1, 1, 1, 0)
+		v_scrollbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v_scrollbar.custom_minimum_size.x = 0.0
 
 func show_tab():
 	if herb_gather_panel:
@@ -169,12 +185,12 @@ func _report_log_message(result: Dictionary):
 	var drops = result.get("drops_gained", {})
 	var success_roll = bool(result.get("success_roll", false))
 	if drops is Dictionary and not drops.is_empty():
-		log_message.emit("采集获得")
+		log_message.emit("采集成功，获得" + _drop_map_to_text(drops))
 		return
 	if success_roll:
-		log_message.emit("采集获得")
+		log_message.emit("采集成功，获得无")
 	else:
-		log_message.emit("本轮采集失败")
+		log_message.emit("采集失败，本轮未获得产物")
 
 func _render_cards():
 	if not point_list:
@@ -194,6 +210,7 @@ func _render_cards():
 		card.custom_minimum_size = Vector2(0, 192)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		card.mouse_filter = Control.MOUSE_FILTER_PASS
 
 		var card_style := StyleBoxFlat.new()
 		card_style.bg_color = Color(0.95, 0.90, 0.80, 1.0)
@@ -282,15 +299,16 @@ func _render_cards():
 
 		var start_button = Button.new()
 		start_button.text = "开始采集"
-		ACTION_BUTTON_TEMPLATE.apply_alchemy_green(start_button, Vector2(130, 42), 18)
+		ACTION_BUTTON_TEMPLATE.apply_alchemy_green(start_button, Vector2(130, 44), 20)
 		start_button.pressed.connect(_on_start_pressed.bind(point_id))
 		right_vbox.add_child(start_button)
 
 		var stop_button = Button.new()
 		stop_button.text = "停止采集"
-		ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(stop_button, Vector2(130, 42), 18)
+		ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(stop_button, Vector2(130, 44), 20)
 		stop_button.pressed.connect(_on_stop_pressed)
 		right_vbox.add_child(stop_button)
+		_set_non_button_mouse_filter_ignore(card)
 
 		point_list.add_child(card)
 		_card_refs[point_id] = {
@@ -301,6 +319,14 @@ func _render_cards():
 
 	_update_button_states()
 	_update_progress_visual()
+
+func _set_non_button_mouse_filter_ignore(root: Control) -> void:
+	if root is Button:
+		return
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in root.get_children():
+		if child is Control:
+			_set_non_button_mouse_filter_ignore(child)
 
 func _update_button_states():
 	for point_id in _card_refs.keys():
@@ -405,8 +431,12 @@ func _do_report_once():
 	_report_time_invalid_prompted = false
 	var drops_gained = result.get("drops_gained", {})
 	if drops_gained is Dictionary and inventory and inventory.has_method("add_item"):
+		if game_ui and game_ui.has_method("begin_silent_item_added_logs"):
+			game_ui.begin_silent_item_added_logs()
 		for item_id in drops_gained.keys():
 			inventory.add_item(str(item_id), int(drops_gained[item_id]))
+		if game_ui and game_ui.has_method("end_silent_item_added_logs"):
+			game_ui.end_silent_item_added_logs()
 		if game_ui and game_ui.has_method("update_ui"):
 			game_ui.update_ui()
 	_apply_local_spell_use_count("herb_gathering")

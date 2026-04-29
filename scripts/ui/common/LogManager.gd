@@ -5,11 +5,12 @@ signal log_added(message: String)
 enum LogType {
 	SYSTEM,    # 系统消息
 	BATTLE,    # 战斗消息
-	ALCHEMY    # 炼丹消息
+	PRODUCTION # 生产消息（炼丹/采集）
 }
 
 var log_messages: Array = []
 var max_log_count: int = 500
+var current_filter: String = "all" # all/system/battle/production
 
 var rich_text_label: RichTextLabel = null
 
@@ -20,6 +21,24 @@ func set_rich_text_label(label: RichTextLabel):
 	rich_text_label = label
 	rich_text_label.bbcode_enabled = true
 
+func set_max_log_count(value: int):
+	max_log_count = maxi(1, value)
+	if log_messages.size() > max_log_count:
+		var overflow = log_messages.size() - max_log_count
+		for _i in range(overflow):
+			log_messages.remove_at(0)
+	_update_display()
+
+func set_filter(filter_key: String):
+	var normalized = String(filter_key).to_lower()
+	if normalized != "all" and normalized != "system" and normalized != "battle" and normalized != "production":
+		normalized = "all"
+	current_filter = normalized
+	_update_display()
+
+func get_filter() -> String:
+	return current_filter
+
 # 添加系统消息
 func add_system_log(message: String):
 	_add_log_internal(message, LogType.SYSTEM)
@@ -28,9 +47,9 @@ func add_system_log(message: String):
 func add_battle_log(message: String):
 	_add_log_internal(message, LogType.BATTLE)
 
-# 添加炼丹消息
-func add_alchemy_log(message: String):
-	_add_log_internal(message, LogType.ALCHEMY)
+# 添加生产消息（炼丹/采集）
+func add_production_log(message: String):
+	_add_log_internal(message, LogType.PRODUCTION)
 
 func _add_log_internal(message: String, log_type: LogType):
 	var timestamp = _get_timestamp()
@@ -64,8 +83,8 @@ func _get_type_tag(log_type: LogType) -> String:
 			return "[系统]"
 		LogType.BATTLE:
 			return "[战斗]"
-		LogType.ALCHEMY:
-			return "[炼丹]"
+		LogType.PRODUCTION:
+			return "[生产]"
 		_:
 			return "[系统]"
 
@@ -123,9 +142,25 @@ func _update_display():
 	
 	var full_text = ""
 	for log_msg in log_messages:
+		if not _passes_filter(log_msg):
+			continue
 		full_text += log_msg.timestamp + log_msg.type_tag + " " + log_msg.formatted_message + "\n"
 	
 	rich_text_label.text = full_text
+
+func _passes_filter(log_msg: Dictionary) -> bool:
+	if current_filter == "all":
+		return true
+	var log_type = int(log_msg.get("type", LogType.SYSTEM))
+	match current_filter:
+		"system":
+			return log_type == LogType.SYSTEM
+		"battle":
+			return log_type == LogType.BATTLE
+		"production":
+			return log_type == LogType.PRODUCTION
+		_:
+			return true
 
 func clear_logs():
 	log_messages.clear()

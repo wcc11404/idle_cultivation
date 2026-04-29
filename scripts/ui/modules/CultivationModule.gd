@@ -28,10 +28,14 @@ var health_value: Label = null
 var spirit_bar: ProgressBar = null
 var spirit_value: Label = null
 
-var attack_label: Label = null
-var defense_label: Label = null
-var speed_label: Label = null
-var spirit_gain_label: Label = null
+var attack_value_label: Label = null
+var defense_value_label: Label = null
+var speed_value_label: Label = null
+var spirit_gain_value_label: Label = null
+var penetration_value_label: Label = null
+var crit_value_label: Label = null
+var crit_damage_value_label: Label = null
+var health_regen_value_label: Label = null
 
 var status_label: Label = null
 var cultivation_figure: TextureRect = null
@@ -335,8 +339,8 @@ func _build_breakthrough_panel_material_entries(preview: Dictionary) -> Array:
 
 	var energy_required = int(preview.get("energy_cost", 0))
 	if energy_required > 0:
-		var energy_current = int(floor(float(preview.get("spirit_energy_current", 0.0))))
-		entries.append("灵气：%s / %s" % [UIUtils.format_display_number(float(energy_current)), UIUtils.format_display_number(float(energy_required))])
+		var energy_current = float(preview.get("spirit_energy_current", 0.0))
+		entries.append("灵气：%s / %s" % [UIUtils.format_display_number_integer(energy_current), UIUtils.format_display_number_integer(float(energy_required))])
 
 	var stone_required = int(preview.get("stone_cost", 0))
 	if stone_required > 0:
@@ -650,14 +654,23 @@ func update_display(status: Dictionary = {}):
 	if spirit_value:
 		spirit_value.text = UIUtils.format_display_number_integer(status.spirit_energy) + " / " + UIUtils.format_display_number_integer(player.get_final_max_spirit_energy())
 
-	if attack_label:
-		attack_label.text = "攻击: " + UIUtils.format_display_number(player.get_final_attack())
-	if defense_label:
-		defense_label.text = "防御: " + UIUtils.format_display_number(player.get_final_defense())
-	if speed_label:
-		speed_label.text = "速度: " + UIUtils.format_display_number(player.get_final_speed())
-	if spirit_gain_label:
-		spirit_gain_label.text = "灵气获取: " + UIUtils.format_display_number(player.get_final_spirit_gain_speed()) + "/秒"
+	if attack_value_label:
+		attack_value_label.text = UIUtils.format_display_number(player.get_final_attack())
+	if defense_value_label:
+		defense_value_label.text = UIUtils.format_display_number(player.get_final_defense())
+	if speed_value_label:
+		speed_value_label.text = UIUtils.format_display_number(player.get_final_speed())
+	if penetration_value_label:
+		penetration_value_label.text = UIUtils.format_display_number(0.0)
+	if crit_value_label:
+		crit_value_label.text = UIUtils.format_display_number(0.0)
+	if crit_damage_value_label:
+		crit_damage_value_label.text = UIUtils.format_display_number(0.0)
+	if spirit_gain_value_label:
+		spirit_gain_value_label.text = UIUtils.format_display_number(player.get_final_spirit_gain_speed()) + "/秒"
+	if health_regen_value_label:
+		var regen_per_second = CULTIVATION_LOGIC.calculate_health_regen_per_second(player, _get_spell_system())
+		health_regen_value_label.text = UIUtils.format_display_number(regen_per_second) + "/秒"
 
 	if status.is_cultivating:
 		if status_label:

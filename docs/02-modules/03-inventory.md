@@ -45,6 +45,17 @@
 4. 失败：
    - 统一按 reason_code 映射失败文案（数量不足/不可使用/已使用过/等级条件不足等）。
 
+### 3.1) 点击批量使用
+
+1. 打开批量弹窗后选择数量，调用同一接口：`inventory/use`，仅附加 `count`。
+2. 批量前先执行一次修炼 flush（防止修炼乐观状态未结算导致后续状态跳变）。
+3. 服务端单请求内部循环使用，返回汇总：
+   - `requested_count`
+   - `completed_count`
+   - `is_partial`
+   - 以及合并后的 `effect/contents`
+4. 客户端根据汇总结果刷新背包与详情面板，不再循环发 N 次 use 请求。
+
 ### 4) 点击丢弃
 
 1. 调 `inventory/discard`（当前实现为固定数量策略）。
@@ -75,6 +86,7 @@
   - 消耗品：展示实际恢复/获得值
   - 礼包：展示开包奖励汇总
   - 解锁类：展示术法/丹方/丹炉中文名
+- 批量部分成功：`INVENTORY_USE_PARTIAL_SUCCEEDED`，显示“部分成功（完成数/请求数）”。
 - 重复使用统一文案：`xx已经使用过了，无法重复使用`。
 - 礼包等级门槛：`INVENTORY_USE_REQUIREMENT_NOT_MET` 时，按 `reason_data.requirement.realm_min` 输出“需达到炼气X层后才能打开”。
 

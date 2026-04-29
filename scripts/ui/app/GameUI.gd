@@ -76,7 +76,7 @@ const REALM_FRAME_TEXTURES = {
 @onready var top_player_info: HBoxContainer = $ContentFrame/VBoxContainer/TopBar/TopBarContent/PlayerInfo
 @onready var top_bar_background: TextureRect = $ContentFrame/VBoxContainer/TopBar/TopBarBackground
 @onready var safe_top: Control = $SafeTop
-@onready var safe_top_fill: TextureRect = $SafeTop/TopFill
+@onready var safe_top_fill: ColorRect = $SafeTop/TopFill
 @onready var content_frame: Control = $ContentFrame
 @onready var safe_bottom: Control = $SafeBottom
 @onready var safe_bottom_fill: ColorRect = $SafeBottom/BottomFill
@@ -94,17 +94,29 @@ const REALM_FRAME_TEXTURES = {
 @onready var spirit_value: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritRow/SpiritValue
 
 # 属性标签
-@onready var attack_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/AttackLabel
-@onready var defense_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/DefenseLabel
-@onready var speed_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/SpeedLabel
-@onready var spirit_gain_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/SpiritGainLabel
+@onready var attack_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/AttackItem/AttackValueLabel
+@onready var defense_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/DefenseItem/DefenseValueLabel
+@onready var speed_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/SpeedItem/SpeedValueLabel
+@onready var penetration_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/PenetrationItem/PenetrationValueLabel
+@onready var crit_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritItem/CritValueLabel
+@onready var crit_damage_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritDamageItem/CritDamageValueLabel
+@onready var spirit_gain_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/SpiritGainItem/SpiritGainValueLabel
+@onready var health_regen_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/HealthRegenItem/HealthRegenValueLabel
 
 # 修炼小人素材
 @onready var cultivation_figure: TextureRect = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual/CultivationFigure
 @onready var cultivation_figure_particles: TextureRect = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual/CultivationFigureParticles
 @onready var cultivation_visual: Control = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual
+@onready var cultivation_container: Control = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer
+@onready var status_area_panel: Control = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea
+@onready var breakthrough_panel_container: Control = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel
 
-@onready var log_text: RichTextLabel = $ContentFrame/VBoxContainer/LogArea/LogText
+@onready var log_text: RichTextLabel = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogText
+@onready var log_filter_tab_bar: HBoxContainer = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar
+@onready var log_filter_all_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar/LogFilterAllButton
+@onready var log_filter_system_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar/LogFilterSystemButton
+@onready var log_filter_battle_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar/LogFilterBattleButton
+@onready var log_filter_production_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar/LogFilterProductionButton
 @onready var cultivate_button: Button = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughButtonBar/CultivateButton
 @onready var breakthrough_button: Button = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughButtonBar/BreakthroughButton
 @onready var bottom_bar: HBoxContainer = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughButtonBar
@@ -176,6 +188,7 @@ const REALM_FRAME_TEXTURES = {
 # 查看按钮（可选）
 var view_button: Button = null
 @onready var use_button: Button = $ContentFrame/VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/MainHBox/ButtonContainer/ButtonVBox/UseButton
+@onready var batch_use_button: Button = $ContentFrame/VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/MainHBox/ButtonContainer/ButtonVBox/BatchUseButton
 @onready var discard_button: Button = $ContentFrame/VBoxContainer/ContentPanel/ChunaPanel/ItemDetailPanel/VBoxContainer/MainHBox/ButtonContainer/ButtonVBox/DiscardButton
 
 @onready var lianli_area_1_button: Button = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel/VBoxContainer/Area1Button")
@@ -244,6 +257,7 @@ var log_manager: LogManager = null
 
 const GRID_COLS = 5
 const DESIGN_CONTENT_SIZE := Vector2(720.0, 1280.0)
+const LOG_MAX_COUNT_DEFAULT := 500
 
 var item_data_ref: Node = null
 var spell_data_ref: Node = null
@@ -312,6 +326,7 @@ func _setup_optional_nodes():
 	_setup_status_header_style()
 	_setup_breakthrough_panel_style()
 	_apply_safe_area_layout()
+	_setup_cultivation_visual_auto_center()
 
 	# 监听屏幕大小变化
 	if get_viewport() and not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
@@ -426,6 +441,7 @@ func _setup_neishi_sub_tab_layout():
 
 func _on_viewport_size_changed():
 	_apply_safe_area_layout()
+	call_deferred("_reposition_cultivation_visual_between_panels")
 
 func update_font_sizes():
 	# 主界面常驻字体回归固定设计稿字号，不再按真实屏幕宽度二次缩放。
@@ -440,18 +456,47 @@ func _apply_safe_area_layout():
 	content_frame.position = safe_rect.position
 	content_frame.size = safe_rect.size
 	_update_safe_fill_frames(viewport_rect.size, safe_rect)
+	call_deferred("_reposition_cultivation_visual_between_panels")
+
+func _setup_cultivation_visual_auto_center():
+	if cultivation_container and not cultivation_container.resized.is_connected(_on_cultivation_layout_changed):
+		cultivation_container.resized.connect(_on_cultivation_layout_changed)
+	if status_area_panel and not status_area_panel.resized.is_connected(_on_cultivation_layout_changed):
+		status_area_panel.resized.connect(_on_cultivation_layout_changed)
+	if breakthrough_panel_container and not breakthrough_panel_container.resized.is_connected(_on_cultivation_layout_changed):
+		breakthrough_panel_container.resized.connect(_on_cultivation_layout_changed)
+	call_deferred("_reposition_cultivation_visual_between_panels")
+
+func _on_cultivation_layout_changed():
+	call_deferred("_reposition_cultivation_visual_between_panels")
+
+func _reposition_cultivation_visual_between_panels():
+	if not cultivation_visual or not cultivation_container or not status_area_panel or not breakthrough_panel_container:
+		return
+	if not neishi_panel or not neishi_panel.visible:
+		return
+
+	var top_edge: float = status_area_panel.position.y + status_area_panel.size.y
+	var bottom_edge: float = breakthrough_panel_container.position.y
+	if bottom_edge <= top_edge:
+		return
+
+	var center_y: float = (top_edge + bottom_edge) * 0.5
+	var new_x: float = (cultivation_container.size.x - cultivation_visual.size.x) * 0.5
+	var new_y: float = center_y - cultivation_visual.size.y * 0.5
+	cultivation_visual.position = Vector2(new_x, new_y)
 
 func _update_safe_fill_frames(viewport_size: Vector2, safe_rect: Rect2):
 	if safe_top:
 		safe_top.position = Vector2.ZERO
 		safe_top.size = Vector2(viewport_size.x, max(0.0, safe_rect.position.y))
 	if safe_top_fill:
-		safe_top_fill.texture = null
+		safe_top_fill.color = Color(0, 0, 0, 1)
 	if safe_bottom:
 		safe_bottom.position = Vector2(0.0, safe_rect.end.y)
 		safe_bottom.size = Vector2(viewport_size.x, max(0.0, viewport_size.y - safe_rect.end.y))
 	if safe_bottom_fill:
-		safe_bottom_fill.color = Color(0, 0, 0, 0)
+		safe_bottom_fill.color = Color(0, 0, 0, 1)
 
 func _process(delta: float):
 	# 更新UI
@@ -462,7 +507,74 @@ func setup_log_manager():
 	log_manager = LogManager.new()
 	log_manager.name = "LogManager"
 	add_child(log_manager)
+	log_manager.set_max_log_count(LOG_MAX_COUNT_DEFAULT)
 	log_manager.set_rich_text_label(log_text)
+	_setup_log_filter_tabs()
+
+func _setup_log_filter_tabs():
+	if not log_filter_tab_bar:
+		return
+	TAB_BAR_STYLE_TEMPLATE.apply_to_bar(log_filter_tab_bar, {
+		"bar_height": 38.0,
+		"font_size": 18,
+		"line_position": "bottom",
+		"line_width": 1,
+		"selected_line_width": 2,
+		"normal_bg": Color(0.94, 0.90, 0.82, 1.0),
+		"hover_bg": Color(0.96, 0.92, 0.85, 1.0),
+		"pressed_bg": Color(0.92, 0.88, 0.80, 1.0),
+		"selected_bg": Color(0.96, 0.93, 0.86, 1.0),
+		"line_color": Color(0.71, 0.66, 0.58, 1.0),
+		"selected_line_color": Color(0.87, 0.70, 0.21, 1.0),
+		"font_color": Color(0.30, 0.28, 0.25, 1.0),
+		"selected_font_color": Color(0.78, 0.56, 0.16, 1.0),
+	})
+	if log_filter_all_button and not log_filter_all_button.pressed.is_connected(_on_log_filter_all_pressed):
+		log_filter_all_button.pressed.connect(_on_log_filter_all_pressed)
+	if log_filter_system_button and not log_filter_system_button.pressed.is_connected(_on_log_filter_system_pressed):
+		log_filter_system_button.pressed.connect(_on_log_filter_system_pressed)
+	if log_filter_battle_button and not log_filter_battle_button.pressed.is_connected(_on_log_filter_battle_pressed):
+		log_filter_battle_button.pressed.connect(_on_log_filter_battle_pressed)
+	if log_filter_production_button and not log_filter_production_button.pressed.is_connected(_on_log_filter_production_pressed):
+		log_filter_production_button.pressed.connect(_on_log_filter_production_pressed)
+	_apply_log_filter("all")
+
+func _set_log_filter_tabs_disabled(all_sel: bool, system_sel: bool, battle_sel: bool, production_sel: bool):
+	if log_filter_all_button:
+		log_filter_all_button.disabled = all_sel
+	if log_filter_system_button:
+		log_filter_system_button.disabled = system_sel
+	if log_filter_battle_button:
+		log_filter_battle_button.disabled = battle_sel
+	if log_filter_production_button:
+		log_filter_production_button.disabled = production_sel
+
+func _apply_log_filter(filter_key: String):
+	if not log_manager:
+		return
+	var normalized = String(filter_key).to_lower()
+	log_manager.set_filter(normalized)
+	match normalized:
+		"system":
+			_set_log_filter_tabs_disabled(false, true, false, false)
+		"battle":
+			_set_log_filter_tabs_disabled(false, false, true, false)
+		"production":
+			_set_log_filter_tabs_disabled(false, false, false, true)
+		_:
+			_set_log_filter_tabs_disabled(true, false, false, false)
+
+func _on_log_filter_all_pressed():
+	_apply_log_filter("all")
+
+func _on_log_filter_system_pressed():
+	_apply_log_filter("system")
+
+func _on_log_filter_battle_pressed():
+	_apply_log_filter("battle")
+
+func _on_log_filter_production_pressed():
+	_apply_log_filter("production")
 
 func setup_button_connections():
 	# 修炼和突破按钮（CultivationModule）
@@ -756,7 +868,7 @@ func setup_herb_gather_module():
 	herb_gather_module.back_button = herb_gather_back_button
 	herb_gather_module.spell_system = spell_system
 	herb_gather_module.initialize(self, player, inventory, item_data_ref, api)
-	herb_gather_module.log_message.connect(_on_module_log)
+	herb_gather_module.log_message.connect(_on_production_log)
 	herb_gather_module.back_to_region_requested.connect(_on_back_to_region_requested)
 
 func setup_task_module():
@@ -794,6 +906,7 @@ func setup_chuna_module():
 	chuna_module.item_detail_panel = item_detail_panel
 	chuna_module.view_button = view_button
 	chuna_module.use_button = use_button
+	chuna_module.batch_use_button = batch_use_button
 	chuna_module.discard_button = discard_button
 	chuna_module.expand_button = expand_button
 	chuna_module.sort_button = sort_button
@@ -842,10 +955,14 @@ func setup_neishi_module():
 	cultivation_module.spirit_value = spirit_value
 	
 	# 设置属性标签
-	cultivation_module.attack_label = attack_label
-	cultivation_module.defense_label = defense_label
-	cultivation_module.speed_label = speed_label
-	cultivation_module.spirit_gain_label = spirit_gain_label
+	cultivation_module.attack_value_label = attack_value_label
+	cultivation_module.defense_value_label = defense_value_label
+	cultivation_module.speed_value_label = speed_value_label
+	cultivation_module.penetration_value_label = penetration_value_label
+	cultivation_module.crit_value_label = crit_value_label
+	cultivation_module.crit_damage_value_label = crit_damage_value_label
+	cultivation_module.spirit_gain_value_label = spirit_gain_value_label
+	cultivation_module.health_regen_value_label = health_regen_value_label
 	
 	# 设置修炼状态标签和小人素材
 	cultivation_module.status_label = status_label
@@ -889,6 +1006,11 @@ func _on_module_log(message: String):
 	if log_manager:
 		log_manager.add_system_log(message)
 
+func _on_production_log(message: String):
+	"""处理生产模块日志消息（采集/炼丹）"""
+	if log_manager:
+		log_manager.add_production_log(message)
+
 func _bind_network_error_bridge():
 	var net = get_node_or_null("/root/GlobalNetworkManager")
 	if net and net.has_signal("technical_error_for_ui"):
@@ -907,7 +1029,7 @@ func _on_network_technical_error_for_ui(_message: String):
 func _on_alchemy_log(message: String):
 	"""处理炼丹模块的日志消息"""
 	if log_manager:
-		log_manager.add_alchemy_log(message)
+		log_manager.add_production_log(message)
 
 func setup_lianli_module():
 	# 创建历练模块
@@ -1183,6 +1305,7 @@ func show_neishi_tab():
 	# 初始化内室子Tab（NeishiModule）
 	if neishi_module:
 		neishi_module.show_tab()
+	call_deferred("_reposition_cultivation_visual_between_panels")
 
 func show_chuna_tab():
 	neishi_panel.visible = false
@@ -1441,7 +1564,8 @@ func _init_lianli_area_buttons():
 			var button = lianli_area_buttons[current_index]
 			var area_name = ""
 			if area_id == "sourth_endless_tower":
-				area_name = "无尽塔 (第%d层)" % tower_floor
+				var tower_name = lianli_area_data.get_tower_name() if lianli_area_data else "南麓试练塔"
+				area_name = "%s (第%d层)" % [tower_name, tower_floor]
 			else:
 				area_name = lianli_area_data.get_area_name(area_id) if lianli_area_data else area_id
 			
@@ -1561,7 +1685,8 @@ func update_lianli_area_buttons_display():
 	for area_id in tower_area_ids:
 		if current_index < lianli_area_buttons.size():
 			var button = lianli_area_buttons[current_index]
-			var area_name = "无尽塔 (第" + str(tower_floor) + "层)"
+			var tower_name = lianli_area_data.get_tower_name() if lianli_area_data else "南麓试练塔"
+			var area_name = tower_name + " (第" + str(tower_floor) + "层)"
 			button.text = area_name
 			button.disabled = false
 			current_index += 1
@@ -1644,7 +1769,7 @@ func update_realm_background(realm_name: String):
 	if texture:
 		top_bar_background.texture = texture
 		if safe_top_fill:
-			safe_top_fill.texture = null
+			safe_top_fill.color = Color(0, 0, 0, 1)
 
 # 修炼按钮处理已迁移到 CultivationModule
 

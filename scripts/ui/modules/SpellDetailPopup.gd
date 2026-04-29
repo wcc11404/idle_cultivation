@@ -377,10 +377,12 @@ func update_content(spell_info: Dictionary, spell_config: Dictionary,
 		else:
 			level_label.text = "等级：未解锁"
 	
-	# 获取当前等级数据
+	# 获取展示等级数据
+	# 已获得：展示当前等级
+	# 未获得：按 1 级展示属性与术法效果（升级条件逻辑保持原样）
 	var level_data = {}
-	if is_obtained:
-		level_data = spell_data.get_spell_level_data(str(spell_info.get("id", "")), normalized_level) if spell_data else {}
+	var display_level := normalized_level if is_obtained else 1
+	level_data = spell_data.get_spell_level_data(str(spell_info.get("id", "")), display_level) if spell_data else {}
 	
 	# 更新属性加成
 	_update_attribute_value(level_data)

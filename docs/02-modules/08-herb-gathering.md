@@ -42,7 +42,7 @@
 2. `report` 使用网络层“1 秒延迟 + 1 次重试”策略。
 3. 成功：
    - 根据 `drops_gained` 本地更新背包与顶部资源展示。
-   - 输出“采集获得：xxx”或“本轮采集无产出/失败”。
+   - 输出“采集成功，获得xxx”或“采集失败，本轮未获得产物”。
 4. 失败：
    - `HERB_REPORT_TIME_INVALID` 只提示一次“采集同步异常，请稍后重试”。
    - 其他错误按 reason_code 映射提示。
@@ -61,6 +61,7 @@
 ## reason_code 文案策略
 
 - 采集模块仅使用 `reason_code + reason_data` 生成玩家文案。
+- 采集日志必须走 `【生产】`，不输出储纳“获得物品”重复文案。
 - 互斥提示：
   - `HERB_START_BLOCKED_BY_CULTIVATION`：正在修炼中，无法开始采集
   - `HERB_START_BLOCKED_BY_ALCHEMY`：正在炼丹中，无法开始采集

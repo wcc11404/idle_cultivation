@@ -260,3 +260,32 @@ func test_discard_important_item_confirm_consumes_item():
 
 	assert_true(harness.last_log().contains("丢弃成功"), "确认后应执行丢弃并输出成功文案")
 	assert_eq(int(harness.get_inventory().get_item_count("test_pack")), before_count - 1, "确认后应实际扣减物品")
+
+func test_discard_non_important_item_still_requires_confirmation():
+	var module = harness.game_ui.chuna_module
+	var set_result = await harness.client.test_post("/test/set_inventory_items", {
+		"items": {
+			"health_pill": 1
+		}
+	})
+	assert_true(set_result.get("success", false), "应能设置补血丹库存用于测试")
+	await harness.sync_full_state()
+
+	var slot_index = FIXTURE_HELPER_SCRIPT.find_inventory_slot_index(harness.get_inventory(), "health_pill")
+	assert_gt(slot_index, -1, "重置后应存在补血丹（非重要物品）")
+
+	module._select_slot(slot_index)
+	await module._on_discard_button_pressed()
+
+	var dialog: Control = null
+	var search_roots: Array = [harness.game_ui, module.chuna_panel]
+	for root in search_roots:
+		if not root:
+			continue
+		for child in root.get_children():
+			if child is Control and child.name == "DiscardConfirmOverlay":
+				dialog = child
+				break
+		if dialog:
+			break
+	assert_not_null(dialog, "所有物品丢弃都应弹出二次确认")

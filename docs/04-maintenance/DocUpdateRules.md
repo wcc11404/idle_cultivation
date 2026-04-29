@@ -9,6 +9,7 @@
 - 公共 UI 模板或默认视觉契约变化（Tab、展示面板、弹窗、术法缩略卡等）。
 - 全局字体真值、内置图标资源、系统字体/emoji 依赖策略变化。
 - 主界面设计基线、长屏/异形屏安全区、`ContentFrame` 承载范围变化。
+- 日志分类（系统/战斗/生产）、掉落文案口径、日志筛选行为变化。
 
 ## 最低更新要求
 
@@ -16,6 +17,7 @@
 - 若涉及全局约束，更新 `docs/01-overview/*`。
 - 若涉及测试链路，更新 `docs/03-testing/GUT_API_Testing.md`。
 - 若涉及模板层变更，更新 `docs/04-maintenance/UI_Templates_Index.md`。
+- 若涉及日志分类或文案口径，更新 `docs/04-maintenance/LogSystemIntegration.md`。
 
 ## 提交前检查
 
