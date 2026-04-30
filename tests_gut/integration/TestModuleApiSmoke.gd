@@ -81,6 +81,12 @@ func test_module_api_smoke_flow():
 	assert_true(_is_badge_visible(harness.game_ui.xianwu_office_button, "task_claimable"), "任务 smoke 在领奖前应点亮仙务司按钮红点")
 	assert_true(_is_badge_visible(harness.game_ui.tab_region, "region_tab_badge"), "任务 smoke 在领奖前应点亮地区页签红点")
 	await task_module._on_claim_pressed("newbie_open_starter_pack_1")
-	assert_true(harness.last_log().contains("领取成功"), "任务 smoke 应能完成领奖")
+	var task_logs := harness.get_log_messages()
+	var task_claim_logged := false
+	for message in task_logs:
+		if str(message).contains("领取成功"):
+			task_claim_logged = true
+			break
+	assert_true(task_claim_logged, "任务 smoke 应记录领奖成功日志，实际最后一条为: %s" % harness.last_log())
 	assert_false(_is_badge_visible(harness.game_ui.xianwu_office_button, "task_claimable"), "任务 smoke 领奖后应及时熄灭仙务司按钮红点")
 	assert_false(_is_badge_visible(harness.game_ui.tab_region, "region_tab_badge"), "任务 smoke 领奖后应及时熄灭地区页签红点")

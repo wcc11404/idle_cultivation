@@ -63,7 +63,13 @@ func test_task_panel_renders_and_claim_refreshes():
 	assert_true(_is_badge_visible(harness.game_ui.tab_region, "region_tab_badge"), "存在可领奖任务时地区页签红点应点亮")
 
 	await module._on_claim_pressed("newbie_open_starter_pack_1")
-	assert_true(harness.last_log().contains("领取成功"), "领取成功后应有日志提示")
+	var claim_logs := harness.get_log_messages()
+	var claim_logged := false
+	for message in claim_logs:
+		if str(message).contains("领取成功"):
+			claim_logged = true
+			break
+	assert_true(claim_logged, "领取成功后应有日志提示，实际最后一条为: %s" % harness.last_log())
 	assert_false(_is_badge_visible(harness.game_ui.xianwu_office_button, "task_claimable"), "领取完成且无剩余可领奖任务时仙务司按钮红点应熄灭")
 	assert_false(_is_badge_visible(harness.game_ui.tab_region, "region_tab_badge"), "领取完成且无剩余可领奖任务时地区页签红点应熄灭")
 
