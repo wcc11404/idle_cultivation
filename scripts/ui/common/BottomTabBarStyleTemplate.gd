@@ -1,4 +1,4 @@
-class_name TabBarStyleTemplate
+class_name BottomTabBarStyleTemplate
 extends RefCounted
 
 static func apply_to_bar(tab_bar: HBoxContainer, config: Dictionary = {}) -> void:

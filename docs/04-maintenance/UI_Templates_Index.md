@@ -4,16 +4,30 @@
 
 ## 模板清单
 
-### 1) `TabBarStyleTemplate`
+### 1) `BottomTabBarStyleTemplate`
 
-- 路径：`scripts/ui/common/TabBarStyleTemplate.gd`
-- 用途：统一主底部 Tab 与内视子 Tab 的样式、字号、分割线位置与选中态颜色。
+- 路径：`scripts/ui/common/BottomTabBarStyleTemplate.gd`
+- 用途：统一主底部 Tab、日志筛选、任务页切换这类“线型 Tab”的样式、字号、分割线位置与选中态颜色。
 - 核心约束：
   - 按钮宽度自动均分，`separation=0`。
   - 选中态仍由 `disabled=true` 驱动（当前项目约定）。
-  - `line_position` 支持 `top/bottom`，用于主 Tab 与子 Tab 复用。
+  - `line_position` 支持 `top/bottom`，用于不同线型 Tab 复用。
 
-### 2) `DisplayPanelTemplate`
+### 2) `TopTabBarStyleTemplate`
+
+- 路径：`scripts/ui/common/TopTabBarStyleTemplate.gd`
+- 用途：统一页内上方分段切换栏，例如“修炼/术法”以及后续“弟子/日常/宝库”这类金色选中块样式。
+- 核心约束：
+  - 选中态仍由 `disabled=true` 驱动（当前项目约定）。
+  - 按钮宽度自动均分，适合 2~4 个同级页内子栏位。
+  - 默认视觉为“浅底板 + 金色选中块 + 深棕未选中文字”。
+  - 结构上使用“外层壳 + Slot + 内层按钮”模式，保证选中块比外层壳小一圈，不直接让按钮贴满父 `HBoxContainer`。
+- 当前应用：
+  - 内视页：`修炼 / 术法`
+  - 仙务司：`每日任务 / 新手任务`
+  - 日志区：`全部 / 系统 / 战斗 / 生产`
+
+### 3) `DisplayPanelTemplate`
 
 - 路径：`scripts/ui/common/DisplayPanelTemplate.gd`
 - 用途：统一“展示面板”的标题行（左强调线 + 标题 + 分割线）与内容对齐规则。
@@ -25,7 +39,7 @@
   - 修炼页属性面板
   - 修炼页突破面板
 
-### 3) `SpellThumbnailTemplate`
+### 4) `SpellThumbnailTemplate`
 
 - 路径：`scripts/ui/common/SpellThumbnailTemplate.gd`
 - 用途：统一术法缩略卡样式。
@@ -34,7 +48,7 @@
   - 圆角边框风格
   - 按钮颜色策略由 `SpellModule` 在卡片行为层补充（查看浅棕、装备可点金色/不可点灰色）。
 
-### 4) `PopupStyleTemplate`
+### 5) `PopupStyleTemplate`
 
 - 路径：`scripts/ui/common/PopupStyleTemplate.gd`
 - 用途：统一弹窗面板样式与遮罩视觉（外部暗化）。
@@ -47,7 +61,7 @@
   - 术法详情弹窗 `SpellDetailPopup`
   - 顶部账号编辑弹窗 `ProfileEditPopup`（昵称/头像）
 
-### 5) `ActionButtonTemplate`
+### 6) `ActionButtonTemplate`
 
 - 路径：`scripts/ui/common/ActionButtonTemplate.gd`
 - 用途：统一四类关键行为按钮配色与交互态（normal/hover/pressed/disabled），避免各模块重复写色值。
@@ -71,7 +85,7 @@
   - 术法详情弹窗：升级（黄）、关闭（红）、`+`/`x10`（棕色）
   - 设置：FPS 档位按钮（淡白 + 选中态）、排行榜返回（淡白）
 
-### 6) 动态红点约定
+### 7) 动态红点约定
 
 - 路径：`scripts/ui/common/NotificationBadgeState.gd` + `GameUI` 运行时挂载
 - 用途：统一管理入口按钮 / Tab 的提醒标记

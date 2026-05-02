@@ -46,4 +46,4 @@
 控件底色 #f2e5cc
 背景底色 #eadab9
 按钮颜色 #b98e2c #b43729 #598059 #3D7DCB #C4AB8A        （ActionButtonTemplate）
-bottomtab栏（TabBarStyleTemplate） + 详情面板（DisplayPanelTemplate） + 弹窗（PopupStyleTemplate） + 缩略卡模板 + toptab栏
+bottomtab栏（BottomTabBarStyleTemplate） + 详情面板（DisplayPanelTemplate） + 弹窗（PopupStyleTemplate） + 缩略卡模板 + toptab栏（TopTabBarStyleTemplate）

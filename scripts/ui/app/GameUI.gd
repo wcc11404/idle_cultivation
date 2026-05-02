@@ -14,7 +14,8 @@ const TASK_MODULE_SCRIPT = preload("res://scripts/ui/modules/TaskModule.gd")
 const MAIL_MODULE_SCRIPT = preload("res://scripts/ui/modules/MailModule.gd")
 const PROFILE_EDIT_POPUP_SCRIPT = preload("res://scripts/ui/modules/ProfileEditPopup.gd")
 const GAME_SERVER_API_SCRIPT = preload("res://scripts/network/GameServerAPI.gd")
-const TAB_BAR_STYLE_TEMPLATE = preload("res://scripts/ui/common/TabBarStyleTemplate.gd")
+const BOTTOM_TAB_BAR_STYLE_TEMPLATE = preload("res://scripts/ui/common/BottomTabBarStyleTemplate.gd")
+const TOP_TAB_BAR_STYLE_TEMPLATE = preload("res://scripts/ui/common/TopTabBarStyleTemplate.gd")
 const DISPLAY_PANEL_TEMPLATE = preload("res://scripts/ui/common/DisplayPanelTemplate.gd")
 const ACTION_BUTTON_TEMPLATE = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
 const NOTIFICATION_BADGE_STATE_SCRIPT = preload("res://scripts/ui/common/NotificationBadgeState.gd")
@@ -117,11 +118,12 @@ const REALM_FRAME_TEXTURES = {
 @onready var breakthrough_panel_container: Control = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel
 
 @onready var log_text: RichTextLabel = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogText
-@onready var log_filter_tab_bar: HBoxContainer = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar
-@onready var log_filter_all_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar/LogFilterAllButton
-@onready var log_filter_system_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar/LogFilterSystemButton
-@onready var log_filter_battle_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar/LogFilterBattleButton
-@onready var log_filter_production_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar/LogFilterProductionButton
+@onready var log_filter_tab_shell: PanelContainer = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell
+@onready var log_filter_tab_bar: HBoxContainer = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar
+@onready var log_filter_all_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar/LogFilterAllButtonSlot/LogFilterAllButton
+@onready var log_filter_system_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar/LogFilterSystemButtonSlot/LogFilterSystemButton
+@onready var log_filter_battle_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar/LogFilterBattleButtonSlot/LogFilterBattleButton
+@onready var log_filter_production_button: Button = $ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar/LogFilterProductionButtonSlot/LogFilterProductionButton
 @onready var cultivate_button: Button = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughButtonBar/CultivateButton
 @onready var breakthrough_button: Button = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughButtonBar/BreakthroughButton
 @onready var bottom_bar: HBoxContainer = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughButtonBar
@@ -135,7 +137,8 @@ const REALM_FRAME_TEXTURES = {
 @onready var tab_lianli: Button = $ContentFrame/VBoxContainer/TabBar/BattleButton
 @onready var tab_settings: Button = $ContentFrame/VBoxContainer/TabBar/SettingsButton
 @onready var tab_bar: HBoxContainer = $ContentFrame/VBoxContainer/TabBar
-@onready var neishi_tab_bar: HBoxContainer = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar
+@onready var neishi_tab_shell: PanelContainer = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTopTabShell
+@onready var neishi_tab_bar: HBoxContainer = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTopTabShell/NeishiTabBar
 @onready var bottom_spacer: Control = get_node_or_null("ContentFrame/VBoxContainer/BottomSpacer")
 @onready var status_header_row: HBoxContainer = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsHeaderRow")
 @onready var breakthrough_header_row: HBoxContainer = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughHeaderRow")
@@ -156,8 +159,8 @@ const REALM_FRAME_TEXTURES = {
 @onready var settings_scroll: ScrollContainer = $ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll
 
 # 内室子Tab
-@onready var cultivation_tab: Button = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar/CultivationTab
-@onready var spell_tab: Button = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar/SpellTab
+@onready var cultivation_tab: Button = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTopTabShell/NeishiTabBar/CultivationTabSlot/CultivationTab
+@onready var spell_tab: Button = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTopTabShell/NeishiTabBar/SpellTabSlot/SpellTab
 
 @onready var cultivation_panel: Control = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer
 @onready var spell_panel: Control = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/SpellPanel
@@ -179,7 +182,8 @@ const REALM_FRAME_TEXTURES = {
 @onready var guide_button: Button = $ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/ActionButtons/GuideButton
 @onready var logout_button: Button = $ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/VBoxContainer/SettingsScroll/SettingsContentVBox/ActionButtons/LogoutButton
 @onready var rank_panel: Control = $ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/RankPanel
-@onready var rank_list: VBoxContainer = $ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/RankList
+@onready var rank_scroll: ScrollContainer = $ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/RankScroll
+@onready var rank_list: VBoxContainer = $ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/RankScroll/RankList
 @onready var back_button: Button = $ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/TitleBar/BackButton
 
 @onready var lianli_select_panel: Control = $ContentFrame/VBoxContainer/ContentPanel/LianliPanel/LianliSelectPanel
@@ -211,9 +215,10 @@ var view_button: Button = null
 @onready var herb_gather_back_button: Button = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/HerbGatherPanel/VBoxContainer/TitleBar/BackButton")
 @onready var herb_gather_point_list: VBoxContainer = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/HerbGatherPanel/VBoxContainer/PointScroll/PointList")
 @onready var task_back_button: Button = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/BackButton")
-@onready var task_tab_bar: HBoxContainer = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TaskTabBar")
-@onready var task_daily_tab_button: Button = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TaskTabBar/DailyTab")
-@onready var task_newbie_tab_button: Button = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TaskTabBar/NewbieTab")
+@onready var task_tab_shell: PanelContainer = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/TaskTopTabShell")
+@onready var task_tab_bar: HBoxContainer = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/TaskTopTabShell/TaskTabBar")
+@onready var task_daily_tab_button: Button = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/TaskTopTabShell/TaskTabBar/DailyTabSlot/DailyTab")
+@onready var task_newbie_tab_button: Button = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/TaskTopTabShell/TaskTabBar/NewbieTabSlot/NewbieTab")
 @onready var task_scroll: ScrollContainer = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TaskScroll")
 @onready var task_list: VBoxContainer = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TaskScroll/TaskList")
 @onready var alchemy_room_panel: Control = get_node_or_null("ContentFrame/VBoxContainer/ContentPanel/AlchemyRoomPanel")
@@ -520,19 +525,33 @@ func _setup_settings_scroll_behavior():
 	if not settings_scroll:
 		return
 	var v_scrollbar: VScrollBar = settings_scroll.get_v_scroll_bar()
-	if not v_scrollbar:
-		return
-	# 设置页保留滚动能力，但不显示纵向滚轴
-	v_scrollbar.modulate = Color(1, 1, 1, 0)
-	v_scrollbar.self_modulate = Color(1, 1, 1, 0)
-	v_scrollbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v_scrollbar.custom_minimum_size.x = 0.0
+	if v_scrollbar:
+		# 设置页保留滚动能力，但不显示纵向滚轴
+		v_scrollbar.modulate = Color(1, 1, 1, 0)
+		v_scrollbar.self_modulate = Color(1, 1, 1, 0)
+		v_scrollbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v_scrollbar.custom_minimum_size.x = 0.0
+	if rank_scroll:
+		rank_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		rank_scroll.vertical_scroll_mode = 3
+		var rank_v_scrollbar: VScrollBar = rank_scroll.get_v_scroll_bar()
+		if rank_v_scrollbar:
+			rank_v_scrollbar.modulate = Color(1, 1, 1, 0)
+			rank_v_scrollbar.self_modulate = Color(1, 1, 1, 0)
+			rank_v_scrollbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			rank_v_scrollbar.custom_minimum_size.x = 0.0
+		var rank_h_scrollbar: HScrollBar = rank_scroll.get_h_scroll_bar()
+		if rank_h_scrollbar:
+			rank_h_scrollbar.modulate = Color(1, 1, 1, 0)
+			rank_h_scrollbar.self_modulate = Color(1, 1, 1, 0)
+			rank_h_scrollbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			rank_h_scrollbar.custom_minimum_size.y = 0.0
 
 func _setup_bottom_tab_layout():
 	if not tab_bar:
 		return
 	var tab_bar_height: float = max(62.0, tab_bar.custom_minimum_size.y)
-	TAB_BAR_STYLE_TEMPLATE.apply_to_bar(tab_bar, {
+	BOTTOM_TAB_BAR_STYLE_TEMPLATE.apply_to_bar(tab_bar, {
 		"bar_height": tab_bar_height,
 		"font_size": 23,
 		"text_raise": 20.0,
@@ -555,20 +574,22 @@ func _setup_neishi_sub_tab_layout():
 	if not neishi_tab_bar:
 		return
 	var neishi_tab_height: float = max(58.0, neishi_tab_bar.custom_minimum_size.y)
-	TAB_BAR_STYLE_TEMPLATE.apply_to_bar(neishi_tab_bar, {
-		"bar_height": neishi_tab_height,
+	TOP_TAB_BAR_STYLE_TEMPLATE.apply_to_bar(neishi_tab_bar, {
+		"bar_height": 38.0,
 		"font_size": 20,
-		"line_position": "bottom",
-		"line_width": 2,
-		"selected_line_width": 3,
-		"normal_bg": Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0),
-		"hover_bg": Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0),
-		"pressed_bg": Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0),
-		"selected_bg": Color(0.95, 0.92, 0.85, 1.0),
-		"line_color": Color(0.52, 0.49, 0.45, 1.0),
-		"selected_line_color": Color(222.0 / 255.0, 180.0 / 255.0, 53.0 / 255.0, 1.0),
-		"font_color": Color(0.35, 0.32, 0.28, 1.0),
-		"selected_font_color": Color(222.0 / 255.0, 180.0 / 255.0, 53.0 / 255.0, 1.0)
+		"separation": 0,
+		"button_corner_radius": 12,
+		"shell_inset_x": 18.0,
+		"shell_inset_y": 9.0,
+		"shell_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+		"shell_border_color": Color(0.86, 0.78, 0.63, 0.45),
+		"shell_corner_radius": 20,
+		"normal_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+		"hover_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+		"pressed_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+		"selected_bg": Color(188.0 / 255.0, 144.0 / 255.0, 48.0 / 255.0, 1.0),
+		"font_color": Color(0.33, 0.28, 0.22, 1.0),
+		"selected_font_color": Color(0.98, 0.96, 0.92, 1.0)
 	})
 
 func _on_viewport_size_changed():
@@ -646,20 +667,21 @@ func setup_log_manager():
 func _setup_log_filter_tabs():
 	if not log_filter_tab_bar:
 		return
-	TAB_BAR_STYLE_TEMPLATE.apply_to_bar(log_filter_tab_bar, {
-		"bar_height": 38.0,
+	TOP_TAB_BAR_STYLE_TEMPLATE.apply_to_bar(log_filter_tab_bar, {
+		"bar_height": 36.0,
 		"font_size": 18,
-		"line_position": "bottom",
-		"line_width": 1,
-		"selected_line_width": 2,
-		"normal_bg": Color(0.94, 0.90, 0.82, 1.0),
-		"hover_bg": Color(0.96, 0.92, 0.85, 1.0),
-		"pressed_bg": Color(0.92, 0.88, 0.80, 1.0),
-		"selected_bg": Color(0.96, 0.93, 0.86, 1.0),
-		"line_color": Color(0.71, 0.66, 0.58, 1.0),
-		"selected_line_color": Color(0.87, 0.70, 0.21, 1.0),
-		"font_color": Color(0.30, 0.28, 0.25, 1.0),
-		"selected_font_color": Color(0.78, 0.56, 0.16, 1.0),
+		"button_corner_radius": 10,
+		"shell_inset_x": 14.0,
+		"shell_inset_y": 10.0,
+		"shell_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+		"shell_border_color": Color(0.86, 0.78, 0.63, 0.35),
+		"shell_corner_radius": 18,
+		"normal_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+		"hover_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+		"pressed_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+		"selected_bg": Color(188.0 / 255.0, 144.0 / 255.0, 48.0 / 255.0, 1.0),
+		"font_color": Color(0.33, 0.28, 0.22, 1.0),
+		"selected_font_color": Color(0.98, 0.96, 0.92, 1.0)
 	})
 	if log_filter_all_button and not log_filter_all_button.pressed.is_connected(_on_log_filter_all_pressed):
 		log_filter_all_button.pressed.connect(_on_log_filter_all_pressed)

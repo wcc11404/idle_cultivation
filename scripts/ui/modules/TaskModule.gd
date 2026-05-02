@@ -2,7 +2,7 @@ class_name TaskModule
 extends Node
 
 const ACTION_BUTTON_TEMPLATE = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
-const TAB_BAR_STYLE_TEMPLATE = preload("res://scripts/ui/common/TabBarStyleTemplate.gd")
+const TOP_TAB_BAR_STYLE_TEMPLATE = preload("res://scripts/ui/common/TopTabBarStyleTemplate.gd")
 const DISPLAY_PANEL_TEMPLATE = preload("res://scripts/ui/common/DisplayPanelTemplate.gd")
 
 signal log_message(message: String)
@@ -37,10 +37,21 @@ func _setup_ui_styles() -> void:
 		back_button.custom_minimum_size = Vector2(96, 40)
 		ACTION_BUTTON_TEMPLATE.apply_light_neutral(back_button, back_button.custom_minimum_size, 20)
 	if task_tab_bar:
-		TAB_BAR_STYLE_TEMPLATE.apply_to_bar(task_tab_bar, {
-			"line_position": "bottom",
-			"bar_height": 58,
-			"font_size": 20
+		TOP_TAB_BAR_STYLE_TEMPLATE.apply_to_bar(task_tab_bar, {
+			"bar_height": 38.0,
+			"font_size": 20,
+			"button_corner_radius": 12,
+			"shell_inset_x": 16.0,
+			"shell_inset_y": 10.0,
+			"shell_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+			"shell_border_color": Color(0.86, 0.78, 0.63, 0.45),
+			"shell_corner_radius": 20,
+			"normal_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+			"hover_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+			"pressed_bg": Color(243.0 / 255.0, 229.0 / 255.0, 203.0 / 255.0, 1.0),
+			"selected_bg": Color(188.0 / 255.0, 144.0 / 255.0, 48.0 / 255.0, 1.0),
+			"font_color": Color(0.33, 0.28, 0.22, 1.0),
+			"selected_font_color": Color(0.98, 0.96, 0.92, 1.0)
 		})
 	if task_scroll:
 		task_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

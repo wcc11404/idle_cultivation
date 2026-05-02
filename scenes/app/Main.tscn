@@ -577,7 +577,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="NeishiTabBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel" unique_id=1352927155]
+[node name="NeishiTopTabShell" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel"]
 custom_minimum_size = Vector2(0, 68)
 layout_mode = 1
 anchors_preset = 10
@@ -587,26 +587,47 @@ offset_top = 0.0
 offset_right = -10.0
 offset_bottom = 68.0
 grow_horizontal = 2
+
+[node name="NeishiTabBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTopTabShell" unique_id=1352927155]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 10.0
+offset_right = -16.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 alignment = 1
 
-[node name="CultivationTab" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar" unique_id=857891155]
-custom_minimum_size = Vector2(120, 50)
+[node name="CultivationTabSlot" type="MarginContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTopTabShell/NeishiTabBar"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
-theme_override_font_sizes/font_size = 18
-theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
-theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="CultivationTab" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTopTabShell/NeishiTabBar/CultivationTabSlot" unique_id=857891155]
+custom_minimum_size = Vector2(120, 24)
+layout_mode = 2
+size_flags_horizontal = 3
 text = "修炼"
 
-[node name="SpellTab" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTabBar" unique_id=857891157]
-custom_minimum_size = Vector2(120, 50)
+[node name="SpellTabSlot" type="MarginContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTopTabShell/NeishiTabBar"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.35, 0.32, 0.28, 1)
-theme_override_font_sizes/font_size = 18
-theme_override_styles/normal = SubResource("StyleBoxFlat_tab_normal")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_tab_pressed")
-theme_override_styles/hover = SubResource("StyleBoxFlat_tab_hover")
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="SpellTab" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/NeishiTopTabShell/NeishiTabBar/SpellTabSlot" unique_id=857891157]
+custom_minimum_size = Vector2(120, 24)
+layout_mode = 2
+size_flags_horizontal = 3
 text = "术法"
 
 [node name="CultivationContainer" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel" unique_id=828400658]
@@ -1624,7 +1645,7 @@ grow_vertical = 2
 theme_override_constants/separation = 0
 
 [node name="TitleBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer" unique_id=165030205]
-custom_minimum_size = Vector2(0, 58)
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
 alignment = 1
 theme_override_constants/separation = 10
@@ -1634,34 +1655,49 @@ custom_minimum_size = Vector2(96, 40)
 layout_mode = 2
 text = "< 返回"
 
-[node name="TitleLabel" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar" unique_id=165030207]
+[node name="TaskTopTabShell" type="PanelContainer" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar"]
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
-theme_override_font_sizes/font_size = 28
-text = "仙务司"
-horizontal_alignment = 1
-vertical_alignment = 1
 
-[node name="Spacer" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar" unique_id=165030208]
-custom_minimum_size = Vector2(96, 0)
-layout_mode = 2
-
-[node name="TopSeparator" type="HSeparator" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer" unique_id=165030209]
-custom_minimum_size = Vector2(0, 10)
-layout_mode = 2
-
-[node name="TaskTabBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer" unique_id=165030210]
-custom_minimum_size = Vector2(0, 58)
-layout_mode = 2
+[node name="TaskTabBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/TaskTopTabShell" unique_id=165030210]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 10.0
+offset_right = -16.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/separation = 0
 
-[node name="DailyTab" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TaskTabBar" unique_id=165030211]
+[node name="DailyTabSlot" type="MarginContainer" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/TaskTopTabShell/TaskTabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="DailyTab" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/TaskTopTabShell/TaskTabBar/DailyTabSlot" unique_id=165030211]
+custom_minimum_size = Vector2(120, 24)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "每日任务"
 
-[node name="NewbieTab" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TaskTabBar" unique_id=165030212]
+[node name="NewbieTabSlot" type="MarginContainer" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/TaskTopTabShell/TaskTabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="NewbieTab" type="Button" parent="ContentFrame/VBoxContainer/ContentPanel/TaskPanel/VBoxContainer/TitleBar/TaskTopTabShell/TaskTabBar/NewbieTabSlot" unique_id=165030212]
+custom_minimum_size = Vector2(120, 24)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "新手任务"
@@ -2347,8 +2383,15 @@ custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
 
 [node name="RankList" type="VBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer" unique_id=1554290797]
+[node name="RankScroll" type="ScrollContainer" parent="ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
+horizontal_scroll_mode = 2
+vertical_scroll_mode = 3
+
+[node name="RankList" type="VBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/SettingsPanel/RankPanel/VBoxContainer/RankScroll" unique_id=1554290797]
+layout_mode = 2
+size_flags_horizontal = 3
 
 [node name="AlchemyRoomPanel" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel" unique_id=1816358069]
 visible = false
@@ -2614,31 +2657,77 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_log")
 layout_mode = 2
 theme_override_constants/separation = 0
 
-[node name="LogFilterTabBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/LogArea/LogVBox"]
-custom_minimum_size = Vector2(0, 38)
+[node name="LogFilterTopTabShell" type="PanelContainer" parent="ContentFrame/VBoxContainer/LogArea/LogVBox"]
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LogFilterTabBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 14.0
+offset_top = 6.0
+offset_right = -14.0
+offset_bottom = -6.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/separation = 0
 
-[node name="LogFilterAllButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar"]
-custom_minimum_size = Vector2(0, 38)
+[node name="LogFilterAllButtonSlot" type="MarginContainer" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="LogFilterAllButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar/LogFilterAllButtonSlot"]
+custom_minimum_size = Vector2(0, 24)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "全部"
 
-[node name="LogFilterSystemButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar"]
-custom_minimum_size = Vector2(0, 38)
+[node name="LogFilterSystemButtonSlot" type="MarginContainer" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="LogFilterSystemButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar/LogFilterSystemButtonSlot"]
+custom_minimum_size = Vector2(0, 24)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "系统"
 
-[node name="LogFilterBattleButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar"]
-custom_minimum_size = Vector2(0, 38)
+[node name="LogFilterBattleButtonSlot" type="MarginContainer" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="LogFilterBattleButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar/LogFilterBattleButtonSlot"]
+custom_minimum_size = Vector2(0, 24)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "战斗"
 
-[node name="LogFilterProductionButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTabBar"]
-custom_minimum_size = Vector2(0, 38)
+[node name="LogFilterProductionButtonSlot" type="MarginContainer" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="LogFilterProductionButton" type="Button" parent="ContentFrame/VBoxContainer/LogArea/LogVBox/LogFilterTopTabShell/LogFilterTabBar/LogFilterProductionButtonSlot"]
+custom_minimum_size = Vector2(0, 24)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "生产"

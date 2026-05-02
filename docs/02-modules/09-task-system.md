@@ -11,6 +11,7 @@
 - 当前页签：`_active_tab`（`daily` / `newbie`）
 - 任务缓存：`_daily_tasks`、`_newbie_tasks`
 - 列表容器：`task_list`（滚动可用，滚动轴隐藏）
+- 顶部结构：保留返回按钮；原“仙务司”标题已移除，`每日任务 / 新手任务` 切换栏直接放入头部，与返回按钮同一行；上方分割线不再保留。
 - 红点摘要：可领奖数量由 `TaskModule` 计算后，通过 `task_state_changed(claimable_count)` 上报给 `GameUI` 的统一红点聚合器。
 
 ## API 交互
@@ -31,6 +32,7 @@
 
 1. 点击页签按钮切换 `_active_tab`。
 2. 只重绘当前页签任务，不重算本地进度。
+3. 页签样式使用统一 `TopTabBarStyleTemplate`：浅色外壳包裹、选中项为金色块、未选中项与外壳同底色。
 3. 按钮状态：
    - 未完成：灰色不可点
    - 已完成未领取：绿色可点
