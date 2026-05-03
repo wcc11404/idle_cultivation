@@ -40,6 +40,21 @@ var _music_bus_name: String = "Master"
 var _is_music_muted: bool = false
 var _last_music_linear_volume: float = DEFAULT_MUSIC_VOLUME
 var _music_mute_icon_rect: TextureRect = null
+const CHINESE_LEVEL_NAMES := {
+	1: "一层",
+	2: "二层",
+	3: "三层",
+	4: "四层",
+	5: "五层",
+	6: "六层",
+	7: "七层",
+	8: "八层",
+	9: "九层",
+	10: "大圆满",
+}
+const RANK_GOLD_COLOR := Color(0.85, 0.67, 0.18, 1)
+const RANK_SILVER_COLOR := Color(0.68, 0.72, 0.78, 1)
+const RANK_BRONZE_COLOR := Color(0.72, 0.48, 0.24, 1)
 
 func _get_logout_result_text(result: Dictionary, fallback: String = "登出失败") -> String:
 	var reason_code = str(result.get("reason_code", ""))
@@ -391,15 +406,15 @@ func _create_rank_header() -> HBoxContainer:
 	header.custom_minimum_size = Vector2(0, 40)
 	var rank_header = Label.new()
 	rank_header.text = "排名"
-	rank_header.size_flags_horizontal = Control.SIZE_EXPAND
+	rank_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rank_header.size_flags_stretch_ratio = 10.0
-	rank_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rank_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	rank_header.add_theme_font_size_override("font_size", 18)
 	rank_header.add_theme_color_override("font_color", Color(0.3, 0.3, 0.3, 1))
 	header.add_child(rank_header)
 	var title_header = Label.new()
 	title_header.text = "称号"
-	title_header.size_flags_horizontal = Control.SIZE_EXPAND
+	title_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_header.size_flags_stretch_ratio = 20.0
 	title_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_header.add_theme_font_size_override("font_size", 18)
@@ -407,7 +422,7 @@ func _create_rank_header() -> HBoxContainer:
 	header.add_child(title_header)
 	var nickname_header = Label.new()
 	nickname_header.text = "昵称"
-	nickname_header.size_flags_horizontal = Control.SIZE_EXPAND
+	nickname_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nickname_header.size_flags_stretch_ratio = 30.0
 	nickname_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nickname_header.add_theme_font_size_override("font_size", 18)
@@ -415,7 +430,7 @@ func _create_rank_header() -> HBoxContainer:
 	header.add_child(nickname_header)
 	var realm_header = Label.new()
 	realm_header.text = "境界"
-	realm_header.size_flags_horizontal = Control.SIZE_EXPAND
+	realm_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	realm_header.size_flags_stretch_ratio = 25.0
 	realm_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	realm_header.add_theme_font_size_override("font_size", 18)
@@ -423,7 +438,7 @@ func _create_rank_header() -> HBoxContainer:
 	header.add_child(realm_header)
 	var spirit_header = Label.new()
 	spirit_header.text = "灵气"
-	spirit_header.size_flags_horizontal = Control.SIZE_EXPAND
+	spirit_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	spirit_header.size_flags_stretch_ratio = 15.0
 	spirit_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	spirit_header.add_theme_font_size_override("font_size", 18)
@@ -434,17 +449,66 @@ func _create_rank_header() -> HBoxContainer:
 func _create_rank_item(rank_data: Dictionary) -> HBoxContainer:
 	var item = HBoxContainer.new()
 	item.custom_minimum_size = Vector2(0, 50)
-	var rank_label = Label.new()
-	rank_label.text = str(int(rank_data.get("rank", 0)))
-	rank_label.size_flags_horizontal = Control.SIZE_EXPAND
-	rank_label.size_flags_stretch_ratio = 10.0
-	rank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rank_label.add_theme_font_size_override("font_size", 20)
-	rank_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2, 1))
-	item.add_child(rank_label)
+	var rank = int(rank_data.get("rank", 0))
+	var rank_cell = MarginContainer.new()
+	rank_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rank_cell.size_flags_stretch_ratio = 10.0
+	rank_cell.add_theme_constant_override("margin_left", 0)
+	rank_cell.add_theme_constant_override("margin_top", 0)
+	rank_cell.add_theme_constant_override("margin_right", 8)
+	rank_cell.add_theme_constant_override("margin_bottom", 0)
+	if rank <= 9 and rank >= 1:
+		var badge_host := Control.new()
+		badge_host.custom_minimum_size = Vector2(0, 32)
+		badge_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		var badge := Panel.new()
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.anchor_left = 1.0
+		badge.anchor_right = 1.0
+		badge.anchor_top = 0.5
+		badge.anchor_bottom = 0.5
+		badge.offset_left = -32.0
+		badge.offset_right = 0.0
+		badge.offset_top = -16.0
+		badge.offset_bottom = 16.0
+
+		var badge_style := StyleBoxFlat.new()
+		badge_style.bg_color = _get_rank_badge_color(rank)
+		badge_style.set_corner_radius_all(16)
+		badge.add_theme_stylebox_override("panel", badge_style)
+		badge_host.add_child(badge)
+
+		var badge_label := Label.new()
+		badge_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge_label.text = str(rank)
+		badge_label.anchor_left = 1.0
+		badge_label.anchor_right = 1.0
+		badge_label.anchor_top = 0.5
+		badge_label.anchor_bottom = 0.5
+		badge_label.offset_left = -32.0
+		badge_label.offset_right = 0.0
+		badge_label.offset_top = -16.0
+		badge_label.offset_bottom = 16.0
+		badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		badge_label.add_theme_font_size_override("font_size", 18)
+		badge_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+		badge_host.add_child(badge_label)
+		rank_cell.add_child(badge_host)
+	else:
+		var rank_label = Label.new()
+		rank_label.text = str(rank)
+		rank_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		rank_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		rank_label.add_theme_font_size_override("font_size", 20)
+		rank_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2, 1))
+		rank_cell.add_child(rank_label)
+	item.add_child(rank_cell)
 	var title_label = Label.new()
 	title_label.text = rank_data.get("title_id", "")
-	title_label.size_flags_horizontal = Control.SIZE_EXPAND
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_label.size_flags_stretch_ratio = 20.0
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 16)
@@ -452,7 +516,7 @@ func _create_rank_item(rank_data: Dictionary) -> HBoxContainer:
 	item.add_child(title_label)
 	var nickname_label = Label.new()
 	nickname_label.text = rank_data.get("nickname", "未知")
-	nickname_label.size_flags_horizontal = Control.SIZE_EXPAND
+	nickname_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nickname_label.size_flags_stretch_ratio = 30.0
 	nickname_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	nickname_label.add_theme_font_size_override("font_size", 18)
@@ -461,11 +525,9 @@ func _create_rank_item(rank_data: Dictionary) -> HBoxContainer:
 	var realm_label = Label.new()
 	var realm_name = rank_data.get("realm", "未知")
 	var level = int(rank_data.get("level", 1))
-	var level_text = "第" + str(level) + "层"
-	if level == 10:
-		level_text = "十层"
+	var level_text = CHINESE_LEVEL_NAMES.get(level, str(level) + "层")
 	realm_label.text = realm_name + " " + level_text
-	realm_label.size_flags_horizontal = Control.SIZE_EXPAND
+	realm_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	realm_label.size_flags_stretch_ratio = 25.0
 	realm_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	realm_label.add_theme_font_size_override("font_size", 16)
@@ -473,10 +535,19 @@ func _create_rank_item(rank_data: Dictionary) -> HBoxContainer:
 	item.add_child(realm_label)
 	var spirit_label = Label.new()
 	spirit_label.text = UIUtils.format_display_number(float(rank_data.get("spirit_energy", 0)))
-	spirit_label.size_flags_horizontal = Control.SIZE_EXPAND
+	spirit_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	spirit_label.size_flags_stretch_ratio = 15.0
 	spirit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	spirit_label.add_theme_font_size_override("font_size", 16)
 	spirit_label.add_theme_color_override("font_color", Color(0.5, 0.3, 0.8, 1))
 	item.add_child(spirit_label)
 	return item
+
+func _get_rank_badge_color(rank: int) -> Color:
+	if rank == 1:
+		return RANK_GOLD_COLOR
+	if rank >= 2 and rank <= 4:
+		return RANK_SILVER_COLOR
+	if rank >= 5 and rank <= 9:
+		return RANK_BRONZE_COLOR
+	return Color(0.2, 0.2, 0.2, 1)

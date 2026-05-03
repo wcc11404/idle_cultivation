@@ -6,6 +6,18 @@ signal breakthrough_failed(reason: String)
 var REALM_ORDER: Array = []
 var BREAKTHROUGH_MATERIALS: Dictionary = {}
 var REALMS: Dictionary = {}
+const CHINESE_LEVEL_NAMES := {
+	1: "一层",
+	2: "二层",
+	3: "三层",
+	4: "四层",
+	5: "五层",
+	6: "六层",
+	7: "七层",
+	8: "八层",
+	9: "九层",
+	10: "大圆满",
+}
 
 func _ready():
 	_load_config()
@@ -44,7 +56,7 @@ func get_level_info(realm_name: String, level: int) -> Dictionary:
 func get_level_name(realm_name: String, level: int) -> String:
 	var realm_info = get_realm_info(realm_name)
 	var names = realm_info.get("level_names", {})
-	return names.get(str(level), str(level) + "段")
+	return names.get(str(level), CHINESE_LEVEL_NAMES.get(level, str(level) + "层"))
 
 func get_max_spirit_energy(realm_name: String, level: int) -> int:
 	var level_info = get_level_info(realm_name, level)

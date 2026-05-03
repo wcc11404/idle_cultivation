@@ -33,8 +33,11 @@ var defense_value_label: Label = null
 var speed_value_label: Label = null
 var spirit_gain_value_label: Label = null
 var penetration_value_label: Label = null
+var hit_value_label: Label = null
+var dodge_value_label: Label = null
 var crit_value_label: Label = null
 var crit_damage_value_label: Label = null
+var anti_crit_value_label: Label = null
 var health_regen_value_label: Label = null
 
 var status_label: Label = null
@@ -661,11 +664,17 @@ func update_display(status: Dictionary = {}):
 	if speed_value_label:
 		speed_value_label.text = UIUtils.format_display_number(player.get_final_speed())
 	if penetration_value_label:
-		penetration_value_label.text = UIUtils.format_display_number(0.0)
+		penetration_value_label.text = "0"
+	if hit_value_label:
+		hit_value_label.text = "100%"
+	if dodge_value_label:
+		dodge_value_label.text = "0%"
 	if crit_value_label:
-		crit_value_label.text = UIUtils.format_display_number(0.0)
+		crit_value_label.text = "0%"
 	if crit_damage_value_label:
-		crit_damage_value_label.text = UIUtils.format_display_number(0.0)
+		crit_damage_value_label.text = "100%"
+	if anti_crit_value_label:
+		anti_crit_value_label.text = "0%"
 	if spirit_gain_value_label:
 		spirit_gain_value_label.text = UIUtils.format_display_number(player.get_final_spirit_gain_speed()) + "/秒"
 	if health_regen_value_label:

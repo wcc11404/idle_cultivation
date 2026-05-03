@@ -104,10 +104,13 @@ const REALM_FRAME_TEXTURES = {
 @onready var defense_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/DefenseItem/DefenseValueLabel
 @onready var speed_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow/SpeedItem/SpeedValueLabel
 @onready var penetration_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/PenetrationItem/PenetrationValueLabel
-@onready var crit_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritItem/CritValueLabel
-@onready var crit_damage_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/CritDamageItem/CritDamageValueLabel
-@onready var spirit_gain_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/SpiritGainItem/SpiritGainValueLabel
-@onready var health_regen_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/HealthRegenItem/HealthRegenValueLabel
+@onready var hit_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/HitItem/HitValueLabel
+@onready var dodge_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow2/DodgeItem/DodgeValueLabel
+@onready var crit_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/CritItem/CritValueLabel
+@onready var crit_damage_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/CritDamageItem/CritDamageValueLabel
+@onready var anti_crit_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow3/AntiCritItem/AntiCritValueLabel
+@onready var spirit_gain_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow4/SpiritGainItem/SpiritGainValueLabel
+@onready var health_regen_value_label: Label = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/StatusArea/PlayerDataContainer/VBoxContainer/StatsRow4/HealthRegenItem/HealthRegenValueLabel
 
 # 修炼小人素材
 @onready var cultivation_figure: TextureRect = $ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/CultivationVisual/CultivationFigure
@@ -1144,8 +1147,11 @@ func setup_neishi_module():
 	cultivation_module.defense_value_label = defense_value_label
 	cultivation_module.speed_value_label = speed_value_label
 	cultivation_module.penetration_value_label = penetration_value_label
+	cultivation_module.hit_value_label = hit_value_label
+	cultivation_module.dodge_value_label = dodge_value_label
 	cultivation_module.crit_value_label = crit_value_label
 	cultivation_module.crit_damage_value_label = crit_damage_value_label
+	cultivation_module.anti_crit_value_label = anti_crit_value_label
 	cultivation_module.spirit_gain_value_label = spirit_gain_value_label
 	cultivation_module.health_regen_value_label = health_regen_value_label
 	
