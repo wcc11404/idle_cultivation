@@ -7,6 +7,7 @@ const ACTION_BUTTON_TEMPLATE = preload("res://scripts/ui/common/ActionButtonTemp
 signal spell_equipped(spell_id: String)
 signal spell_unequipped(spell_id: String)
 signal spell_upgraded(spell_id: String)
+signal spell_star_upgraded(spell_id: String)
 signal spell_viewed(spell_id: String)
 signal log_message(message: String)
 
@@ -30,6 +31,16 @@ var _card_pool: Array[Control] = []
 var _max_pool_size: int = 30
 var _signals_connected: bool = false
 var _scroll_vertical_step: float = 20.0
+var _touch_states := {}
+const TOUCH_SLOP := 16.0
+const ELEMENT_ICONS := {
+	"metal": "⚙",
+	"wood": "🌿",
+	"water": "💧",
+	"fire": "🔥",
+	"earth": "⛰",
+	"none": "○"
+}
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ACTION_LOCK_MANAGER.new()
@@ -41,6 +52,8 @@ const TYPE_NAMES = {
 	"opening": "开局术法",
 	"production": "生产术法"
 }
+const RARITY_ORDER = {"fan": 0, "huang": 1, "xuan": 2, "di": 3, "tian": 4}
+const ELEMENT_ORDER = {"none": 0, "metal": 1, "wood": 2, "water": 3, "fire": 4, "earth": 5}
 
 func _get_spell_name(spell_id: String) -> String:
 	if spell_data and spell_data.has_method("get_spell_name"):
@@ -113,6 +126,24 @@ func _get_spell_result_text(result: Dictionary, fallback: String) -> String:
 			return "术法【%s】灵气已充足" % spell_name
 		"SPELL_CHARGE_PLAYER_SPIRIT_INSUFFICIENT":
 			return "自身灵气不足，无法为术法【%s】充灵" % spell_name
+		"SPELL_STAR_UP_SUCCEEDED":
+			return "%s升星成功，达到%d星" % [spell_name, int(reason_data.get("new_star", result.get("new_star", 0)))]
+		"SPELL_STAR_UP_NOT_OWNED":
+			return "未获取术法【%s】" % spell_name
+		"SPELL_STAR_UP_AT_MAX_STAR":
+			return "术法【%s】已达到最高星级" % spell_name
+		"SPELL_STAR_UP_UNLOCK_ITEM_INSUFFICIENT":
+			var unlock_shortage = max(
+				int(reason_data.get("required_unlock_item_count", 0)) - int(reason_data.get("current_unlock_item_count", 0)),
+				0
+			)
+			return "升星失败，缺少同名术法解锁道具%d个" % unlock_shortage
+		"SPELL_STAR_UP_STAR_MATERIAL_INSUFFICIENT":
+			var material_shortage = max(
+				int(reason_data.get("required_star_material_count", 0)) - int(reason_data.get("current_star_material_count", 0)),
+				0
+			)
+			return "升星失败，缺少空白玉简%d个" % material_shortage
 		_:
 			return api.network_manager.get_api_error_text_for_ui(result, fallback)
 
@@ -238,6 +269,19 @@ func update_spell_ui():
 		if not spells_by_type.has(type_str):
 			spells_by_type[type_str] = []
 		spells_by_type[type_str].append({"id": spell_id, "info": info, "data": spells[spell_id]})
+
+	for type_key in spells_by_type.keys():
+		spells_by_type[type_key].sort_custom(func(a, b):
+			var ar = int(RARITY_ORDER.get(str(a.info.get("rarity", "fan")), 99))
+			var br = int(RARITY_ORDER.get(str(b.info.get("rarity", "fan")), 99))
+			if ar != br:
+				return ar < br
+			var ae = int(ELEMENT_ORDER.get(str(a.info.get("element", "none")), 99))
+			var be = int(ELEMENT_ORDER.get(str(b.info.get("element", "none")), 99))
+			if ae != be:
+				return ae < be
+			return str(a.id) < str(b.id)
+		)
 	
 	var visible_type_keys: Array = []
 	for type_key in TYPE_ORDER:
@@ -261,7 +305,7 @@ func update_spell_ui():
 		
 		var grid = GridContainer.new()
 		grid.name = type_key + "_grid"
-		grid.columns = 4
+		grid.columns = 5
 		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_theme_constant_override("h_separation", 10)
 		grid.add_theme_constant_override("v_separation", 10)
@@ -290,7 +334,9 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 		card = _create_card_template()
 	
 	var vbox = card.get_child(0) as VBoxContainer
+	var star_label = vbox.get_node_or_null("StarLabel") as Label
 	var name_label = vbox.get_node_or_null("NameLabel") as Label
+	var meta_label = vbox.get_node_or_null("MetaLabel") as Label
 	var status_label = vbox.get_node_or_null("StatusLabel") as Label
 	var button_container = vbox.get_node_or_null("ButtonContainer") as HBoxContainer
 	if not button_container:
@@ -299,8 +345,18 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 	var equip_btn = button_container.get_node_or_null("EquipButton") as Button
 	
 	var spell_name = info.get("name", "未知术法")
+	var quality = int(info.get("quality", spell_data.get_spell_quality(spell_id) if spell_data else 0))
+	var rarity_color = _get_spell_quality_color(quality)
+	var star = int(data.get("star", 0))
+	var element = str(info.get("element", spell_data.get_spell_element(spell_id) if spell_data else "none"))
 	if name_label:
 		name_label.text = spell_name
+		name_label.add_theme_color_override("font_color", rarity_color)
+	if star_label:
+		star_label.text = "" if star <= 0 else "★".repeat(min(star, 5))
+		star_label.visible = true
+	if meta_label:
+		meta_label.text = _get_element_icon(element) + "  " + _get_element_name(element)
 	
 	var level = int(data.get("level", 0))
 	var obtained = bool(data.get("obtained", false)) or level > 0
@@ -336,21 +392,27 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 			if obtained and level > 0:
 				if is_equipped:
 					equip_btn.text = "卸下"
+					ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(equip_btn)
 				else:
 					equip_btn.text = "装备"
+					ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(equip_btn)
 				equip_btn.disabled = false
-				ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(equip_btn)
 				equip_btn.pressed.connect(_on_equip_button_pressed.bind(spell_id))
 			else:
 				equip_btn.text = "装备"
 				equip_btn.disabled = true
 				ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(equip_btn)
+
+	_touch_states[spell_id] = {"active": false, "start_pos": Vector2.ZERO, "touch_id": -1, "moved": false}
+	for conn in card.gui_input.get_connections():
+		card.gui_input.disconnect(conn.callable)
+	card.gui_input.connect(_on_card_input.bind(spell_id))
 	
 	return card
 
 func _create_card_template() -> Control:
 	var card = PanelContainer.new()
-	card.custom_minimum_size = Vector2(130, 160)
+	card.custom_minimum_size = Vector2(130, 188)
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	SPELL_THUMBNAIL_TEMPLATE.apply_to_card(card, {
 		"bg_color": SPELL_THUMBNAIL_TEMPLATE.DEFAULT_BG_COLOR
@@ -360,13 +422,34 @@ func _create_card_template() -> Control:
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_theme_constant_override("separation", 8)
 	card.add_child(vbox)
+
+	var top_spacer = Control.new()
+	top_spacer.name = "TopSpacer"
+	top_spacer.custom_minimum_size = Vector2(0, 5)
+	vbox.add_child(top_spacer)
+
+	var star_label = Label.new()
+	star_label.name = "StarLabel"
+	star_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	star_label.custom_minimum_size = Vector2(0, 24)
+	star_label.add_theme_font_size_override("font_size", 16)
+	star_label.add_theme_color_override("font_color", Color(0.89, 0.72, 0.21, 1.0))
+	vbox.add_child(star_label)
 	
 	var name_label = Label.new()
 	name_label.name = "NameLabel"
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 18)
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.add_theme_font_size_override("font_size", 17)
 	name_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))
 	vbox.add_child(name_label)
+
+	var meta_label = Label.new()
+	meta_label.name = "MetaLabel"
+	meta_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	meta_label.add_theme_font_size_override("font_size", 14)
+	meta_label.add_theme_color_override("font_color", Color(0.36, 0.33, 0.29, 1.0))
+	vbox.add_child(meta_label)
 	
 	var status_label = Label.new()
 	status_label.name = "StatusLabel"
@@ -392,17 +475,13 @@ func _create_card_template() -> Control:
 	equip_button.custom_minimum_size = Vector2(48, 30)
 	equip_button.add_theme_font_size_override("font_size", 14)
 	button_container.add_child(equip_button)
-	_set_non_button_mouse_filter_ignore(card)
+
+	var bottom_spacer = Control.new()
+	bottom_spacer.name = "BottomSpacer"
+	bottom_spacer.custom_minimum_size = Vector2(0, 7)
+	vbox.add_child(bottom_spacer)
 	
 	return card
-
-func _set_non_button_mouse_filter_ignore(root: Control) -> void:
-	if root is Button:
-		return
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for child in root.get_children():
-		if child is Control:
-			_set_non_button_mouse_filter_ignore(child)
 
 func _return_card_to_pool(card: Control):
 	if card.get_parent():
@@ -415,6 +494,37 @@ func _return_card_to_pool(card: Control):
 
 func _on_view_button_pressed(spell_id: String):
 	_show_spell_detail(spell_id)
+
+func _on_card_input(event: InputEvent, spell_id: String):
+	var state = _touch_states.get(spell_id, {"active": false, "start_pos": Vector2.ZERO, "touch_id": -1, "moved": false})
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+			state["active"] = true
+			state["start_pos"] = mb.position
+			state["moved"] = false
+		elif mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+			if bool(state.get("active", false)) and not bool(state.get("moved", false)):
+				_show_spell_detail(spell_id)
+			state["active"] = false
+	elif event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		if st.pressed:
+			state["active"] = true
+			state["touch_id"] = st.index
+			state["start_pos"] = st.position
+			state["moved"] = false
+		else:
+			if bool(state.get("active", false)) and int(state.get("touch_id", -1)) == st.index and not bool(state.get("moved", false)):
+				_show_spell_detail(spell_id)
+			state["active"] = false
+			state["touch_id"] = -1
+	elif event is InputEventScreenDrag:
+		var sd := event as InputEventScreenDrag
+		if bool(state.get("active", false)) and int(state.get("touch_id", -1)) == sd.index:
+			if sd.position.distance_to(state.get("start_pos", Vector2.ZERO)) > TOUCH_SLOP:
+				state["moved"] = true
+	_touch_states[spell_id] = state
 
 func _on_equip_button_pressed(spell_id: String):
 	current_viewing_spell = spell_id
@@ -439,6 +549,7 @@ func _create_spell_detail_popup():
 		spell_detail_popup.setup(self)
 	spell_detail_popup.close_requested.connect(_on_spell_detail_close_pressed)
 	spell_detail_popup.upgrade_requested.connect(_on_spell_upgrade_pressed)
+	spell_detail_popup.star_up_requested.connect(_on_spell_star_up_pressed)
 	spell_detail_popup.charge_requested.connect(_on_spell_charge_pressed)
 	spell_detail_popup.multiplier_changed.connect(_on_multiplier_changed)
 
@@ -446,11 +557,17 @@ func _update_spell_detail_popup():
 	if not spell_detail_popup or current_viewing_spell.is_empty():
 		return
 	var info = spell_data.get_spell_data(current_viewing_spell)
-	var player_spells = spell_system.get_player_spells()
-	var data = player_spells.get(current_viewing_spell, {})
-	var display_data = data.duplicate()
-	if not display_data.has("id"):
-		display_data["id"] = current_viewing_spell
+	var display_data = spell_system.get_spell_info(current_viewing_spell).duplicate(true)
+	if display_data.is_empty():
+		var player_spells = spell_system.get_player_spells()
+		var data = player_spells.get(current_viewing_spell, {})
+		display_data = data.duplicate(true)
+		if not display_data.has("id"):
+			display_data["id"] = current_viewing_spell
+	display_data["quality"] = int(info.get("quality", spell_data.get_spell_quality(current_viewing_spell) if spell_data else 0))
+	display_data["rarity"] = str(info.get("rarity", spell_data.get_spell_rarity(current_viewing_spell) if spell_data else "fan"))
+	display_data["element"] = str(info.get("element", spell_data.get_spell_element(current_viewing_spell) if spell_data else "none"))
+	display_data["max_star"] = int(info.get("max_star", spell_data.get_spell_max_star(current_viewing_spell) if spell_data else 5))
 	spell_detail_popup.update_content(display_data, info, spell_system, spell_data, current_multiplier_index, MULTIPLIERS)
 
 func _update_use_count_label_only():
@@ -515,6 +632,22 @@ func _on_spell_upgrade_pressed():
 		spell_upgraded.emit(current_viewing_spell)
 	else:
 		var err_msg = _get_spell_result_text(result, "升级失败")
+		if not err_msg.is_empty():
+			_add_log(err_msg)
+
+func _on_spell_star_up_pressed():
+	if current_viewing_spell.is_empty():
+		return
+	var result = await api.spell_star_up(current_viewing_spell)
+	if result.get("success", false):
+		_add_log(_get_spell_result_text(result, "术法升星成功"))
+		if game_ui and game_ui.has_method("refresh_inventory_ui") and game_ui.chuna_module and game_ui.chuna_module.has_method("_refresh_inventory_from_server"):
+			await game_ui.chuna_module._refresh_inventory_from_server()
+		await _refresh_after_spell_action()
+		_update_spell_detail_popup()
+		spell_star_upgraded.emit(current_viewing_spell)
+	else:
+		var err_msg = _get_spell_result_text(result, "升星失败")
 		if not err_msg.is_empty():
 			_add_log(err_msg)
 
@@ -602,14 +735,41 @@ func _get_slot_type_by_spell(spell_id: String) -> String:
 	var raw_type = spell_info.get("type", "active")
 	var type_str = str(raw_type).to_lower()
 	match type_str:
-		"breathing", "production":
+		"breathing":
 			return "breathing"
+		"production":
+			return "production"
 		"active", "attack":
 			return "active"
 		"passive", "opening":
 			return "opening"
 		_:
 			return "active"
+
+func _get_spell_quality_color(quality: int) -> Color:
+	var game_manager = get_node_or_null("/root/GameManager")
+	var item_data = game_manager.get_item_data() if game_manager and game_manager.has_method("get_item_data") else null
+	if item_data and item_data.has_method("get_item_quality_color"):
+		return item_data.get_item_quality_color(quality)
+	return Color(0.2, 0.2, 0.2, 1.0)
+
+func _get_element_icon(element: String) -> String:
+	return ELEMENT_ICONS.get(element, ELEMENT_ICONS["none"])
+
+func _get_element_name(element: String) -> String:
+	match element:
+		"metal":
+			return "金"
+		"wood":
+			return "木"
+		"water":
+			return "水"
+		"fire":
+			return "火"
+		"earth":
+			return "土"
+		_:
+			return "无"
 
 func _add_log(message: String):
 	log_message.emit(message)

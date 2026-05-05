@@ -9,6 +9,7 @@ const SAFE_AREA_HELPER = preload("res://scripts/ui/common/SafeAreaHelper.gd")
 
 # 信号
 signal upgrade_requested
+signal star_up_requested
 signal charge_requested
 signal multiplier_changed
 signal close_requested
@@ -21,6 +22,7 @@ var vbox: VBoxContainer = null
 var charge_button: Button = null
 var multiplier_button: Button = null
 var upgrade_button: Button = null
+var star_up_button: Button = null
 var close_button: Button = null
 var overlay_host: Control = null
 
@@ -110,6 +112,13 @@ func _create_popup_content():
 	type_label.add_theme_font_size_override("font_size", 21)
 	type_label.add_theme_color_override("font_color", Color(0.22, 0.2, 0.18, 1))
 	vbox.add_child(type_label)
+
+	var meta_label = Label.new()
+	meta_label.name = "MetaLabel"
+	meta_label.text = "五行 / 稀有度："
+	meta_label.add_theme_font_size_override("font_size", 21)
+	meta_label.add_theme_color_override("font_color", Color(0.22, 0.2, 0.18, 1))
+	vbox.add_child(meta_label)
 	
 	# 等级
 	var level_label = Label.new()
@@ -118,6 +127,13 @@ func _create_popup_content():
 	level_label.add_theme_font_size_override("font_size", 21)
 	level_label.add_theme_color_override("font_color", Color(0.22, 0.2, 0.18, 1))
 	vbox.add_child(level_label)
+
+	var star_label = Label.new()
+	star_label.name = "StarLabel"
+	star_label.text = "星级："
+	star_label.add_theme_font_size_override("font_size", 21)
+	star_label.add_theme_color_override("font_color", Color(0.22, 0.2, 0.18, 1))
+	vbox.add_child(star_label)
 	
 	# 分隔线
 	vbox.add_child(_create_section_gap(4))
@@ -265,6 +281,25 @@ func _create_popup_content():
 	
 	# 轻量留白（避免使用 EXPAND_FILL 把弹窗高度异常撑大）
 	vbox.add_child(_create_section_gap(8))
+	vbox.add_child(_create_thick_separator())
+	vbox.add_child(_create_section_gap(2))
+
+	var star_title = Label.new()
+	star_title.name = "StarUpgradeTitleLabel"
+	star_title.text = "【升星条件】"
+	star_title.add_theme_font_size_override("font_size", 23)
+	star_title.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
+	vbox.add_child(star_title)
+
+	var star_condition_label = Label.new()
+	star_condition_label.name = "StarConditionLabel"
+	star_condition_label.text = ""
+	star_condition_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	star_condition_label.add_theme_font_size_override("font_size", 19)
+	star_condition_label.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
+	vbox.add_child(star_condition_label)
+
+	vbox.add_child(_create_section_gap(8))
 	
 	# 按钮容器
 	var button_container = HBoxContainer.new()
@@ -280,6 +315,14 @@ func _create_popup_content():
 	upgrade_button.add_theme_font_size_override("font_size", 22)
 	upgrade_button.pressed.connect(func(): upgrade_requested.emit())
 	button_container.add_child(upgrade_button)
+
+	star_up_button = Button.new()
+	star_up_button.name = "StarUpButton"
+	star_up_button.text = "升星"
+	star_up_button.custom_minimum_size = Vector2(124, 46)
+	star_up_button.add_theme_font_size_override("font_size", 22)
+	star_up_button.pressed.connect(func(): star_up_requested.emit())
+	button_container.add_child(star_up_button)
 	
 	# 关闭按钮
 	close_button = Button.new()
@@ -305,6 +348,8 @@ func _apply_action_button_styles():
 		ACTION_BUTTON_TEMPLATE.apply_spell_view_brown(multiplier_button, multiplier_button.custom_minimum_size, 22)
 	if upgrade_button:
 		ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(upgrade_button, upgrade_button.custom_minimum_size, 22)
+	if star_up_button:
+		ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(star_up_button, star_up_button.custom_minimum_size, 22)
 	if close_button:
 		ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(close_button, close_button.custom_minimum_size, 22)
 
@@ -360,6 +405,7 @@ func update_content(spell_info: Dictionary, spell_config: Dictionary,
 	var title_label = vbox.get_node_or_null("TitleLabel")
 	if title_label:
 		title_label.text = spell_config.get("name", "")
+		title_label.modulate = _get_spell_quality_color(int(spell_info.get("quality", 0)))
 	
 	# 更新类型
 	var type_label = vbox.get_node_or_null("TypeLabel")
@@ -367,6 +413,13 @@ func update_content(spell_info: Dictionary, spell_config: Dictionary,
 		var type_str = spell_config.get("type", "active")
 		var type_name = spell_data.get_spell_type_name(type_str) if spell_data else type_str
 		type_label.text = "类型：" + type_name
+
+	var meta_label = vbox.get_node_or_null("MetaLabel")
+	if meta_label:
+		meta_label.text = "五行 / 稀有度：%s / %s阶" % [
+			_get_element_name(str(spell_info.get("element", "none"))),
+			_get_rarity_name(str(spell_info.get("rarity", "fan")))
+		]
 	
 	# 更新等级
 	var level_label = vbox.get_node_or_null("LevelLabel")
@@ -376,6 +429,12 @@ func update_content(spell_info: Dictionary, spell_config: Dictionary,
 			level_label.text = "等级：%s（%d / %d）" % [_format_level_tier_name(normalized_level), normalized_level, max_level]
 		else:
 			level_label.text = "等级：未解锁"
+
+	var star_label = vbox.get_node_or_null("StarLabel")
+	if star_label:
+		var current_star = int(spell_info.get("star", 0))
+		var max_star = int(spell_info.get("max_star", 5))
+		star_label.text = "星级：" + ("☆" if current_star <= 0 else "★".repeat(min(current_star, 5))) + "（%d / %d）" % [current_star, max_star]
 	
 	# 获取展示等级数据
 	# 已获得：展示当前等级
@@ -385,21 +444,34 @@ func update_content(spell_info: Dictionary, spell_config: Dictionary,
 	level_data = spell_data.get_spell_level_data(str(spell_info.get("id", "")), display_level) if spell_data else {}
 	
 	# 更新属性加成
-	_update_attribute_value(level_data)
+	_update_attribute_value(spell_info, level_data, spell_data)
 	
 	# 更新术法效果
-	_update_effect_value(spell_config, level_data)
+	_update_effect_value(spell_info, spell_config, level_data)
 	
 	# 更新升级条件
 	_update_upgrade_conditions(spell_info, spell_config, spell_data, multiplier_index, multipliers)
+	_update_star_conditions(spell_info, spell_config, spell_data)
 
-func _update_attribute_value(level_data: Dictionary):
+func _update_attribute_value(spell_info: Dictionary, level_data: Dictionary, spell_data: Node):
 	"""更新属性加成显示"""
 	var attr_value = vbox.get_node_or_null("AttributeValue")
 	if not attr_value:
 		return
 	
-	var attr_bonus = level_data.get("attribute_bonus", {})
+	var attr_bonus = level_data.get("attribute_bonus", {}).duplicate(true)
+	var spell_id := str(spell_info.get("spell_id", spell_info.get("id", "")))
+	var current_star = int(spell_info.get("star", 0))
+	if current_star >= 0 and spell_data:
+		var star_key = min(current_star, 5)
+		var star_data = spell_data.get_spell_star_data(spell_id, star_key)
+		var star_bonus = star_data.get("attribute_bonus", {})
+		for attr in star_bonus.keys():
+			var value = float(star_bonus[attr])
+			if attr in ["speed", "hit", "dodge", "crit", "anti_crit"]:
+				attr_bonus[attr] = float(attr_bonus.get(attr, 0.0)) + value
+			else:
+				attr_bonus[attr] = float(attr_bonus.get(attr, 1.0)) + value
 	var attr_text = ""
 	var keys = attr_bonus.keys()
 	for i in range(keys.size()):
@@ -407,21 +479,48 @@ func _update_attribute_value(level_data: Dictionary):
 		var value = attr_bonus[attr]
 		if attr == "speed":
 			attr_text += "速度 +" + UIUtils.format_display_number(float(value))
+		elif attr in ["hit", "dodge", "crit", "anti_crit"]:
+			attr_text += _get_attribute_name(attr) + " +" + UIUtils.format_display_number(float(value)) + "%"
 		else:
-			attr_text += _get_attribute_name(attr) + " ×" + UIUtils.format_display_number(float(value))
+			attr_text += _get_attribute_name(attr) + " x " + _format_spell_multiplier(float(value))
 		if i < keys.size() - 1:
 			attr_text += "\n"
 	attr_value.text = attr_text
 
-func _update_effect_value(spell_config: Dictionary, level_data: Dictionary):
+func _update_effect_value(spell_info: Dictionary, spell_config: Dictionary, level_data: Dictionary):
 	"""更新术法效果显示"""
 	var effect_value = vbox.get_node_or_null("EffectValue")
 	if not effect_value:
 		return
 	
-	var effect = level_data.get("effect", {})
-	var description = spell_config.get("description", "")
-	effect_value.text = _format_effect_description(description, effect)
+	var current_effects = spell_info.get("current_effects", [])
+	var fallback_effects = level_data.get("effect", [])
+	var description := str(spell_config.get("description", ""))
+	var display_effects: Variant = current_effects
+	if not (display_effects is Array and not display_effects.is_empty()):
+		display_effects = fallback_effects
+	if display_effects is Array and _has_combat_effects(display_effects):
+		effect_value.text = _build_combat_effect_sentence(display_effects)
+		return
+	if display_effects is Array and _has_opening_buff_effects(display_effects):
+		effect_value.text = _build_opening_effect_sentence(display_effects)
+		return
+	if description.find("基础伤害") != -1 and display_effects is Array and not display_effects.is_empty():
+		var legacy_parts: Array[String] = []
+		for effect in display_effects:
+			legacy_parts.append(_format_effect_entry(effect))
+		effect_value.text = "\n".join(legacy_parts)
+		return
+	if not description.is_empty():
+		effect_value.text = _format_effect_description(description, display_effects)
+		return
+	if display_effects is Array and not display_effects.is_empty():
+		var parts: Array[String] = []
+		for effect in display_effects:
+			parts.append(_format_effect_entry(effect))
+		effect_value.text = "\n".join(parts)
+	else:
+		effect_value.text = ""
 
 func _update_upgrade_conditions(spell_info: Dictionary, spell_config: Dictionary, spell_data: Node, 
 								multiplier_index: int, multipliers: Array):
@@ -494,6 +593,8 @@ func _set_buttons_enabled(enabled: bool, multiplier_index: int):
 		multiplier_button.text = MULTIPLIER_LABELS[multiplier_index] if multiplier_index < MULTIPLIER_LABELS.size() else "x10"
 	if upgrade_button:
 		upgrade_button.disabled = not enabled
+	if star_up_button:
+		star_up_button.disabled = true
 
 func update_use_count_only(spell_info: Dictionary, spell_config: Dictionary, spell_data: Node):
 	"""只更新使用次数（用于实时更新）"""
@@ -529,6 +630,40 @@ func update_use_count_only(spell_info: Dictionary, spell_config: Dictionary, spe
 	if current_level > 0 and current_level < max_level:
 		_set_buttons_enabled(true, 0)
 
+func _update_star_conditions(spell_info: Dictionary, spell_config: Dictionary, spell_data: Node):
+	var star_condition_label = vbox.get_node_or_null("StarConditionLabel")
+	if not star_condition_label:
+		return
+	if not _is_spell_obtained(spell_info):
+		star_condition_label.text = "同名术法解锁道具 - / -"
+		if star_up_button:
+			star_up_button.disabled = true
+		return
+	var current_star = int(spell_info.get("star", 0))
+	var max_star = int(spell_info.get("max_star", 5))
+	if current_star >= max_star:
+		star_condition_label.text = "已达到最高星级"
+		if star_up_button:
+			star_up_button.disabled = true
+		return
+	var spell_id := str(spell_config.get("id", spell_info.get("id", "")))
+	var star_data = spell_data.get_spell_star_data(spell_id, current_star) if spell_data else {}
+	var requirements = star_data.get("requirements", {})
+	var unlock_count = int(requirements.get("unlock_item_count", 0))
+	var star_material_count = int(requirements.get("star_material_count", 0))
+	var inventory_counts = _get_inventory_counts()
+	var unlock_item_id = str(spell_config.get("unlock_item_id", ""))
+	var current_unlock_count = int(inventory_counts.get(unlock_item_id, 0))
+	var lines = [
+		"同名术法解锁道具 %d / %d" % [current_unlock_count, unlock_count]
+	]
+	if star_material_count > 0:
+		var current_blank = int(inventory_counts.get("blank_jade_slip", 0))
+		lines.append("空白玉简 %d / %d" % [current_blank, star_material_count])
+	star_condition_label.text = "\n".join(lines)
+	if star_up_button:
+		star_up_button.disabled = not _is_spell_obtained(spell_info)
+
 func _is_spell_obtained(spell_info: Dictionary) -> bool:
 	return bool(spell_info.get("obtained", false)) or int(spell_info.get("level", 0)) > 0
 
@@ -563,6 +698,12 @@ func _get_attribute_name(attr: String) -> String:
 		"spirit_gain": return "灵气获取"
 		"speed": return "速度"
 		"max_spirit": return "最大灵气"
+		"crit_damage": return "爆伤"
+		"penetration": return "穿透"
+		"hit": return "命中"
+		"dodge": return "闪避"
+		"crit": return "暴击"
+		"anti_crit": return "抗暴"
 		_: return attr
 
 func _format_spell_number(value: float) -> String:
@@ -578,11 +719,29 @@ func _format_spell_percent(value: float) -> String:
 		result = result.substr(0, result.length() - 1)
 	return result + "%"
 
-func _format_effect_description(description: String, effect: Dictionary) -> String:
+func _format_effect_description(description: String, effect: Variant) -> String:
 	var result = description
-	
-	for key in effect.keys():
-		var value = effect[key]
+	var effects: Array = []
+	if effect is Array:
+		effects = effect
+	elif effect is Dictionary:
+		effects = [effect]
+
+	var merged_effect_dict: Dictionary = {}
+	for effect_entry in effects:
+		if effect_entry is Dictionary:
+			for key in effect_entry.keys():
+				merged_effect_dict[key] = effect_entry[key]
+
+	if result.find("{damage_text}") != -1:
+		result = result.replace("{damage_text}", _build_damage_text(effects))
+	if result.find("{drain_text}") != -1:
+		result = result.replace("{drain_text}", _build_drain_text(effects))
+	if result.find("{turn_gauge_text}") != -1:
+		result = result.replace("{turn_gauge_text}", _build_turn_gauge_text(effects))
+
+	for key in merged_effect_dict.keys():
+		var value = merged_effect_dict[key]
 		var placeholder = "{" + key + "}"
 		if result.find(placeholder) != -1:
 			var formatted_value = str(value)
@@ -618,7 +777,203 @@ func _format_level_tier_name(level: int) -> String:
 		return names[level] + "重"
 	if level == 10:
 		return "十重"
-	return str(level) + "重"
+	return str(level)
+
+func _format_effect_entry(effect: Dictionary) -> String:
+	var effect_type = str(effect.get("effect_type", ""))
+	match effect_type:
+		"instant_damage":
+			var min_text = _format_spell_number(float(effect.get("damage_percent_min", 0.0)))
+			var max_text = _format_spell_number(float(effect.get("damage_percent_max", effect.get("damage_percent_min", 0.0))))
+			if min_text == max_text:
+				return "战斗中有概率造成%s倍伤害" % min_text
+			return "战斗中有概率造成%s-%s倍伤害" % [min_text, max_text]
+		"drain_health":
+			return "恢复造成伤害的%s气血" % _format_spell_percent(float(effect.get("drain_percent", 0.0)))
+		"turn_gauge_delta":
+			var delta_value = 0.0
+			if effect.has("turn_gauge_delta"):
+				delta_value = abs(float(effect.get("turn_gauge_delta", 0.0)))
+			else:
+				delta_value = abs(float(effect.get("delta", 0.0)))
+			return "敌方行动条减少%s" % _format_spell_percent(delta_value)
+		"passive_heal":
+			return "修炼时每秒恢复%s最大气血" % _format_spell_percent(float(effect.get("heal_percent", 0.0)))
+		"spirit_leak_bonus":
+			return "逸散灵气几率增加%s" % _format_spell_percent(float(effect.get("leak_bonus", 0.0)))
+		"reduce_pill_toxicity":
+			return "丹毒减少%s" % _format_spell_percent(float(effect.get("toxic_reduce", 0.0)))
+		"undispellable_buff":
+			return "开局获得常驻加成"
+		_:
+			return str(effect)
+
+func _has_combat_effects(effects: Array) -> bool:
+	for effect in effects:
+		if effect is Dictionary:
+			var effect_type = str(effect.get("effect_type", ""))
+			if effect_type in ["instant_damage", "drain_health", "turn_gauge_delta"]:
+				return true
+	return false
+
+func _has_opening_buff_effects(effects: Array) -> bool:
+	for effect in effects:
+		if effect is Dictionary and str(effect.get("effect_type", "")) == "undispellable_buff":
+			return true
+	return false
+
+func _build_combat_effect_sentence(effects: Array) -> String:
+	var parts: Array[String] = []
+	var damage_text := _build_damage_text(effects)
+	if not damage_text.is_empty():
+		parts.append("战斗中有概率造成%s伤害" % damage_text)
+	var drain_text := _build_drain_text(effects)
+	if not drain_text.is_empty():
+		parts.append("恢复造成伤害的%s气血" % drain_text)
+	var turn_gauge_text := _build_turn_gauge_text(effects)
+	if not turn_gauge_text.is_empty():
+		parts.append("使敌方行动条减少%s" % turn_gauge_text)
+	if parts.is_empty():
+		return ""
+	if parts.size() == 1:
+		return parts[0]
+	return "%s，并%s" % [parts[0], "，并".join(parts.slice(1))]
+
+func _build_opening_effect_sentence(effects: Array) -> String:
+	var parts: Array[String] = []
+	for effect in effects:
+		if effect is Dictionary and str(effect.get("effect_type", "")) == "undispellable_buff":
+			var buff_text := _build_opening_buff_text(effect)
+			if not buff_text.is_empty():
+				parts.append(buff_text)
+	if parts.is_empty():
+		return ""
+	return "开局" + "，".join(parts)
+
+func _build_opening_buff_text(effect: Dictionary) -> String:
+	var buff_type := str(effect.get("buff_type", ""))
+	var buff_percent := float(effect.get("buff_percent", 0.0))
+	var buff_value := float(effect.get("buff_value", 0.0))
+	match buff_type:
+		"attack":
+			return "攻击增加%s" % _format_spell_percent(buff_percent)
+		"defense":
+			return "防御增加%s" % _format_spell_percent(buff_percent)
+		"health":
+			return "气血增加%s" % _format_spell_percent(buff_percent)
+		"penetration":
+			return "穿透增加%s" % _format_spell_percent(buff_percent)
+		"crit_damage":
+			return "爆伤增加%s" % _format_spell_percent(buff_percent)
+		"speed":
+			return "速度增加%s" % _format_spell_number(buff_value)
+		"hit":
+			return "命中增加%s" % _format_spell_percent(buff_percent)
+		"dodge":
+			return "闪避增加%s" % _format_spell_percent(buff_percent)
+		"crit":
+			return "暴击增加%s" % _format_spell_percent(buff_percent)
+		"anti_crit":
+			return "抗暴增加%s" % _format_spell_percent(buff_percent)
+		_:
+			return ""
+
+func _build_damage_text(effects: Array) -> String:
+	for effect in effects:
+		if effect is Dictionary and str(effect.get("effect_type", "")) == "instant_damage":
+			var min_text = _format_spell_number(float(effect.get("damage_percent_min", 0.0)))
+			var max_text = _format_spell_number(float(effect.get("damage_percent_max", effect.get("damage_percent_min", 0.0))))
+			if min_text == max_text:
+				return "%s倍" % min_text
+			return "%s-%s倍" % [min_text, max_text]
+	return ""
+
+func _build_drain_text(effects: Array) -> String:
+	for effect in effects:
+		if effect is Dictionary and str(effect.get("effect_type", "")) == "drain_health":
+			return _format_spell_percent(float(effect.get("drain_percent", 0.0)))
+	return ""
+
+func _build_turn_gauge_text(effects: Array) -> String:
+	for effect in effects:
+		if effect is Dictionary and str(effect.get("effect_type", "")) == "turn_gauge_delta":
+			var delta_value = 0.0
+			if effect.has("turn_gauge_delta"):
+				delta_value = abs(float(effect.get("turn_gauge_delta", 0.0)))
+			else:
+				delta_value = abs(float(effect.get("delta", 0.0)))
+			return _format_spell_percent(delta_value)
+	return ""
+
+func _get_rarity_name(rarity: String) -> String:
+	match rarity:
+		"huang":
+			return "黄"
+		"xuan":
+			return "玄"
+		"di":
+			return "地"
+		"tian":
+			return "天"
+		_:
+			return "凡"
+
+func _get_element_name(element: String) -> String:
+	match element:
+		"metal":
+			return "金"
+		"wood":
+			return "木"
+		"water":
+			return "水"
+		"fire":
+			return "火"
+		"earth":
+			return "土"
+		_:
+			return "无"
+
+func _get_spell_quality_color(quality: int) -> Color:
+	var game_manager = get_node_or_null("/root/GameManager")
+	var item_data = game_manager.get_item_data() if game_manager and game_manager.has_method("get_item_data") else null
+	if item_data and item_data.has_method("get_item_quality_color"):
+		return item_data.get_item_quality_color(quality)
+	return Color(0.2, 0.2, 0.2, 1.0)
+
+func _format_spell_multiplier(value: float) -> String:
+	var rounded = snappedf(value, 0.001)
+	if is_equal_approx(rounded, round(rounded)):
+		return str(int(round(rounded)))
+	var text = "%.3f" % rounded
+	while text.ends_with("0"):
+		text = text.substr(0, text.length() - 1)
+	if text.ends_with("."):
+		text = text.substr(0, text.length() - 1)
+	return text
+
+func _get_inventory_counts() -> Dictionary:
+	var counts := {}
+	var game_manager = get_node_or_null("/root/GameManager")
+	var inventory = game_manager.get_inventory() if game_manager and game_manager.has_method("get_inventory") else null
+	if not inventory:
+		return counts
+	var slots = []
+	if inventory.has_method("get_item_list"):
+		slots = inventory.get_item_list()
+	elif "slots" in inventory:
+		slots = inventory.slots
+	else:
+		return counts
+	for slot in slots:
+		if typeof(slot) != TYPE_DICTIONARY:
+			continue
+		if bool(slot.get("empty", false)):
+			continue
+		var item_id = str(slot.get("id", ""))
+		if item_id.is_empty():
+			continue
+		counts[item_id] = int(counts.get(item_id, 0)) + int(slot.get("count", 0))
+	return counts
 
 func _create_thick_separator() -> HSeparator:
 	"""创建粗分割线，使其在不同分辨率下都能清晰显示"""

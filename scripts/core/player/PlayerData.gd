@@ -20,6 +20,12 @@ var base_defense: float = 2.0
 var base_speed: float = 5.0
 var base_health_regen: float = 1.0
 var base_spirit_gain: float = 1.0
+var base_hit: float = 1.0
+var base_dodge: float = 0.0
+var base_crit: float = 0.0
+var base_anti_crit: float = 0.0
+var base_penetration: float = 0.0
+var base_crit_damage: float = 1.0
 
 # 静态最终属性（基础属性 + 术法等永久加成）
 var static_max_health: float = 50.0
@@ -29,6 +35,12 @@ var static_defense: float = 2.0
 var static_speed: float = 5.0
 var static_health_regen_per_second: float = 1.0
 var static_spirit_gain_speed: float = 1.0
+var static_hit: float = 1.0
+var static_dodge: float = 0.0
+var static_crit: float = 0.0
+var static_anti_crit: float = 0.0
+var static_penetration: float = 0.0
+var static_crit_damage: float = 1.0
 
 var cultivation_active: bool = false
 
@@ -80,6 +92,13 @@ func _load_static_attributes():
 	static_speed = ATTRIBUTE_CALCULATOR.calculate_final_speed(self)
 	static_health_regen_per_second = base_health_regen
 	static_spirit_gain_speed = ATTRIBUTE_CALCULATOR.calculate_final_spirit_gain_speed(self)
+	var spell_bonuses = get_spell_bonuses()
+	static_hit = base_hit + float(spell_bonuses.get("hit", 0.0)) / 100.0
+	static_dodge = base_dodge + float(spell_bonuses.get("dodge", 0.0)) / 100.0
+	static_crit = base_crit + float(spell_bonuses.get("crit", 0.0)) / 100.0
+	static_anti_crit = base_anti_crit + float(spell_bonuses.get("anti_crit", 0.0)) / 100.0
+	static_penetration = base_penetration * float(spell_bonuses.get("penetration", 1.0))
+	static_crit_damage = base_crit_damage * float(spell_bonuses.get("crit_damage", 1.0))
 	
 	health = min(health, static_max_health)
 
@@ -120,6 +139,12 @@ func get_display_dict() -> Dictionary:
 		"final_speed": static_speed,
 		"final_health_regen": static_health_regen_per_second,
 		"final_spirit_gain": static_spirit_gain_speed,
+		"final_hit": static_hit,
+		"final_dodge": static_dodge,
+		"final_crit": static_crit,
+		"final_anti_crit": static_anti_crit,
+		"final_penetration": static_penetration,
+		"final_crit_damage": static_crit_damage,
 		"spirit_stone": actual_spirit_stone
 	}
 
@@ -154,7 +179,20 @@ func get_spell_bonuses() -> Dictionary:
 	var spell_system = get_spell_system()
 	if spell_system:
 		return spell_system.get_attribute_bonuses()
-	return {"attack": 1.0, "defense": 1.0, "health": 1.0, "spirit_gain": 1.0, "speed": 0.0}
+	return {
+		"attack": 1.0,
+		"defense": 1.0,
+		"health": 1.0,
+		"spirit_gain": 1.0,
+		"speed": 0.0,
+		"max_spirit": 1.0,
+		"hit": 0.0,
+		"dodge": 0.0,
+		"crit": 0.0,
+		"anti_crit": 0.0,
+		"penetration": 1.0,
+		"crit_damage": 1.0
+	}
 
 # ==================== 最终属性计算（委托给AttributeCalculator） ====================
 # 静态最终能力值 = 基础值 + 境界加成 + 术法加成 + 装备加成 + 功法加成 + 丹药加成
@@ -185,21 +223,6 @@ func get_base_spirit_gain_speed() -> float:
 
 func get_static_health_regen_per_second() -> float:
 	return static_health_regen_per_second
-
-# ==================== 战斗最终能力值计算 ====================
-# 战斗最终能力值 = 静态最终能力值 + 战斗临时Buff
-
-func get_combat_attack() -> float:
-	return ATTRIBUTE_CALCULATOR.calculate_combat_attack(self, combat_buffs)
-
-func get_combat_defense() -> float:
-	return ATTRIBUTE_CALCULATOR.calculate_combat_defense(self, combat_buffs)
-
-func get_combat_speed() -> float:
-	return ATTRIBUTE_CALCULATOR.calculate_combat_speed(self, combat_buffs)
-
-func get_combat_max_health() -> float:
-	return ATTRIBUTE_CALCULATOR.calculate_combat_max_health(self, combat_buffs)
 
 # ==================== 气血管理方法 ====================
 

@@ -10,13 +10,28 @@ var spell_data: Node = null
 var player_spells: Dictionary = {}
 
 var equipped_spells: Dictionary = {}
+const MULTIPLICATIVE_ATTRS := {
+	"health": true,
+	"attack": true,
+	"defense": true,
+	"max_spirit": true,
+	"spirit_gain": true,
+	"penetration": true,
+	"crit_damage": true
+}
 var _cached_bonuses: Dictionary = {
 	"attack": 1.0,
 	"defense": 1.0,
 	"health": 1.0,
 	"spirit_gain": 1.0,
 	"max_spirit": 1.0,
-	"speed": 0.0
+	"speed": 0.0,
+	"hit": 0.0,
+	"dodge": 0.0,
+	"crit": 0.0,
+	"anti_crit": 0.0,
+	"penetration": 1.0,
+	"crit_damage": 1.0
 }
 
 var lianli_system: Node = null
@@ -41,6 +56,7 @@ func _init_player_spells(should_recalculate: bool = true):
 			player_spells[spell_id] = {
 				"obtained": false,
 				"level": 0,
+				"star": 0,
 				"use_count": 0,
 				"charged_spirit": 0
 			}
@@ -60,7 +76,13 @@ func recalculate_bonuses():
 		"health": 1.0,
 		"spirit_gain": 1.0,
 		"max_spirit": 1.0,
-		"speed": 0.0
+		"speed": 0.0,
+		"hit": 0.0,
+		"dodge": 0.0,
+		"crit": 0.0,
+		"anti_crit": 0.0,
+		"penetration": 1.0,
+		"crit_damage": 1.0
 	}
 	
 	if not spell_data:
@@ -73,15 +95,29 @@ func recalculate_bonuses():
 			continue
 		
 		var level_data = spell_data.get_spell_level_data(spell_id, spell_info.level)
-		var attribute_bonus = level_data.get("attribute_bonus", {})
+		var combined_bonus: Dictionary = level_data.get("attribute_bonus", {}).duplicate(true)
 		
-		for attr in attribute_bonus.keys():
-			if attr == "speed":
-				_cached_bonuses[attr] += attribute_bonus[attr]
-			else:
-				_cached_bonuses[attr] *= attribute_bonus[attr]
+		var current_star = int(spell_info.get("star", 0))
+		if current_star >= 0:
+			var star_key = min(current_star, 5)
+			var star_data = spell_data.get_spell_star_data(spell_id, star_key)
+			var star_bonus = star_data.get("attribute_bonus", {})
+			for attr in star_bonus.keys():
+				if MULTIPLICATIVE_ATTRS.has(attr):
+					combined_bonus[attr] = float(combined_bonus.get(attr, 1.0)) + float(star_bonus[attr])
+				else:
+					combined_bonus[attr] = float(combined_bonus.get(attr, 0.0)) + float(star_bonus[attr])
+		_apply_bonus_map(combined_bonus)
 	
 	_notify_player_attributes_changed()
+
+func _apply_bonus_map(attribute_bonus: Dictionary) -> void:
+	for attr in attribute_bonus.keys():
+		var value = float(attribute_bonus[attr])
+		if MULTIPLICATIVE_ATTRS.has(attr):
+			_cached_bonuses[attr] = float(_cached_bonuses.get(attr, 1.0)) * value
+		else:
+			_cached_bonuses[attr] = float(_cached_bonuses.get(attr, 0.0)) + value
 
 func _notify_player_attributes_changed():
 	if player and is_instance_valid(player) and player.has_method("reload_attributes"):
@@ -195,13 +231,21 @@ func get_spell_info(spell_id: String) -> Dictionary:
 		"name": config.get("name", ""),
 		"type": config.get("type", "active"),
 		"type_name": spell_data.get_spell_type_name(config.get("type", "active")),
+		"rarity": spell_data.get_spell_rarity(spell_id),
+		"quality": spell_data.get_spell_quality(spell_id),
+		"element": spell_data.get_spell_element(spell_id),
 		"description": config.get("description", ""),
 		"obtained": player_info.obtained,
 		"level": player_info.level,
+		"star": int(player_info.get("star", 0)),
+		"max_star": int(config.get("max_star", 5)),
 		"max_level": config.get("max_level", 3),
 		"use_count": player_info.use_count,
 		"equipped": is_spell_equipped(spell_id),
-		"charged_spirit": player_info.charged_spirit
+		"charged_spirit": player_info.charged_spirit,
+		"current_level_data": spell_data.get_spell_level_data(spell_id, int(player_info.get("level", 0))),
+		"current_effects": spell_data.get_spell_effects(spell_id, int(player_info.get("level", 0))),
+		"next_star_data": spell_data.get_spell_star_data(spell_id, int(player_info.get("star", 0)))
 	}
 
 func get_attribute_bonuses() -> Dictionary:
@@ -223,13 +267,13 @@ func get_equipped_breathing_heal_effect() -> Dictionary:
 		if not spell_info.obtained or spell_info.level <= 0:
 			continue
 		
-		var level_data = spell_data.get_spell_level_data(breathing_spell_id, spell_info.level)
-		var effect = level_data.get("effect", {})
-		
-		if effect.get("effect_type") == "passive_heal":
-			var heal_percent = effect.get("heal_percent", 0.0)
-			total_heal_percent += heal_percent
-			valid_spell_ids.append(breathing_spell_id)
+		var effects = spell_data.get_spell_effects(breathing_spell_id, spell_info.level)
+		for effect in effects:
+			if effect.get("effect_type") == "passive_heal":
+				var heal_percent = effect.get("heal_percent", 0.0)
+				total_heal_percent += heal_percent
+				if not breathing_spell_id in valid_spell_ids:
+					valid_spell_ids.append(breathing_spell_id)
 	
 	return {
 		"heal_amount": total_heal_percent,
@@ -308,6 +352,7 @@ func apply_save_data(data: Dictionary):
 			player_spells[spell_id] = {
 				"obtained": obtained,
 				"level": level,
+				"star": int(spell_info.get("star", 0)),
 				"use_count": int(spell_info.get("use_count", 0)),
 				"charged_spirit": int(spell_info.get("charged_spirit", 0))
 			}

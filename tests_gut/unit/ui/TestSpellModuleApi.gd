@@ -119,7 +119,7 @@ func test_spell_detail_popup_upgrade_conditions_sync_after_unlock_and_charge():
 	var spirit_amount_label = popup.vbox.get_node_or_null("UpgradeConditionsBox/SpiritChargeRow/SpiritAmountLabel") if popup and popup.vbox else null
 	assert_not_null(use_count_label, "弹窗应包含使用次数标签")
 	assert_not_null(spirit_amount_label, "弹窗应包含所需灵气标签")
-	assert_eq(use_count_label.text, "0 / 50", "解锁后升级条件不应继续显示 0 / 0")
+	assert_eq(use_count_label.text, "0 / 100", "解锁后升级条件应同步新的术法真值配置")
 	assert_eq(spirit_amount_label.text, "0 / 1", "解锁后充灵条件不应继续显示 0 / 0")
 
 	await module._on_spell_charge_pressed()
@@ -164,3 +164,77 @@ func test_spell_detail_popup_unobtained_spell_uses_level_one_preview():
 	assert_true(not effect_value.text.is_empty(), "未获得术法时术法效果应按1级数据展示")
 	assert_eq(use_count_label.text, "- / -", "未获得术法升级条件应保持未解锁占位文案")
 	assert_eq(spirit_amount_label.text, "- / -", "未获得术法充灵条件应保持未解锁占位文案")
+
+func test_spell_detail_popup_obtained_spell_uses_runtime_effect_copy():
+	await harness.reset_and_sync()
+	var module = harness.game_ui.spell_module
+
+	var set_items = await harness.client.test_post("/test/set_inventory_items", {
+		"items": {
+			"spell_basic_boxing_techniques": 1
+		}
+	})
+	assert_true(set_items.get("success", false), "应能补发基础拳法术法书")
+
+	var use_result = await harness.client.inventory_use("spell_basic_boxing_techniques")
+	assert_true(use_result.get("success", false), "应能解锁基础拳法")
+	await harness.sync_full_state()
+
+	module.current_viewing_spell = "basic_boxing_techniques"
+	module._show_spell_detail("basic_boxing_techniques")
+	await get_tree().process_frame
+
+	var popup = module.spell_detail_popup
+	assert_not_null(popup, "应创建术法详情弹窗")
+
+	var effect_value = popup.vbox.get_node_or_null("EffectValue") if popup and popup.vbox else null
+	assert_not_null(effect_value, "弹窗应包含术法效果标签")
+	assert_eq(effect_value.text, "战斗中有概率造成1.1倍伤害", "已获得术法应显示运行时效果文案而不是旧占位文本")
+
+func test_spell_detail_popup_multi_effect_spell_formats_drain_text():
+	await harness.reset_and_sync()
+	var module = harness.game_ui.spell_module
+
+	var set_items = await harness.client.test_post("/test/set_inventory_items", {
+		"items": {
+			"spell_wither_glory_art": 1
+		}
+	})
+	assert_true(set_items.get("success", false), "应能补发枯荣诀术法书")
+
+	var use_result = await harness.client.inventory_use("spell_wither_glory_art")
+	assert_true(use_result.get("success", false), "应能解锁枯荣诀")
+	await harness.sync_full_state()
+
+	module.current_viewing_spell = "wither_glory_art"
+	module._show_spell_detail("wither_glory_art")
+	await get_tree().process_frame
+
+	var popup = module.spell_detail_popup
+	var effect_value = popup.vbox.get_node_or_null("EffectValue") if popup and popup.vbox else null
+	assert_not_null(effect_value, "弹窗应包含术法效果标签")
+	assert_eq(effect_value.text, "战斗中有概率造成1.6倍伤害，并恢复造成伤害的2%气血", "多效果术法应正确展开吸血占位符")
+
+func test_spell_detail_popup_multi_effect_spell_formats_turn_gauge_text():
+	await harness.reset_and_sync()
+	var module = harness.game_ui.spell_module
+
+	var set_items = await harness.client.test_post("/test/set_inventory_items", {
+		"items": {
+			"spell_reverse_wave_break": 1
+		}
+	})
+	assert_true(set_items.get("success", false), "应能补发逆浪破术法书")
+
+	var use_result = await harness.client.inventory_use("spell_reverse_wave_break")
+	assert_true(use_result.get("success", false), "应能解锁逆浪破")
+	await harness.sync_full_state()
+
+	module.current_viewing_spell = "reverse_wave_break"
+	module._show_spell_detail("reverse_wave_break")
+	await get_tree().process_frame
+
+	var popup = module.spell_detail_popup
+	var effect_value = popup.vbox.get_node_or_null("EffectValue") if popup and popup.vbox else null
+	assert_not_null(effect_value, "弹窗应包含术法效果标签")
+	assert_eq(effect_value.text, "战斗中有概率造成1.6倍伤害，并使敌方行动条减少5%", "多效果术法应正确展开行动条占位符")

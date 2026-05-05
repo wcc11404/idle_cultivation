@@ -302,7 +302,7 @@ func test_lianli_speed_button_shows_block_message_when_only_default_speed_availa
 	await module.on_lianli_speed_pressed()
 
 	assert_eq(module.current_lianli_speed, 1.0, "仅有 1 倍速可用时不应切换")
-	assert_eq(harness.last_log(), "达到金丹境界以后可以开启1.5倍速，开通VIP可以开启2倍速", "仅默认倍速可用时应提示解锁条件")
+	assert_eq(harness.last_log(), "达到金丹期后可以切换1.5倍速", "仅默认倍速可用时应提示解锁条件")
 
 func test_lianli_speed_button_cycles_with_server_available_speeds():
 	var module = harness.game_ui.lianli_module

@@ -93,7 +93,7 @@ func test_get_realm_display_name():
 
 func test_get_realm_display_name_unknown_level():
 	var name = realm_system.get_realm_display_name("炼气期", 5)
-	assert_eq(name, "炼气期 5段", "未知等级应显示数字")
+	assert_eq(name, "炼气期 五层", "未知等级应显示中文层级")
 
 #endregion
 
@@ -113,7 +113,7 @@ func test_get_level_name():
 
 func test_get_level_name_unknown():
 	var name = realm_system.get_level_name("炼气期", 999)
-	assert_eq(name, "999段", "未知等级应显示数字")
+	assert_eq(name, "999层", "未知等级应显示层级后缀")
 
 func test_get_max_spirit_energy():
 	var energy = realm_system.get_max_spirit_energy("炼气期", 1)

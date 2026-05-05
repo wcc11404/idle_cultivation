@@ -132,6 +132,11 @@ func spell_charge(spell_id: String, amount: int) -> Dictionary:
 		"amount": amount
 	}, _critical_options())
 
+func spell_star_up(spell_id: String) -> Dictionary:
+	return await network_manager.request("POST", "/game/spell/star_up", {
+		"spell_id": spell_id
+	}, _critical_options())
+
 func spell_list() -> Dictionary:
 	return await network_manager.request("GET", "/game/spell/list", {}, _critical_options())
 

@@ -13,6 +13,13 @@ var MAX_ACTIVE_SPELLS = 2
 var MAX_OPENING_SPELLS = 2
 
 var SPELLS: Dictionary = {}
+const RARITY_TO_QUALITY := {
+	"fan": 0,
+	"huang": 1,
+	"xuan": 2,
+	"di": 3,
+	"tian": 4
+}
 
 const TYPE_NAMES = {
 	"breathing": "吐纳心法",
@@ -94,3 +101,36 @@ func get_spell_description(spell_id: String) -> String:
 func get_spell_max_level(spell_id: String) -> int:
 	var spell = get_spell_data(spell_id)
 	return int(spell.get("max_level", 3))
+
+func get_spell_max_star(spell_id: String) -> int:
+	var spell = get_spell_data(spell_id)
+	return int(spell.get("max_star", 0))
+
+func get_spell_rarity(spell_id: String) -> String:
+	var spell = get_spell_data(spell_id)
+	return str(spell.get("rarity", "fan"))
+
+func get_spell_quality(spell_id: String) -> int:
+	return int(RARITY_TO_QUALITY.get(get_spell_rarity(spell_id), 0))
+
+func get_spell_element(spell_id: String) -> String:
+	var spell = get_spell_data(spell_id)
+	return str(spell.get("element", "none"))
+
+func get_spell_effects(spell_id: String, level: int) -> Array:
+	var level_data = get_spell_level_data(spell_id, level)
+	var effect = level_data.get("effect", [])
+	if effect is Array:
+		return effect
+	if effect is Dictionary and not effect.is_empty():
+		return [effect]
+	return []
+
+func get_spell_star_data(spell_id: String, star: int) -> Dictionary:
+	var spell = get_spell_data(spell_id)
+	var stars = spell.get("stars", {})
+	return stars.get(str(star), {})
+
+func apply_remote_config(remote_data: Dictionary) -> void:
+	if remote_data.has("spells") and remote_data["spells"] is Dictionary:
+		SPELLS = remote_data["spells"].duplicate(true)

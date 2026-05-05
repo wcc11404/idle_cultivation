@@ -52,10 +52,10 @@ func get_alchemy_bonus() -> Dictionary:
 	var level = spell_info.level
 	bonus.level = level
 	if level > 0:
-		var level_data = spell_system.spell_data.get_spell_level_data("alchemy", level)
-		var effect = level_data.get("effect", {})
-		bonus.success_bonus = effect.get("success_bonus", 0)
-		bonus.speed_rate = effect.get("speed_rate", 0.0)
+		var effects = spell_system.spell_data.get_spell_effects("alchemy", level)
+		for effect in effects:
+			bonus.success_bonus += int(effect.get("success_bonus", 0))
+			bonus.speed_rate += float(effect.get("speed_rate", 0.0))
 	return bonus
 
 func get_furnace_bonus() -> Dictionary:
@@ -81,7 +81,7 @@ func calculate_success_rate(recipe_id: String) -> int:
 	var base_value = recipe_data.get_recipe_success_value(recipe_id)
 	var alchemy_bonus = get_alchemy_bonus()
 	var furnace_bonus = get_furnace_bonus()
-	var final_value = base_value + alchemy_bonus.success_bonus + furnace_bonus.success_bonus
+	var final_value = base_value + int(alchemy_bonus.get("success_bonus", 0)) + int(furnace_bonus.get("success_bonus", 0))
 	return clamp(final_value, 1, 100)
 
 func calculate_craft_time(recipe_id: String) -> float:
@@ -90,7 +90,7 @@ func calculate_craft_time(recipe_id: String) -> float:
 	var base_time = recipe_data.get_recipe_base_time(recipe_id)
 	var alchemy_bonus = get_alchemy_bonus()
 	var furnace_bonus = get_furnace_bonus()
-	var final_speed = 1.0 + alchemy_bonus.speed_rate + furnace_bonus.speed_rate + special_bonus_speed_rate
+	var final_speed = 1.0 + float(alchemy_bonus.get("speed_rate", 0.0)) + float(furnace_bonus.get("speed_rate", 0.0)) + special_bonus_speed_rate
 	return base_time / final_speed
 
 func apply_save_data(data: Dictionary):

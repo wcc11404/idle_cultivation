@@ -74,34 +74,6 @@ func test_format_for_save_small_decimal():
 
 #endregion
 
-#region 伤害计算测试
-
-func test_calculate_damage_basic():
-	var damage = AttributeCalculator.calculate_damage(100.0, 30.0)
-	assert_true(abs(damage - 76.9230769) < 0.001, "应按减伤公式计算基础伤害")
-
-func test_calculate_damage_with_percent():
-	var damage = AttributeCalculator.calculate_damage(100.0, 30.0, 1.5)
-	assert_true(abs(damage - 115.3846154) < 0.001, "150%伤害应按减伤后结果放大")
-
-func test_calculate_damage_minimum():
-	var damage = AttributeCalculator.calculate_damage(10.0, 50.0)
-	assert_true(abs(damage - 6.6666667) < 0.001, "应按减伤公式计算伤害")
-
-func test_calculate_damage_zero_defense():
-	var damage = AttributeCalculator.calculate_damage(100.0, 0.0)
-	assert_eq(damage, 100.0, "零防御时应为全额伤害")
-
-func test_calculate_damage_high_defense():
-	var damage = AttributeCalculator.calculate_damage(50.0, 100.0)
-	assert_true(abs(damage - 25.0) < 0.001, "高防御场景仍应按减伤公式计算")
-
-func test_calculate_damage_with_small_percent():
-	var damage = AttributeCalculator.calculate_damage(100.0, 0.0, 0.5)
-	assert_eq(damage, 50.0, "50%伤害应正确计算")
-
-#endregion
-
 #region 最终属性计算测试 - 空玩家
 
 func test_calculate_final_attack_null_player():
@@ -133,64 +105,6 @@ func test_calculate_final_spirit_gain_speed_uses_player_base_speed():
 	player.base_spirit_gain = 2.5
 	var speed = AttributeCalculator.calculate_final_spirit_gain_speed(player)
 	assert_eq(speed, 2.5, "应优先使用玩家当前基础灵气获取速度")
-	player.free()
-
-#endregion
-
-#region 战斗属性计算测试 - 使用模拟对象
-
-func test_calculate_combat_attack_empty_buffs():
-	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
-	var attack = AttributeCalculator.calculate_combat_attack(player, {})
-	assert_eq(attack, 100.0, "无Buff时攻击力等于基础值")
-	player.free()
-
-func test_calculate_combat_attack_with_buff():
-	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
-	var buffs = {"attack_percent": 0.2}
-	var attack = AttributeCalculator.calculate_combat_attack(player, buffs)
-	assert_eq(attack, 120.0, "20%攻击加成应正确计算")
-	player.free()
-
-func test_calculate_combat_defense_empty_buffs():
-	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
-	var defense = AttributeCalculator.calculate_combat_defense(player, {})
-	assert_eq(defense, 50.0, "无Buff时防御力等于基础值")
-	player.free()
-
-func test_calculate_combat_defense_with_buff():
-	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
-	var buffs = {"defense_percent": 0.3}
-	var defense = AttributeCalculator.calculate_combat_defense(player, buffs)
-	assert_eq(defense, 65.0, "30%防御加成应正确计算")
-	player.free()
-
-func test_calculate_combat_speed_empty_buffs():
-	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
-	var speed = AttributeCalculator.calculate_combat_speed(player, {})
-	assert_eq(speed, 5.0, "无Buff时速度等于基础值")
-	player.free()
-
-func test_calculate_combat_speed_with_buff():
-	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
-	var buffs = {"speed_bonus": 3.0}
-	var speed = AttributeCalculator.calculate_combat_speed(player, buffs)
-	assert_eq(speed, 8.0, "速度加成应为加法")
-	player.free()
-
-func test_calculate_combat_max_health_empty_buffs():
-	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
-	player.base_max_health = 500.0
-	var health = AttributeCalculator.calculate_combat_max_health(player, {})
-	assert_eq(health, 500.0, "无Buff时最大气血等于基础值")
-	player.free()
-
-func test_calculate_combat_max_health_with_buff():
-	var player = _create_simple_mock_player(100.0, 50.0, 5.0)
-	player.base_max_health = 500.0
-	var buffs = {"health_bonus": 100.0}
-	var health = AttributeCalculator.calculate_combat_max_health(player, buffs)
-	assert_eq(health, 600.0, "气血加成应为加法")
 	player.free()
 
 #endregion

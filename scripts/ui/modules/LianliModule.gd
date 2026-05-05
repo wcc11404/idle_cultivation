@@ -54,7 +54,7 @@ var current_battle_max_speed: float = 1.0
 # 历练速度选项
 const LIANLI_SPEEDS = [1.0, 1.5, 2.0]
 const DEFAULT_LIANLI_SPEED := 1.0
-const LIANLI_SPEED_BLOCKED_MESSAGE := "达到金丹境界以后可以开启1.5倍速，开通VIP可以开启2倍速"
+const LIANLI_SPEED_BLOCKED_MESSAGE := "达到金丹期后可以切换1.5倍速"
 var current_lianli_speed: float = DEFAULT_LIANLI_SPEED
 var available_lianli_speeds: Array = [DEFAULT_LIANLI_SPEED]
 
@@ -207,16 +207,18 @@ func _process_battle_event(event: Dictionary, duration: float) -> void:
 	var info = event.get("info", {})
 	if not (info is Dictionary):
 		return
+	var effects := _get_battle_effects(info)
+	var resolved_info := _get_primary_battle_effect(effects)
 	
 	var spell_id = str(info.get("spell_id", "norm_attack"))
 	
 	if event_type == "player_action":
-		var enemy_health_after = float(info.get("target_health_after", info.get("self_health_after", enemy_health_bar.value if enemy_health_bar else 0.0)))
-		if info.has("target_health_after"):
+		var enemy_health_after = float(resolved_info.get("target_health_after", resolved_info.get("self_health_after", enemy_health_bar.value if enemy_health_bar else 0.0)))
+		if resolved_info.has("target_health_after"):
 			_animate_health_bar(enemy_health_bar, enemy_health_value, max(0.0, enemy_health_after), duration, true)
-		elif info.has("self_health_after") and player_health_bar_lianli:
+		elif resolved_info.has("self_health_after") and player_health_bar_lianli:
 			_simulated_player_health_after = enemy_health_after
-			_simulated_player_max_health = float(info.get("self_max_health_after", _simulated_player_max_health))
+			_simulated_player_max_health = float(resolved_info.get("self_max_health_after", _simulated_player_max_health))
 			player_health_bar_lianli.max_value = _simulated_player_max_health
 			if player_health_value_lianli:
 				player_health_value_lianli.text = _format_health_pair(max(0.0, enemy_health_after), _simulated_player_max_health)
@@ -240,8 +242,7 @@ func _generate_battle_log_message(event: Dictionary) -> String:
 	var info = event.get("info", {})
 	if not (info is Dictionary):
 		return ""
-	
-	var effect_type = str(info.get("effect_type", ""))
+	var effects := _get_battle_effects(info)
 	var spell_id = str(info.get("spell_id", "norm_attack"))
 	
 	var actor_name: String
@@ -258,15 +259,69 @@ func _generate_battle_log_message(event: Dictionary) -> String:
 	if spell_data:
 		spell_name = spell_data.get_spell_name(spell_id)
 	
-	if effect_type == "undispellable_buff":
-		var log_effect = str(info.get("log_effect", ""))
-		return actor_name + "使用" + spell_name + "，" + log_effect
-	elif effect_type == "instant_damage":
-		var damage = info.get("damage", 0.0)
+	var opening_log := _format_opening_buff_log(effects)
+	if not opening_log.is_empty():
+		return actor_name + "使用" + spell_name + "，" + opening_log
+	
+	var primary_effect := _get_primary_battle_effect(effects)
+	var effect_type = str(primary_effect.get("effect_type", info.get("effect_type", "")))
+	if effect_type == "instant_damage":
+		var damage = primary_effect.get("damage", info.get("damage", 0.0))
 		var damage_str = UI_UTILS.format_display_number(float(damage))
 		return actor_name + "使用" + spell_name + "对" + target_name + "造成" + damage_str + "点伤害"
 	
 	return ""
+
+func _get_battle_effects(info: Dictionary) -> Array:
+	if info.has("effect_type") and info is Dictionary:
+		return [info]
+	var effects = info.get("effects", [])
+	if effects is Array:
+		return effects
+	return []
+
+func _get_primary_battle_effect(effects: Array) -> Dictionary:
+	for effect in effects:
+		if effect is Dictionary and str(effect.get("effect_type", "")) in ["instant_damage", "drain_health", "turn_gauge_delta"]:
+			return effect
+	return {}
+
+func _format_opening_buff_log(effects: Array) -> String:
+	var parts: Array[String] = []
+	for effect in effects:
+		if effect is Dictionary and str(effect.get("effect_type", "")) == "undispellable_buff":
+			var single_text := _format_single_undispellable_buff_log(effect)
+			if not single_text.is_empty():
+				parts.append(single_text)
+	return "，".join(parts)
+
+func _format_single_undispellable_buff_log(effect_info: Dictionary) -> String:
+	var buff_type := str(effect_info.get("buff_type", ""))
+	var buff_percent := float(effect_info.get("buff_percent", 0.0))
+	var buff_value := float(effect_info.get("buff_value", 0.0))
+	match buff_type:
+		"attack":
+			return "攻击提升%s" % AttributeCalculator.format_percent(buff_percent)
+		"defense":
+			return "防御提升%s" % AttributeCalculator.format_percent(buff_percent)
+		"penetration":
+			return "穿透提升%s" % AttributeCalculator.format_percent(buff_percent)
+		"crit_damage":
+			return "爆伤提升%s" % AttributeCalculator.format_percent(buff_percent)
+		"health":
+			return "气血提升%s" % AttributeCalculator.format_percent(buff_percent)
+		"speed":
+			return "速度提升%s" % UI_UTILS.format_display_number(buff_value)
+		"hit":
+			return "命中提升%s" % AttributeCalculator.format_percent(buff_percent)
+		"dodge":
+			return "闪避提升%s" % AttributeCalculator.format_percent(buff_percent)
+		"crit":
+			return "暴击提升%s" % AttributeCalculator.format_percent(buff_percent)
+		"anti_crit":
+			return "抗暴提升%s" % AttributeCalculator.format_percent(buff_percent)
+		_:
+			return "效果触发"
 
 func _update_spell_proficiency(spell_id: String) -> void:
 	if spell_id == "norm_attack":
@@ -312,7 +367,7 @@ func _start_timeline_from_simulation(sim_result: Dictionary, area_id: String):
 	_simulate_loot = sim_result.get("loot", [])
 	_current_enemy_data = sim_result.get("enemy_data", {})
 	_simulated_player_health_after = float(sim_result.get("player_health_after", player.health if player else 0.0))
-	_simulated_player_max_health = player.get_combat_max_health() if player else 0.0
+	_simulated_player_max_health = player.get_final_max_health() if player else 0.0
 	current_lianli_area_id = area_id
 	_finish_time_invalid_prompted = false
 	# 初始化本次战斗的最大速度
@@ -334,7 +389,7 @@ func _start_timeline_from_simulation(sim_result: Dictionary, area_id: String):
 		enemy_health_value.text = _format_health_pair(enemy_health_bar.value, enemy_health_bar.max_value)
 
 	if player and player_health_bar_lianli:
-		var player_max_hp = player.get_combat_max_health()
+		var player_max_hp = player.get_final_max_health()
 		_simulated_player_max_health = player_max_hp
 		player_health_bar_lianli.step = 0.01
 		player_health_bar_lianli.max_value = player_max_hp

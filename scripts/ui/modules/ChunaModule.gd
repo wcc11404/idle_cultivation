@@ -37,7 +37,7 @@ var sort_button: Button = null
 
 # 常量
 const GRID_COLS = 5
-const MAX_SLOTS = 40
+const MAX_SLOTS = 60
 const SLOT_BG_EMPTY := Color(0.82, 0.78, 0.70, 1.0)
 const SLOT_BG_OCCUPIED := Color(0.88, 0.84, 0.76, 1.0)
 const SLOT_BG_SELECTED := Color(0.95, 0.90, 0.80, 1.0)
