@@ -2,6 +2,13 @@ from PIL import Image, ImageDraw, ImageFilter
 import os
 import math
 
+LEGACY_GENERATOR_MESSAGE = (
+    "generate_realm_frames.py is a legacy 200x50 badge-frame generator. "
+    "TopBar now uses 1280x110 full-width realm banner PNG assets generated "
+    "with imagegen, so this script is intentionally disabled to avoid "
+    "overwriting the current artwork."
+)
+
 
 def draw_gradient_circle(draw, center_x, center_y, radius, color_center, color_edge):
     """绘制渐变圆形"""
@@ -442,4 +449,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(LEGACY_GENERATOR_MESSAGE)

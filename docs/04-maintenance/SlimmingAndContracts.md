@@ -46,8 +46,8 @@
 ## 字体与图标资源规范
 
 - 全客户端 UI 字体真值为内置字体资源，不依赖 Windows/Android 系统字体回退。
-- 当前正式字体资源为 `res://assets/fonts/SourceHanSansSC-VF.ttf`，随客户端一并分发。
-- 顶部灵石、静音等符号型展示统一使用客户端内置 SVG 图标，不恢复到 emoji 方案。
+- 当前正式字体资源为 `res://assets/fonts/SourceHanSansSC-Medium.otf`，随客户端一并分发。
+- 顶部灵石、静音等符号型展示统一使用客户端内置图标资源，不恢复到 emoji 方案；图标素材目录统一为 `assets/icon/`，音频按钮当前使用透明 PNG。
 - 若后续替换字体，必须同时确认授权、导出包含、真机显示与动态弹窗继承效果。
 
 ## 长屏与安全区契约

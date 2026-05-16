@@ -1,5 +1,7 @@
 class_name NeishiModule extends Node
 
+const UI_FEEDBACK_MANAGER = preload("res://scripts/ui/common/UIFeedbackManager.gd")
+
 ## 内视模块 - 管理内视页面的所有子模块
 ## 负责协调修炼、突破、术法等功能
 
@@ -63,13 +65,9 @@ func hide_tab():
 # 显示子面板（修炼/术法）
 func show_cultivation_panel():
 	_show_sub_panel(cultivation_panel)
-	if cultivation_module:
-		cultivation_module.show_panel()
 
 func show_spell_panel():
 	_show_sub_panel(spell_panel)
-	if spell_module:
-		spell_module.show_tab()
 
 # 内部：切换子面板
 func _show_sub_panel(active_panel: Control):
@@ -95,6 +93,7 @@ func _show_sub_panel(active_panel: Control):
 			cultivation_module.show_panel()
 		elif active_panel == spell_panel and spell_module:
 			spell_module.show_tab()
+		UI_FEEDBACK_MANAGER.play_tab_content_in(active_panel)
 	
 	# 更新按钮状态
 	_update_tab_buttons(active_panel)

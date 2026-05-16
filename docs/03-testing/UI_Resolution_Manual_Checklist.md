@@ -77,8 +77,8 @@
 
 为解决 Android / APK 上中文标点、图标和字体回退不稳定的问题，当前已经统一为：
 
-- 内置中文字体资源
-- 内置 SVG 图标资源
+- 内置中文字体资源（`SourceHanSansSC-Medium.otf`）
+- 内置图标资源（`assets/icon/` 下的 SVG/PNG）
 
 不再依赖系统 emoji 或系统中文字体回退。
 

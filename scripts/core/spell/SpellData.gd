@@ -13,7 +13,8 @@ var MAX_ACTIVE_SPELLS = 2
 var MAX_OPENING_SPELLS = 2
 
 var SPELLS: Dictionary = {}
-const RARITY_TO_QUALITY := {
+var _config_loaded: bool = false
+const RARITY_ORDER := {
 	"fan": 0,
 	"huang": 1,
 	"xuan": 2,
@@ -28,10 +29,15 @@ const TYPE_NAMES = {
 	"production": "生产术法"
 }
 
+func _init():
+	_load_config()
+
 func _ready():
 	_load_config()
 
 func _load_config():
+	if _config_loaded:
+		return
 	var file = FileAccess.open("res://scripts/core/spell/spells.json", FileAccess.READ)
 	if file:
 		var json_text = file.get_as_text()
@@ -44,6 +50,7 @@ func _load_config():
 			
 			if data.has("spells") and data["spells"] is Dictionary:
 				SPELLS = data["spells"].duplicate(true)
+				_config_loaded = true
 		else:
 			print("[SpellData] JSON解析失败")
 	else:
@@ -110,8 +117,8 @@ func get_spell_rarity(spell_id: String) -> String:
 	var spell = get_spell_data(spell_id)
 	return str(spell.get("rarity", "fan"))
 
-func get_spell_quality(spell_id: String) -> int:
-	return int(RARITY_TO_QUALITY.get(get_spell_rarity(spell_id), 0))
+func get_spell_rarity_rank(spell_id: String) -> int:
+	return int(RARITY_ORDER.get(get_spell_rarity(spell_id), 0))
 
 func get_spell_element(spell_id: String) -> String:
 	var spell = get_spell_data(spell_id)

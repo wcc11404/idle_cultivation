@@ -148,15 +148,27 @@ func test_log_filtering():
 	log_manager.add_system_log("系统A")
 	log_manager.add_battle_log("战斗B")
 	log_manager.add_production_log("生产C")
+	log_manager.add_debug_log("调试D")
+
+	log_manager.set_filter("all")
+	assert_true(test_label.text.contains("系统A"), "全部筛选应显示系统日志")
+	assert_true(test_label.text.contains("战斗B"), "全部筛选应显示战斗日志")
+	assert_true(test_label.text.contains("生产C"), "全部筛选应显示生产日志")
+	assert_false(test_label.text.contains("调试D"), "全部筛选不应显示调试日志")
 
 	log_manager.set_filter("battle")
 	assert_true(test_label.text.contains("战斗B"), "战斗筛选应显示战斗日志")
 	assert_false(test_label.text.contains("系统A"), "战斗筛选不应显示系统日志")
 	assert_false(test_label.text.contains("生产C"), "战斗筛选不应显示生产日志")
+	assert_false(test_label.text.contains("调试D"), "战斗筛选不应显示调试日志")
 
 	log_manager.set_filter("production")
 	assert_true(test_label.text.contains("生产C"), "生产筛选应显示生产日志")
 	assert_false(test_label.text.contains("战斗B"), "生产筛选不应显示战斗日志")
+
+	log_manager.set_filter("debug")
+	assert_true(test_label.text.contains("调试D"), "调试筛选应显示调试日志")
+	assert_false(test_label.text.contains("系统A"), "调试筛选不应显示系统日志")
 
 #endregion
 

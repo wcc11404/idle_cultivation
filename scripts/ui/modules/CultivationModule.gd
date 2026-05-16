@@ -3,6 +3,7 @@ class_name CultivationModule extends Node
 const ATTRIBUTE_CALCULATOR = preload("res://scripts/core/shared/AttributeCalculator.gd")
 const ACTION_LOCK_MANAGER = preload("res://scripts/utils/flow/ActionLockManager.gd")
 const CULTIVATION_LOGIC = preload("res://scripts/core/cultivation/CultivationSystem.gd")
+const UI_FEEDBACK_MANAGER = preload("res://scripts/ui/common/UIFeedbackManager.gd")
 
 signal cultivation_started
 signal cultivation_stopped
@@ -21,6 +22,7 @@ var realm_system_ref: Node = null
 var cultivation_panel: Control = null
 var cultivate_button: Button = null
 var breakthrough_button: Button = null
+var breakthrough_material_name_labels: Array = []
 var breakthrough_material_labels: Array = []
 
 var health_bar: ProgressBar = null
@@ -43,6 +45,7 @@ var health_regen_value_label: Label = null
 var status_label: Label = null
 var cultivation_figure: TextureRect = null
 var cultivation_figure_particles: TextureRect = null
+var _cultivation_breath_tween: Tween = null
 
 var _pending_elapsed_seconds: float = 0.0
 var _flush_in_flight: bool = false
@@ -50,6 +53,10 @@ var _optimistic_spell_use_accumulator: float = 0.0
 var _last_optimistic_update_at: float = 0.0
 var _optimistic_tick_accumulator: float = 0.0
 var _next_auto_flush_at: float = 0.0
+var _last_display_is_cultivating: bool = false
+var _display_feedback_initialized: bool = false
+var _last_health_display_value: float = -1.0
+var _last_spirit_display_value: float = -1.0
 
 const REPORT_INTERVAL_SECONDS: float = 5.0
 const FLUSH_WAIT_MAX_FRAMES: int = 180
@@ -76,6 +83,25 @@ func initialize(
 	spell_system_ref = spell_sys_ref
 	realm_system_ref = realm_sys_ref
 	set_process(true)
+	_setup_cultivation_figure_input()
+
+func _setup_cultivation_figure_input() -> void:
+	for figure in [cultivation_figure, cultivation_figure_particles]:
+		if not figure:
+			continue
+		figure.mouse_filter = Control.MOUSE_FILTER_STOP
+		if not figure.gui_input.is_connected(_on_cultivation_figure_gui_input):
+			figure.gui_input.connect(_on_cultivation_figure_gui_input)
+
+func _on_cultivation_figure_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT and not mouse_event.pressed:
+			on_cultivate_button_pressed()
+	elif event is InputEventScreenTouch:
+		var touch_event := event as InputEventScreenTouch
+		if not touch_event.pressed:
+			on_cultivate_button_pressed()
 
 func _process(_delta: float):
 	if not player or not player.get_is_cultivating():
@@ -341,15 +367,26 @@ func _build_breakthrough_panel_material_entries(preview: Dictionary) -> Array:
 	var entries: Array = []
 
 	var energy_required = int(preview.get("energy_cost", 0))
-	if energy_required > 0:
-		var energy_current = float(preview.get("spirit_energy_current", 0.0))
-		entries.append("灵气：%s / %s" % [UIUtils.format_display_number_integer(energy_current), UIUtils.format_display_number_integer(float(energy_required))])
+	var energy_current = float(preview.get("spirit_energy_current", 0.0))
+	entries.append({
+		"name": "消耗灵气",
+		"value": UIUtils.format_display_number_integer(float(energy_required)),
+		"sufficient": energy_current >= float(energy_required)
+	})
 
 	var stone_required = int(preview.get("stone_cost", 0))
-	if stone_required > 0:
-		var stone_current = int(preview.get("stone_current", preview.get("spirit_stone_current", 0)))
-		entries.append("灵石：%s / %s" % [UIUtils.format_display_number(float(stone_current)), UIUtils.format_display_number(float(stone_required))])
+	var stone_current = int(preview.get("stone_current", preview.get("spirit_stone_current", 0)))
+	entries.append({
+		"name": "消耗灵石",
+		"value": UIUtils.format_display_number(float(stone_required)),
+		"sufficient": stone_current >= stone_required
+	})
 
+	var material_entry := {
+		"name": "",
+		"value": "",
+		"sufficient": true
+	}
 	var materials = preview.get("materials", {})
 	if materials is Dictionary:
 		var material_ids: Array[String] = []
@@ -362,9 +399,13 @@ func _build_breakthrough_panel_material_entries(preview: Dictionary) -> Array:
 				continue
 			var current = int(material_info.get("current", 0))
 			var required = int(material_info.get("required", 0))
-			entries.append("%s：%s / %s" % [_get_preview_item_name(material_id), UIUtils.format_display_number(float(current)), UIUtils.format_display_number(float(required))])
-			if entries.size() >= 3:
-				break
+			material_entry = {
+				"name": _get_preview_item_name(material_id),
+				"value": UIUtils.format_display_number(float(required)),
+				"sufficient": current >= required
+			}
+			break
+	entries.append(material_entry)
 
 	return entries
 
@@ -572,7 +613,9 @@ func _stop_cultivation_internal(by_failure: bool):
 		if cultivate_button:
 			cultivate_button.text = "修炼"
 			if game_ui and game_ui.has_method("refresh_all_player_data"):
-				await game_ui.refresh_all_player_data()
+				await game_ui.refresh_all_player_data({
+					"priority_scope": "cultivation"
+				})
 				cultivation_stopped.emit()
 				if not by_failure:
 					log_message.emit(_resolve_cultivation_result_message(result, "停止修炼"))
@@ -605,7 +648,9 @@ func on_breakthrough_button_pressed():
 		log_message.emit(msg)
 		
 		if game_ui and game_ui.has_method("refresh_all_player_data"):
-			await game_ui.refresh_all_player_data()
+			await game_ui.refresh_all_player_data({
+				"priority_scope": "cultivation"
+			})
 		
 		breakthrough_succeeded.emit(result)
 	else:
@@ -642,6 +687,10 @@ func update_display(status: Dictionary = {}):
 
 	if status.is_empty():
 		status = player.get_status_dict()
+	var is_cultivating := bool(status.get("is_cultivating", false))
+	var health_current := float(status.get("health", 0.0))
+	var spirit_current := float(status.get("spirit_energy", 0.0))
+	_update_value_feedback(is_cultivating, health_current, spirit_current)
 
 	if health_bar:
 		var final_max_health = player.get_final_max_health()
@@ -681,7 +730,7 @@ func update_display(status: Dictionary = {}):
 		var regen_per_second = CULTIVATION_LOGIC.calculate_health_regen_per_second(player, _get_spell_system())
 		health_regen_value_label.text = UIUtils.format_display_number(regen_per_second) + "/秒"
 
-	if status.is_cultivating:
+	if is_cultivating:
 		if status_label:
 			status_label.text = "修炼中..."
 			status_label.modulate = Color.GREEN
@@ -697,6 +746,7 @@ func update_display(status: Dictionary = {}):
 			cultivation_figure.visible = true
 		if cultivation_figure_particles:
 			cultivation_figure_particles.visible = false
+	_update_cultivation_motion(is_cultivating)
 
 	if breakthrough_button:
 		breakthrough_button.disabled = false
@@ -713,11 +763,76 @@ func update_display(status: Dictionary = {}):
 				var label = breakthrough_material_labels[i]
 				if not (label is Label):
 					continue
+				var name_label = breakthrough_material_name_labels[i] if i < breakthrough_material_name_labels.size() else null
 				if i < entries.size():
+					var entry = entries[i]
 					label.visible = true
-					label.text = str(entries[i])
+					if name_label is Label:
+						name_label.visible = true
+					if entry is Dictionary:
+						if name_label is Label:
+							name_label.text = str(entry.get("name", ""))
+						label.text = str(entry.get("value", ""))
+						var font_color := Color(0.2, 0.2, 0.2, 1.0) if bool(entry.get("sufficient", false)) else Color(0.82, 0.18, 0.14, 1.0)
+						label.add_theme_color_override("font_color", font_color)
+					else:
+						label.text = str(entry)
+						label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2, 1.0))
 				else:
-					label.visible = false
+					label.visible = true
+					label.text = ""
+					if name_label is Label:
+						name_label.visible = true
+						name_label.text = ""
+
+func _update_value_feedback(is_cultivating: bool, health_current: float, spirit_current: float) -> void:
+	if not _display_feedback_initialized:
+		_last_health_display_value = health_current
+		_last_spirit_display_value = spirit_current
+		_display_feedback_initialized = true
+		return
+	if is_cultivating and not is_equal_approx(health_current, _last_health_display_value):
+		if health_value:
+			UI_FEEDBACK_MANAGER.play_value_bump(health_value, 1 if health_current > _last_health_display_value else -1)
+	if is_cultivating and not is_equal_approx(spirit_current, _last_spirit_display_value):
+		if spirit_value:
+			UI_FEEDBACK_MANAGER.play_value_bump(spirit_value, 1 if spirit_current > _last_spirit_display_value else -1)
+	_last_health_display_value = health_current
+	_last_spirit_display_value = spirit_current
+
+func _update_cultivation_motion(is_cultivating: bool) -> void:
+	if is_cultivating == _last_display_is_cultivating and _display_feedback_initialized:
+		return
+	_last_display_is_cultivating = is_cultivating
+	if is_cultivating:
+		_start_cultivation_breathing()
+	else:
+		_stop_cultivation_breathing()
+
+func _start_cultivation_breathing() -> void:
+	if not cultivation_figure_particles:
+		return
+	if _cultivation_breath_tween and is_instance_valid(_cultivation_breath_tween):
+		_cultivation_breath_tween.kill()
+	cultivation_figure_particles.scale = Vector2.ONE
+	cultivation_figure_particles.modulate.a = 1.0
+	_cultivation_breath_tween = cultivation_figure_particles.create_tween()
+	_cultivation_breath_tween.set_loops()
+	_cultivation_breath_tween.set_trans(Tween.TRANS_SINE)
+	_cultivation_breath_tween.set_ease(Tween.EASE_IN_OUT)
+	_cultivation_breath_tween.tween_property(cultivation_figure_particles, "modulate:a", 0.86, 1.25)
+	_cultivation_breath_tween.tween_property(cultivation_figure_particles, "modulate:a", 1.0, 1.25)
+
+func _stop_cultivation_breathing() -> void:
+	if _cultivation_breath_tween and is_instance_valid(_cultivation_breath_tween):
+		_cultivation_breath_tween.kill()
+		_cultivation_breath_tween = null
+	if cultivation_figure_particles:
+		cultivation_figure_particles.scale = Vector2.ONE
+		cultivation_figure_particles.modulate.a = 1.0
+	if cultivation_figure:
+		cultivation_figure.scale = Vector2.ONE
+		cultivation_figure.modulate.a = 1.0
 
 func cleanup():
 	pass

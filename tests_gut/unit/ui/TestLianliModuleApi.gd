@@ -219,6 +219,90 @@ func test_lianli_continuous_choice_kept_after_next_battle_start():
 	assert_true(module._is_timeline_running, "下一场模拟后应进入时间轴播放态")
 	assert_true(module.continuous_checkbox.button_pressed, "仅首次进入历练按配置加载，后续应保持用户勾选")
 
+
+func test_lianli_selection_cards_render_expected_copy():
+	var module = harness.game_ui.lianli_module
+	harness.game_ui.dungeon_info_cache["foundation_herb_cave"] = {
+		"remaining_count": 2,
+		"max_count": 3
+	}
+	module.refresh_selection_cards(harness.game_ui.dungeon_info_cache)
+
+	var tower_card = module._selection_cards.get("sourth_endless_tower")
+	var daily_card = module._selection_cards.get("foundation_herb_cave")
+	assert_not_null(tower_card, "应渲染试练塔卡片")
+	assert_not_null(daily_card, "应渲染每日副本卡片")
+	assert_eq(tower_card.get_button_text(), "开始试炼", "试练塔按钮文案应固定")
+	assert_eq(tower_card.get_title_suffix_text(), "当前挑战 第1层", "试练塔副标题应显示当前挑战层数")
+	assert_eq(daily_card.get_title_text(), "破境草洞穴", "每日副本名称应使用定稿文案")
+	assert_eq(daily_card.get_title_suffix_text(), "今日剩余次数 2/3", "每日副本副标题应显示今日剩余次数")
+	assert_true(daily_card.get_tag_texts().has("每日次数限制"), "每日副本应额外显示每日限制标签")
+
+
+func test_lianli_selection_cards_group_by_area_sections():
+	var module = harness.game_ui.lianli_module
+	harness.game_ui.dungeon_info_cache["foundation_herb_cave"] = {
+		"remaining_count": 2,
+		"max_count": 3
+	}
+	module.refresh_selection_cards(harness.game_ui.dungeon_info_cache)
+
+	assert_not_null(module._select_root_list, "历练页应创建根列表")
+	assert_eq(module._select_root_list.get_child_count(), 6, "历练页应包含三个分组标题和三个卡片列表")
+
+	var normal_section = module._select_root_list.get_child(0)
+	var normal_list = module._select_root_list.get_child(1)
+	var daily_section = module._select_root_list.get_child(2)
+	var daily_list = module._select_root_list.get_child(3)
+	var special_section = module._select_root_list.get_child(4)
+	var special_list = module._select_root_list.get_child(5)
+
+	assert_eq(_get_section_title(normal_section), "普通区域", "首个分组标题应为普通区域")
+	assert_eq(_get_section_title(daily_section), "每日区域", "第二个分组标题应为每日区域")
+	assert_eq(_get_section_title(special_section), "特殊区域", "第三个分组标题应为特殊区域")
+	assert_eq(normal_list.get_child_count(), 4, "普通区域下应有四张区域卡片")
+	assert_eq(daily_list.get_child_count(), 1, "每日区域下应有一张区域卡片")
+	assert_eq(special_list.get_child_count(), 1, "特殊区域下应有一张区域卡片")
+
+	var normal_titles: Array[String] = []
+	for child in normal_list.get_children():
+		normal_titles.append(child.get_title_text())
+	assert_eq(normal_titles.size(), 4, "普通区域应渲染四张卡片")
+
+	var daily_titles: Array[String] = []
+	for child in daily_list.get_children():
+		daily_titles.append(child.get_title_text())
+	assert_eq(daily_titles, ["破境草洞穴"], "每日区域卡片应为破境草洞穴")
+
+	var special_titles: Array[String] = []
+	for child in special_list.get_children():
+		special_titles.append(child.get_title_text())
+	assert_eq(special_titles.size(), 1, "特殊区域应渲染一张卡片")
+	assert_true(special_titles[0].contains("试练塔"), "特殊区域卡片应为试练塔")
+
+
+func test_daily_dungeon_card_refreshes_remaining_count_after_player_data_sync():
+	var game_ui = harness.game_ui
+	var module = game_ui.lianli_module
+	var lianli_data := {
+		"tower_highest_floor": 0,
+		"daily_dungeon_data": {
+			"foundation_herb_cave": {
+				"remaining_count": 1,
+				"max_count": 3
+			}
+		}
+	}
+
+	module.on_player_data_refreshed(lianli_data)
+	game_ui.sync_dungeon_info_cache_from_lianli_system()
+	game_ui.update_lianli_area_buttons_display()
+
+	var daily_card = module._selection_cards.get("foundation_herb_cave")
+	assert_not_null(daily_card, "应渲染每日副本卡片")
+	assert_eq(game_ui.dungeon_info_cache["foundation_herb_cave"]["remaining_count"], 1, "日副本缓存应同步为最新剩余次数")
+	assert_eq(daily_card.get_title_suffix_text(), "今日剩余次数 1/3", "玩家数据刷新后每日副本卡片应立刻显示最新剩余次数")
+
 func test_lianli_exit_before_first_event_uses_minus_one_index():
 	var module = harness.game_ui.lianli_module
 	var capture_api = CaptureFinishApi.new()
@@ -330,3 +414,10 @@ func test_lianli_speed_button_cycles_three_available_speeds():
 
 	assert_eq(module.current_lianli_speed, 2.0, "VIP 可用三档时应能切换到 2 倍速")
 	assert_eq(module.lianli_speed_button.text, "历练速度: 2x", "按钮文案应更新为 2x")
+
+
+func _get_section_title(section: Node) -> String:
+	if not section:
+		return ""
+	var title_label = section.get_child(0)
+	return title_label.text if title_label is Label else ""

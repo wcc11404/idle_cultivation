@@ -1,17 +1,24 @@
 class_name EnemyData extends Node
 
 var ENEMY_TEMPLATES: Dictionary = {}
+var _config_loaded: bool = false
+
+func _init():
+	_load_config()
 
 func _ready():
 	_load_config()
 
 func _load_config():
+	if _config_loaded:
+		return
 	var file = FileAccess.open("res://scripts/core/lianli/enemies.json", FileAccess.READ)
 	if file:
 		var json_text = file.get_as_text()
 		var data = JSON.parse_string(json_text)
 		if data:
 			ENEMY_TEMPLATES = data.get("templates", {})
+			_config_loaded = true
 
 func generate_enemy(template_id: String, level: int) -> Dictionary:
 	var template = ENEMY_TEMPLATES.get(template_id, {})

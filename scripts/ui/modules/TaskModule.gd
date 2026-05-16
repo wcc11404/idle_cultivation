@@ -4,6 +4,7 @@ extends Node
 const ACTION_BUTTON_TEMPLATE = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
 const TOP_TAB_BAR_STYLE_TEMPLATE = preload("res://scripts/ui/common/TopTabBarStyleTemplate.gd")
 const DISPLAY_PANEL_TEMPLATE = preload("res://scripts/ui/common/DisplayPanelTemplate.gd")
+const UI_FEEDBACK_MANAGER = preload("res://scripts/ui/common/UIFeedbackManager.gd")
 
 signal log_message(message: String)
 signal back_to_region_requested
@@ -88,12 +89,14 @@ func _on_daily_tab_pressed() -> void:
 	_active_tab = "daily"
 	_update_tab_state()
 	_render_active_tasks()
+	_play_task_tab_feedback()
 
 
 func _on_newbie_tab_pressed() -> void:
 	_active_tab = "newbie"
 	_update_tab_state()
 	_render_active_tasks()
+	_play_task_tab_feedback()
 
 
 func _update_tab_state() -> void:
@@ -145,6 +148,11 @@ func _render_active_tasks() -> void:
 		if not (task is Dictionary):
 			continue
 		task_list.add_child(_build_task_card(task))
+
+
+func _play_task_tab_feedback() -> void:
+	if task_list:
+		UI_FEEDBACK_MANAGER.play_tab_content_in(task_list)
 
 
 func _sort_tasks(a: Dictionary, b: Dictionary) -> bool:
@@ -308,7 +316,9 @@ func _on_claim_pressed(task_id: String) -> void:
 	if success:
 		await _refresh_task_list()
 		if game_ui and game_ui.has_method("refresh_all_player_data"):
-			await game_ui.refresh_all_player_data()
+			await game_ui.refresh_all_player_data({
+				"priority_scope": "task"
+			})
 			if game_ui.has_method("update_ui"):
 				game_ui.update_ui()
 		elif game_ui and game_ui.has_method("refresh_inventory_ui"):
@@ -364,10 +374,24 @@ func _emit_task_state_changed() -> void:
 func _count_claimable_tasks() -> int:
 	var count := 0
 	for task_group in [_daily_tasks, _newbie_tasks]:
-		for task_variant in task_group:
-			if not (task_variant is Dictionary):
-				continue
-			var task := task_variant as Dictionary
-			if bool(task.get("completed", false)) and not bool(task.get("claimed", false)):
-				count += 1
+		count += _count_claimable_in_group(task_group)
+	return count
+
+
+func get_claimable_daily_count() -> int:
+	return _count_claimable_in_group(_daily_tasks)
+
+
+func get_claimable_newbie_count() -> int:
+	return _count_claimable_in_group(_newbie_tasks)
+
+
+func _count_claimable_in_group(task_group: Array) -> int:
+	var count := 0
+	for task_variant in task_group:
+		if not (task_variant is Dictionary):
+			continue
+		var task := task_variant as Dictionary
+		if bool(task.get("completed", false)) and not bool(task.get("claimed", false)):
+			count += 1
 	return count

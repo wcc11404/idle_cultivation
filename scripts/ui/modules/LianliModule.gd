@@ -3,6 +3,7 @@ class_name LianliModule extends Node
 ## 历练模块 - 管理历练和无尽塔功能
 ## 包括战斗UI更新、战斗控制、战斗日志等
 const ACTION_LOCK_MANAGER = preload("res://scripts/utils/flow/ActionLockManager.gd")
+const AREA_ENTRY_CARD_SCRIPT = preload("res://scripts/ui/common/AreaEntryCard.gd")
 const UI_UTILS = preload("res://scripts/utils/UIUtils.gd")
 
 # 信号
@@ -30,6 +31,7 @@ var spell_system: Node = null
 var lianli_panel: Control = null
 var lianli_scene_panel: Control = null
 var lianli_select_panel: Control = null
+var lianli_select_list_host: VBoxContainer = null
 var lianli_status_label: Label = null
 var area_name_label: Label = null
 var reward_info_label: Label = null
@@ -73,6 +75,14 @@ var _enemy_hp_tween: Tween = null
 var _player_hp_tween: Tween = null
 var _finish_time_invalid_prompted: bool = false
 var _continuous_default_applied: bool = false
+var _speed_options_refresh_inflight: int = 0
+var _test_shutdown_requested: bool = false
+var _select_scroll: ScrollContainer = null
+var _select_root_list: VBoxContainer = null
+var _select_normal_list: VBoxContainer = null
+var _select_daily_list: VBoxContainer = null
+var _select_special_list: VBoxContainer = null
+var _selection_cards: Dictionary = {}
 
 # 等待状态
 var _is_waiting: bool = false
@@ -159,6 +169,8 @@ func initialize(ui: Node, player_node: Node, lianli_sys: Node,
 	spell_data = spell_data_node
 	spell_system = spell_system_node
 	_continuous_default_applied = false
+	_build_selection_layout()
+	refresh_selection_cards()
 	_update_lianli_speed_button_text()
 	_update_battle_info()
 
@@ -441,7 +453,10 @@ func _finish_current_battle(full_settle: bool):
 		return
 
 	if game_ui and game_ui.has_method("refresh_all_player_data"):
-		await game_ui.refresh_all_player_data()
+		await game_ui.refresh_all_player_data({
+			"priority_scope": "lianli",
+			"defer_other_scopes": false
+		})
 	elif game_ui and game_ui.has_method("update_ui"):
 		game_ui.update_ui()
 
@@ -553,9 +568,256 @@ func show_lianli_select_panel():
 		lianli_scene_panel.visible = false
 	if lianli_select_panel:
 		lianli_select_panel.visible = true
-	# 不需要调用update_lianli_area_buttons_display，因为show_lianli_tab已经调用了它
+	refresh_selection_cards()
 
 # ==================== 历练区域功能 ====================
+
+func refresh_selection_cards(dungeon_info_cache: Dictionary = {}) -> void:
+	if not _select_root_list:
+		return
+	_ensure_selection_cards()
+
+	var normal_area_ids: Array = lianli_area_data.get_normal_area_ids() if lianli_area_data else ["area_1", "area_2", "area_3", "area_4"]
+	for area_id in normal_area_ids:
+		_refresh_normal_area_card(area_id)
+
+	_refresh_tower_card()
+
+	var daily_area_ids: Array = lianli_area_data.get_daily_area_ids() if lianli_area_data else ["foundation_herb_cave"]
+	for area_id in daily_area_ids:
+		_refresh_daily_area_card(area_id, dungeon_info_cache)
+
+
+func _build_selection_layout() -> void:
+	if not lianli_select_list_host:
+		return
+	for child in lianli_select_list_host.get_children():
+		lianli_select_list_host.remove_child(child)
+		child.queue_free()
+
+	lianli_select_list_host.add_theme_constant_override("separation", 0)
+
+	_select_scroll = ScrollContainer.new()
+	_select_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_select_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_select_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_select_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	lianli_select_list_host.add_child(_select_scroll)
+	_hide_scrollbar(_select_scroll.get_v_scroll_bar())
+
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_theme_constant_override("margin_left", 14)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 14)
+	margin.add_theme_constant_override("margin_bottom", 18)
+	_select_scroll.add_child(margin)
+
+	_select_root_list = VBoxContainer.new()
+	_select_root_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_select_root_list.add_theme_constant_override("separation", 18)
+	margin.add_child(_select_root_list)
+
+	_select_root_list.add_child(_build_selection_section_header("普通区域"))
+	_select_normal_list = VBoxContainer.new()
+	_select_normal_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_select_normal_list.add_theme_constant_override("separation", 18)
+	_select_root_list.add_child(_select_normal_list)
+
+	_select_root_list.add_child(_build_selection_section_header("每日区域"))
+	_select_daily_list = VBoxContainer.new()
+	_select_daily_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_select_daily_list.add_theme_constant_override("separation", 18)
+	_select_root_list.add_child(_select_daily_list)
+
+	_select_root_list.add_child(_build_selection_section_header("特殊区域"))
+	_select_special_list = VBoxContainer.new()
+	_select_special_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_select_special_list.add_theme_constant_override("separation", 18)
+	_select_root_list.add_child(_select_special_list)
+
+
+func _ensure_selection_cards() -> void:
+	if not _selection_cards.is_empty():
+		return
+	var normal_ids: Array = ["area_1", "area_2", "area_3", "area_4"]
+	for area_id in normal_ids:
+		_register_selection_card(area_id, _select_normal_list)
+	_register_selection_card("foundation_herb_cave", _select_daily_list)
+	_register_selection_card("sourth_endless_tower", _select_special_list)
+
+
+func _register_selection_card(area_id: String, host: VBoxContainer) -> void:
+	var card = AREA_ENTRY_CARD_SCRIPT.new()
+	card.action_pressed.connect(_on_selection_card_pressed)
+	card.configure({"entry_id": area_id})
+	_selection_cards[area_id] = card
+	host.add_child(card)
+
+
+func _build_selection_section_header(title: String) -> Control:
+	var section := VBoxContainer.new()
+	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	section.add_theme_constant_override("separation", 8)
+
+	var title_label := Label.new()
+	title_label.text = title
+	title_label.add_theme_font_size_override("font_size", 28)
+	title_label.add_theme_color_override("font_color", Color(0.20, 0.20, 0.20, 1.0))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	section.add_child(title_label)
+
+	var separator := HSeparator.new()
+	separator.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	separator.custom_minimum_size = Vector2(0, 10)
+	section.add_child(separator)
+
+	return section
+
+
+func _on_selection_card_pressed(entry_id: String) -> void:
+	if entry_id == _get_tower_id():
+		await on_endless_tower_pressed()
+		return
+	on_lianli_area_pressed(entry_id)
+
+
+func _refresh_normal_area_card(area_id: String) -> void:
+	var card = _selection_cards.get(area_id, null)
+	if not card:
+		return
+	var area_data: Dictionary = lianli_area_data.get_area_data(area_id) if lianli_area_data else {}
+	var name := str(area_data.get("name", area_id))
+	var description := str(area_data.get("description", ""))
+	var level_range := _get_area_enemy_level_range(area_data)
+	card.configure({
+		"entry_id": area_id,
+		"title": name,
+		"description": description,
+		"image_variant": _get_area_image_variant(area_id),
+		"image_label": name,
+		"image_glyph": _get_area_image_glyph(area_id),
+		"tags": [
+			"敌人 Lv.%d-%d" % [level_range.x, level_range.y],
+			"建议 Lv.%d+" % int(level_range.y)
+		],
+		"button_text": "开始历练",
+		"disabled": false,
+		"disabled_reason": ""
+	})
+
+
+func _refresh_tower_card() -> void:
+	var tower_id := _get_tower_id()
+	var card = _selection_cards.get(tower_id, null)
+	if not card:
+		return
+	var tower_floor := 1
+	var name: String = lianli_area_data.get_area_name(tower_id) if lianli_area_data else "南麓试练塔"
+	var description: String = lianli_area_data.get_area_description(tower_id) if lianli_area_data else ""
+	var max_floor: int = lianli_area_data.get_tower_max_floor() if lianli_area_data else 1
+	if lianli_system:
+		tower_floor = min(int(lianli_system.tower_highest_floor) + 1, max_floor)
+	card.configure({
+		"entry_id": tower_id,
+		"title": name,
+		"title_suffix": "当前挑战 第%d层" % tower_floor,
+		"description": description,
+		"image_variant": "tower",
+		"image_label": name,
+		"image_glyph": "塔",
+		"tags": [
+			"每5层奖励",
+			"稳定战力检验"
+		],
+		"button_text": "开始试炼",
+		"disabled": false,
+		"disabled_reason": ""
+	})
+
+
+func _refresh_daily_area_card(area_id: String, dungeon_info_cache: Dictionary) -> void:
+	var card = _selection_cards.get(area_id, null)
+	if not card:
+		return
+	var area_data: Dictionary = lianli_area_data.get_area_data(area_id) if lianli_area_data else {}
+	var name := str(area_data.get("name", area_id))
+	var description := str(area_data.get("description", ""))
+	var level_range := _get_area_enemy_level_range(area_data)
+	var cached_info: Dictionary = dungeon_info_cache.get(area_id, {"remaining_count": 3, "max_count": 3})
+	var remaining := int(cached_info.get("remaining_count", 3))
+	var max_count: int = maxi(1, int(cached_info.get("max_count", 3)))
+	var disabled: bool = remaining <= 0
+	card.configure({
+		"entry_id": area_id,
+		"title": name,
+		"title_suffix": "今日剩余次数 %d/%d" % [remaining, max_count],
+		"description": description,
+		"image_variant": "daily",
+		"image_label": name,
+		"image_glyph": "草",
+		"tags": [
+			"敌人 Lv.%d-%d" % [level_range.x, level_range.y],
+			"建议 Lv.%d+" % int(level_range.y),
+			"每日次数限制"
+		],
+		"button_text": "开始历练",
+		"disabled": disabled,
+		"disabled_reason": "今日副本次数已用完" if disabled else ""
+	})
+
+
+func _get_area_enemy_level_range(area_data: Dictionary) -> Vector2i:
+	var min_level := 1
+	var max_level := 1
+	var has_value := false
+	var enemy_groups = area_data.get("enemies_template", [])
+	for enemy_group_variant in enemy_groups:
+		if not (enemy_group_variant is Dictionary):
+			continue
+		var enemies = enemy_group_variant.get("enemies", [])
+		for enemy_info_variant in enemies:
+			if not (enemy_info_variant is Dictionary):
+				continue
+			var current_min := int(enemy_info_variant.get("min_level", 1))
+			var current_max := int(enemy_info_variant.get("max_level", current_min))
+			if not has_value:
+				min_level = current_min
+				max_level = current_max
+				has_value = true
+			else:
+				min_level = mini(min_level, current_min)
+				max_level = maxi(max_level, current_max)
+	return Vector2i(min_level, max_level)
+
+
+func _get_area_image_variant(area_id: String) -> String:
+	if area_id in ["area_1", "area_3"]:
+		return "forest"
+	if area_id in ["area_2", "area_4"]:
+		return "plain"
+	return "default"
+
+
+func _get_area_image_glyph(area_id: String) -> String:
+	match area_id:
+		"area_1", "area_3":
+			return "林"
+		"area_2", "area_4":
+			return "丘"
+	return "境"
+
+
+func _get_tower_id() -> String:
+	return lianli_area_data.get_tower_id() if lianli_area_data else "sourth_endless_tower"
+
+
+func _hide_scrollbar(scrollbar: ScrollBar) -> void:
+	if not scrollbar:
+		return
+	scrollbar.custom_minimum_size = Vector2.ZERO
+	scrollbar.modulate = Color(1, 1, 1, 0)
+	scrollbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 # 历练区域按钮点击
 func on_lianli_area_pressed(area_id: String):
@@ -624,21 +886,7 @@ func on_endless_tower_pressed():
 	await start_lianli_in_area(tower_id)
 
 func update_endless_tower_button_text(button: Button):
-	if not button:
-		return
-	
-	var tower_name = "南麓试练塔"
-	var current_floor = 1
-	var max_floor = 51
-	
-	if lianli_area_data:
-		tower_name = lianli_area_data.get_tower_name()
-		max_floor = lianli_area_data.get_tower_max_floor()
-	
-	if lianli_system:
-		current_floor = min(lianli_system.tower_highest_floor + 1, max_floor)
-	
-	button.text = tower_name + " (第" + str(current_floor) + "层)"
+	refresh_selection_cards()
 
 # ==================== 战斗控制功能 ====================
 
@@ -686,9 +934,11 @@ func on_lianli_speed_pressed():
 	_action_lock.end("lianli_speed_switch", 0.0)
 
 func on_tab_entered():
+	refresh_selection_cards()
 	_ensure_continuous_default_applied()
 	_update_lianli_speed_button_text()
-	call_deferred("_refresh_speed_options_on_tab_enter")
+	if not _test_shutdown_requested:
+		call_deferred("_refresh_speed_options_on_tab_enter")
 
 # 退出历练按钮点击
 func on_exit_lianli_pressed():
@@ -730,7 +980,11 @@ func _update_battle_info():
 			reward_info_label.text = _get_area_reward_text()
 
 func _refresh_speed_options_on_tab_enter():
+	if _test_shutdown_requested:
+		return
+	_speed_options_refresh_inflight += 1
 	await _refresh_speed_options_from_server(true)
+	_speed_options_refresh_inflight = maxi(0, _speed_options_refresh_inflight - 1)
 
 func _refresh_speed_options_from_server(silent: bool = false) -> bool:
 	if not api:
@@ -783,11 +1037,13 @@ func _format_speed_text(speed: float) -> String:
 		return str(int(speed))
 	return str(snapped(speed, 0.1))
 
-func on_player_data_refreshed(lianli_data: Dictionary):
+func on_player_data_refreshed(lianli_data: Dictionary, refresh_visuals: bool = true):
 	if lianli_system and lianli_system.has_method("apply_save_data"):
 		lianli_system.apply_save_data(lianli_data)
 	if not _is_timeline_running:
 		_update_battle_info()
+	if refresh_visuals:
+		refresh_selection_cards()
 
 func _update_tower_reward_info():
 	if not lianli_area_data:
@@ -946,4 +1202,8 @@ func on_lianli_waiting(time_remaining: float):
 
 # 清理
 func cleanup():
-	pass
+	_test_shutdown_requested = true
+
+
+func has_pending_test_tasks() -> bool:
+	return _speed_options_refresh_inflight > 0 or _finish_in_flight

@@ -9,8 +9,6 @@ signal nickname_submit_requested(new_nickname: String)
 signal avatar_submit_requested(avatar_id: String)
 signal popup_closed
 
-const COLOR_PANEL_BG := Color(0.917647, 0.854902, 0.72549, 1.0) # #eadab9
-const COLOR_PANEL_BORDER := Color(0.713725, 0.639216, 0.513725, 0.95)
 const COLOR_TEXT_DARK := Color(0.22, 0.2, 0.18, 1.0)
 const COLOR_HINT := Color(0.36, 0.31, 0.25, 1.0)
 
@@ -32,11 +30,14 @@ func _init():
 	visible = false
 	z_index = 1100
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	set_process_input(true)
 
 func setup(host: Control):
 	overlay_host = host
-	background = POPUP_STYLE_TEMPLATE.create_overlay(host, Callable(), 0.58)
+	var outside_click_callback := func():
+		if visible:
+			hide_popup()
+			popup_closed.emit()
+	background = POPUP_STYLE_TEMPLATE.create_overlay(host, outside_click_callback, 0.58)
 	background.name = "ProfileEditOverlay"
 	overlay_host.add_child(background)
 	_build_layout()
@@ -54,28 +55,20 @@ func _build_layout():
 	position = Vector2(120.0, 120.0)
 	size = Vector2(520.0, 600.0)
 
-	var margin = MarginContainer.new()
-	margin.layout_mode = 1
-	margin.anchors_preset = 15
-	margin.anchor_right = 1.0
-	margin.anchor_bottom = 1.0
-	margin.grow_horizontal = 2
-	margin.grow_vertical = 2
-	margin.add_theme_constant_override("margin_left", 18)
-	margin.add_theme_constant_override("margin_top", 18)
-	margin.add_theme_constant_override("margin_right", 18)
-	margin.add_theme_constant_override("margin_bottom", 18)
-	add_child(margin)
+	var margin = POPUP_STYLE_TEMPLATE.build_decorated_popup(self, {
+		"content_name": "ProfileEditContent"
+	})
 
 	var vbox = VBoxContainer.new()
 	vbox.name = "RootVBox"
 	vbox.add_theme_constant_override("separation", 12)
 	margin.add_child(vbox)
 
-	var nickname_title = Label.new()
-	nickname_title.text = "修改昵称"
-	nickname_title.add_theme_font_size_override("font_size", 24)
-	nickname_title.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+	var title = POPUP_STYLE_TEMPLATE.create_title_label("个人信息")
+	vbox.add_child(title)
+	vbox.add_child(POPUP_STYLE_TEMPLATE.create_title_separator())
+
+	var nickname_title = _create_section_title("修改昵称")
 	vbox.add_child(nickname_title)
 
 	nickname_input = LineEdit.new()
@@ -101,14 +94,9 @@ func _build_layout():
 	vbox.add_child(nickname_submit_button)
 	ACTION_BUTTON_TEMPLATE.apply_profile_blue(nickname_submit_button, nickname_submit_button.custom_minimum_size, 20)
 
-	var separator = HSeparator.new()
-	separator.custom_minimum_size = Vector2(0, 12)
-	vbox.add_child(separator)
+	vbox.add_child(POPUP_STYLE_TEMPLATE.create_title_separator())
 
-	var avatar_title = Label.new()
-	avatar_title.text = "选择头像"
-	avatar_title.add_theme_font_size_override("font_size", 24)
-	avatar_title.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+	var avatar_title = _create_section_title("选择头像")
 	vbox.add_child(avatar_title)
 
 	var scroll = ScrollContainer.new()
@@ -196,12 +184,7 @@ func _refresh_avatar_selection():
 		btn.add_theme_stylebox_override("pressed", _make_avatar_style(true))
 
 func _apply_styles():
-	add_theme_stylebox_override("panel", POPUP_STYLE_TEMPLATE.build_panel_style({
-		"bg_color": COLOR_PANEL_BG,
-		"border_color": COLOR_PANEL_BORDER,
-		"corner_radius": 12,
-		"border_width": 2
-	}))
+	pass
 
 func show_popup(current_nickname: String, current_avatar_id: String):
 	if not _avatar_buttons.has(current_avatar_id):
@@ -211,15 +194,20 @@ func show_popup(current_nickname: String, current_avatar_id: String):
 	_refresh_avatar_selection()
 	if background:
 		background.z_index = z_index - 1
-		background.visible = true
 	visible = true
 	_update_layout()
+	if background:
+		POPUP_STYLE_TEMPLATE.play_open(background, self)
 	call_deferred("_update_layout")
 
 func hide_popup():
-	visible = false
 	if background:
-		background.visible = false
+		POPUP_STYLE_TEMPLATE.play_close(background, self, func() -> void:
+			visible = false
+			background.visible = false
+		)
+	else:
+		visible = false
 
 func get_nickname_text() -> String:
 	if not nickname_input:
@@ -236,22 +224,15 @@ func _on_viewport_size_changed():
 func _update_layout():
 	var safe_rect := SAFE_AREA_HELPER.get_safe_inner_rect(self)
 	var viewport_size = safe_rect.size
-	var desired_w = clamp(viewport_size.x * 0.74, 420.0, 620.0)
-	var desired_h = clamp(viewport_size.y * 0.82, 520.0, 760.0)
+	var desired_w = clamp(viewport_size.x * 0.74, POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE.x, 620.0)
+	var desired_h = clamp(viewport_size.y * 0.82, POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE.y, 760.0)
 	var popup_pos := safe_rect.position + (safe_rect.size - Vector2(desired_w, desired_h)) * 0.5
 	position = popup_pos
 	size = Vector2(desired_w, desired_h)
 
-func _input(event: InputEvent):
-	if not visible:
-		return
-	if not (event is InputEventMouseButton):
-		return
-	var mouse_event = event as InputEventMouseButton
-	if not mouse_event.pressed or mouse_event.button_index != MOUSE_BUTTON_LEFT:
-		return
-	if get_global_rect().has_point(mouse_event.position):
-		return
-	hide_popup()
-	popup_closed.emit()
-	get_viewport().set_input_as_handled()
+func _create_section_title(text: String) -> Label:
+	var title := Label.new()
+	title.text = text
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+	return title

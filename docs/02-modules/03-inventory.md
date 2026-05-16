@@ -26,7 +26,8 @@
 
 1. 显示背包面板并清空详情区选中态。
 2. 用当前 `inventory` 数据重建格子 UI。
-3. 若允许后台刷新，延迟触发 `refresh_all_player_data` 做全量对齐。
+3. 若允许后台刷新，延迟触发 `refresh_all_player_data({"priority_scope": "inventory", "defer_other_scopes": false})` 做背包对齐。
+4. 进入储纳页时不重建术法、炼丹、历练、地区等非当前页面 UI。
 
 ### 2) 点击物品格子
 
@@ -39,9 +40,11 @@
 1. 校验当前有选中物品。
 2. 调 `inventory/use`。
 3. 成功：
-   - 按 `reason_code + reason_data.effect` 组装文案。
-   - 立即刷新本地背包显示。
-   - 对礼包类读取 `reason_data.contents` 展示奖励明细。
+   - 按 `reason_code + reason_data.effect/contents` 组装玩家日志文案。
+   - 先按 `reason_data.used_count` 本地扣减被使用物品。
+   - 对礼包类按 `reason_data.contents` 本地加入奖励物品并展示奖励明细。
+   - 立即刷新储纳格子、当前详情面板、顶部资源展示和日志。
+   - 随后触发 `refresh_all_player_data({"priority_scope": "inventory"})`，由服务端真值校准玩家、背包、术法、炼丹、任务等跨系统状态。
 4. 失败：
    - 统一按 reason_code 映射失败文案（数量不足/不可使用/已使用过/等级条件不足等）。
 
@@ -54,7 +57,8 @@
    - `completed_count`
    - `is_partial`
    - 以及合并后的 `effect/contents`
-4. 客户端根据汇总结果刷新背包与详情面板，不再循环发 N 次 use 请求。
+4. 客户端根据 `used_count/completed_count + contents` 先做本地背包增量与日志，再触发全量同步校准。
+5. 客户端不再循环发 N 次 use 请求。
 
 ### 4) 点击丢弃
 
@@ -86,6 +90,7 @@
   - 消耗品：展示实际恢复/获得值
   - 礼包：展示开包奖励汇总
   - 解锁类：展示术法/丹方/丹炉中文名
+- `effect` 只用于文案，不在即时反馈阶段模拟跨系统状态；术法解锁、丹方学习、丹炉获得、属性变化、任务推进等最终以随后的全量同步为准。
 - 批量部分成功：`INVENTORY_USE_PARTIAL_SUCCEEDED`，显示“部分成功（完成数/请求数）”。
 - 重复使用统一文案：`xx已经使用过了，无法重复使用`。
 - 礼包等级门槛：`INVENTORY_USE_REQUIREMENT_NOT_MET` 时，按 `reason_data.requirement.realm_min` 输出“需达到炼气X层后才能打开”。
@@ -104,8 +109,8 @@
     - 选中槽：亮底色 + 亮金边框（加粗）
   - 文本布局维持原约定：名称居中、数量右下角。
 - 物品名颜色：
-  - 继续按 `quality` 做稀有度配色。
-  - `quality=0` 的默认灰色已改为深色（黑色基调），保证在浅底色下可读性。
+  - 继续按 `rarity` 做稀有度配色。
+  - `rarity=fan` 的默认灰色已改为深色（黑色基调），保证在浅底色下可读性。
   - 绿色稀有度改为更深绿色，避免偏亮发灰。
 - 详情卡：
   - 背景色：`#f2e5cc`
@@ -135,7 +140,10 @@
 以“使用道具”为例：
 
 1. `ChunaModule._on_use_button_pressed` 校验选中项并调 `api.inventory_use`。
-2. 服务端返回后，`_build_use_result_message` 根据 `reason_code + reason_data.effect/contents` 生成中文文案。
-3. 成功时执行本地 `inventory.apply_save_data` 或刷新流程，同步数量与详情面板状态。
-4. 解锁类道具通过 `effect.type + id` 映射术法/丹方/丹炉中文名。
-5. 失败时只输出语义码映射文案，不透传底层错误详情。
+2. 服务端返回后，`_get_inventory_result_message` 根据 `reason_code + reason_data.effect/contents` 生成中文文案。
+3. 成功时 `_apply_local_inventory_use_result` 先按 `used_count` 扣减当前物品，按 `contents` 加入礼包产物，并刷新储纳格子与详情面板。
+4. 成功日志立即输出，保证玩家在储纳页能先看到数量变化和反馈。
+5. 随后 `_refresh_after_inventory_action` 触发全量同步，最终覆盖跨系统状态。
+6. 失败时只输出语义码映射文案，不透传底层错误详情。
+
+进入储纳页的后台对齐与“使用物品后的全量校准”不同：前者只刷新 `inventory` scope，不延后刷新其他页面；后者需要允许跨系统状态最终对齐。

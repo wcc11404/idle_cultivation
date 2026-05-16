@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>区域卡片模板预览</title>
+  <style>
+    :root {
+      --bg: #efe4c8;
+      --bg-deep: #e5d5b2;
+      --panel: rgba(255, 248, 234, 0.8);
+      --panel-strong: #f7edd9;
+      --ink: #32271f;
+      --muted: #7d6b57;
+      --line: rgba(117, 87, 44, 0.24);
+      --gold: #c89a36;
+      --gold-deep: #9d7325;
+      --green: #2f7f57;
+      --red: #a54f43;
+      --blue: #4b82ae;
+      --shadow: 0 18px 42px rgba(75, 48, 12, 0.12);
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.46), transparent 32%),
+        radial-gradient(circle at 80% 20%, rgba(230, 193, 112, 0.22), transparent 24%),
+        linear-gradient(180deg, #f3e8ce 0%, #e7d8b5 100%);
+    }
+
+    .page {
+      min-height: 100vh;
+      padding: 28px;
+    }
+
+    .shell {
+      max-width: 1360px;
+      margin: 0 auto;
+      border: 1px solid rgba(124, 94, 50, 0.18);
+      border-radius: 32px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.38), rgba(255,255,255,0.18));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .hero {
+      padding: 28px 28px 18px;
+      border-bottom: 1px solid rgba(124, 94, 50, 0.12);
+      background:
+        radial-gradient(circle at 10% 10%, rgba(255,255,255,0.5), transparent 30%),
+        linear-gradient(135deg, rgba(255,252,245,0.72), rgba(240,224,191,0.45));
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      color: var(--gold-deep);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .hero-row {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.1;
+      font-weight: 800;
+    }
+
+    .hero p {
+      margin: 10px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar button {
+      border: 1px solid rgba(135, 103, 53, 0.22);
+      border-radius: 999px;
+      background: rgba(255, 251, 242, 0.82);
+      color: var(--ink);
+      font-size: 13px;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+
+    .toolbar button.active {
+      background: linear-gradient(180deg, #e0b247, #c99227);
+      color: #fff9ed;
+      border-color: rgba(140, 88, 10, 0.34);
+      box-shadow: 0 10px 24px rgba(163, 116, 26, 0.22);
+    }
+
+    .toolbar button:hover {
+      transform: translateY(-1px);
+    }
+
+    .content {
+      padding: 22px;
+    }
+
+    .preview-frame {
+      margin: 0 auto;
+      width: min(100%, 1240px);
+      border-radius: 28px;
+      border: 1px solid rgba(122, 92, 54, 0.12);
+      background:
+        radial-gradient(circle at top right, rgba(214, 180, 108, 0.16), transparent 20%),
+        linear-gradient(180deg, rgba(255,252,246,0.8), rgba(240,228,203,0.58));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.75);
+      overflow: hidden;
+      transition: width 220ms ease;
+    }
+
+    .preview-frame.mobile {
+      width: min(100%, 440px);
+    }
+
+    .section {
+      padding: 24px;
+    }
+
+    .section + .section {
+      border-top: 1px solid rgba(122, 92, 54, 0.12);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .section-title {
+      font-size: 24px;
+      margin: 0 0 6px;
+      font-weight: 800;
+    }
+
+    .section-desc {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+      max-width: 700px;
+    }
+
+    .section-note {
+      color: var(--gold-deep);
+      font-size: 13px;
+      background: rgba(255, 247, 227, 0.88);
+      border: 1px solid rgba(182, 137, 58, 0.18);
+      border-radius: 999px;
+      padding: 8px 12px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .grid.region {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid.lianli {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius-xl);
+      border: 1px solid rgba(135, 103, 53, 0.16);
+      background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(247, 238, 219, 0.96));
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.82),
+        0 16px 30px rgba(86, 60, 24, 0.08);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.18), transparent 32%);
+      pointer-events: none;
+    }
+
+    .card-image {
+      position: relative;
+      height: 126px;
+      padding: 14px;
+      display: flex;
+      align-items: end;
+      border-bottom: 1px solid rgba(135, 103, 53, 0.12);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02)),
+        radial-gradient(circle at 18% 22%, rgba(255,255,255,0.35), transparent 28%);
+    }
+
+    .card.region-card .card-image {
+      height: 141px;
+    }
+
+    .card-image.furnace {
+      background-color: #6c4d2f;
+      background-image:
+        radial-gradient(circle at 30% 25%, rgba(246, 205, 126, 0.5), transparent 18%),
+        linear-gradient(160deg, #7d5a37, #4b321d 68%);
+    }
+
+    .card-image.herb {
+      background-color: #4f7255;
+      background-image:
+        radial-gradient(circle at 24% 18%, rgba(202, 235, 174, 0.45), transparent 22%),
+        linear-gradient(160deg, #719566, #39513f 70%);
+    }
+
+    .card-image.task {
+      background-color: #5f5a76;
+      background-image:
+        radial-gradient(circle at 22% 22%, rgba(231, 218, 255, 0.4), transparent 20%),
+        linear-gradient(160deg, #7c7392, #433f56 70%);
+    }
+
+    .card-image.woodland {
+      background-color: #536b4f;
+      background-image:
+        radial-gradient(circle at 28% 26%, rgba(219, 240, 185, 0.35), transparent 20%),
+        linear-gradient(160deg, #6e8760, #40533b 72%);
+    }
+
+    .card-image.ruins {
+      background-color: #73624c;
+      background-image:
+        radial-gradient(circle at 30% 22%, rgba(255, 230, 194, 0.26), transparent 18%),
+        linear-gradient(160deg, #8d7a5f, #57493a 72%);
+    }
+
+    .card-image.cave {
+      background-color: #4d4034;
+      background-image:
+        radial-gradient(circle at 32% 24%, rgba(255, 198, 113, 0.36), transparent 18%),
+        linear-gradient(160deg, #71553d, #352920 72%);
+    }
+
+    .card-image.tower {
+      background-color: #535769;
+      background-image:
+        radial-gradient(circle at 30% 18%, rgba(210, 217, 252, 0.35), transparent 18%),
+        linear-gradient(160deg, #737894, #3d4051 72%);
+    }
+
+    .art-placeholder {
+      width: 100%;
+      height: 100%;
+      border-radius: 20px;
+      border: 1px dashed rgba(255,255,255,0.18);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .art-placeholder::before {
+      content: "";
+      position: absolute;
+      inset: auto 18px 14px 18px;
+      height: 54%;
+      border-radius: 20px 20px 12px 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.02));
+    }
+
+    .art-symbol {
+      position: absolute;
+      top: 16px;
+      right: 18px;
+      font-size: 44px;
+      line-height: 1;
+      color: rgba(255,255,255,0.72);
+      font-weight: 700;
+      text-shadow: 0 10px 24px rgba(0,0,0,0.12);
+    }
+
+    .mist {
+      position: absolute;
+      inset: auto auto 20px 20px;
+      width: 76%;
+      height: 48%;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 50%, rgba(255,255,255,0.25), transparent 55%);
+      filter: blur(8px);
+      opacity: 0.65;
+    }
+
+    .image-tag {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      font-size: 12px;
+      color: rgba(255, 248, 231, 0.88);
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(44, 28, 12, 0.18);
+      border: 1px solid rgba(255,255,255,0.14);
+      backdrop-filter: blur(6px);
+    }
+
+    .card-body {
+      position: relative;
+      padding: 13px 14px 12px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1.15;
+      font-weight: 800;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .title-side {
+      flex-shrink: 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gold-deep);
+      white-space: nowrap;
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.6;
+      min-height: 38px;
+    }
+
+    .meta-row,
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 0;
+    }
+
+    .meta-chip,
+    .reward-chip {
+      border-radius: 12px;
+      font-size: 11px;
+      padding: 7px 10px;
+      border: 1px solid rgba(135, 103, 53, 0.1);
+      background: rgba(255, 252, 245, 0.92);
+      color: #5f4a36;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+
+    .reward-chip {
+      background: rgba(253, 246, 227, 0.96);
+    }
+
+    .info-tray {
+      margin-top: 12px;
+      padding: 11px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(250, 243, 228, 0.88), rgba(243, 232, 205, 0.72));
+      border: 1px solid rgba(135, 103, 53, 0.1);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+    }
+
+    .info-tray + .info-tray {
+      margin-top: 8px;
+    }
+
+    .card-footer {
+      display: flex;
+      margin-top: 10px;
+    }
+
+    .enter-button {
+      width: 100%;
+      border: none;
+      border-radius: 14px;
+      padding: 12px 15px;
+      min-width: 104px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff8ea;
+      background: linear-gradient(180deg, #d3a542, #b88420);
+      box-shadow: 0 10px 20px rgba(173, 123, 30, 0.24);
+      cursor: pointer;
+    }
+
+    .enter-button.alt {
+      background: linear-gradient(180deg, #589071, #36654e);
+      box-shadow: 0 10px 20px rgba(54, 101, 78, 0.22);
+    }
+
+    .enter-button.locked {
+      background: linear-gradient(180deg, #cabca0, #a79a84);
+      box-shadow: none;
+      cursor: default;
+    }
+
+    .enter-button.danger {
+      background: linear-gradient(180deg, #bf6b5a, #944537);
+      box-shadow: 0 10px 20px rgba(125, 55, 41, 0.22);
+    }
+
+    .card.region-card:hover,
+    .card.lianli-card:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.82),
+        0 20px 34px rgba(86, 60, 24, 0.12);
+    }
+
+    .card {
+      transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .divider {
+      height: 1px;
+      margin: 10px 0 4px;
+      background: linear-gradient(90deg, transparent, rgba(130, 98, 53, 0.2), transparent);
+    }
+
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .spec {
+      border-radius: 18px;
+      padding: 14px 16px;
+      background: rgba(255, 251, 240, 0.72);
+      border: 1px solid rgba(135, 103, 53, 0.12);
+    }
+
+    .spec strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .spec span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 980px) {
+      .grid.region,
+      .grid.lianli,
+      .spec-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page {
+        padding: 12px;
+      }
+
+      .hero,
+      .content,
+      .section {
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .title {
+        font-size: 19px;
+      }
+
+      .card-footer {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .enter-button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="shell">
+      <div class="hero">
+        <div class="eyebrow">Area Card System Preview</div>
+        <div class="hero-row">
+          <div>
+            <h1>区域卡片模板预览</h1>
+            <p>这版不是“把按钮做大”，而是把入口做成带情境感的情报卡。地区页更像宗门地图上的地点入口，历练页更像战前选择界面的区域情报卡。统一保留名字、简介、占位图和一键进入，但信息层级、状态表达和点击重心会更清楚。</p>
+          </div>
+          <div class="toolbar">
+            <button class="active" data-mode="desktop">桌面宽度</button>
+            <button data-mode="mobile">手机宽度</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="preview-frame" id="previewFrame">
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <h2 class="section-title">地区入口卡</h2>
+                <p class="section-desc">适合替换现在地区页里“炼丹坊 / 百草山 / 仙务司”这类功能入口。视觉重点是地点气质和解锁状态，点击动作保持直接，不引入二级操作。</p>
+              </div>
+              <div class="section-note">更像“去哪里”</div>
+            </div>
+
+            <div class="grid region">
+              <article class="card region-card">
+                <div class="card-image furnace">
+                  <div class="art-placeholder">
+                    <div class="image-tag">图片占位</div>
+                    <div class="art-symbol">炉</div>
+                    <div class="mist"></div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="title-row">
+                    <h3 class="title">炼丹坊</h3>
+                  </div>
+                  <p class="subtitle">炉火常明的内坊小院，适合沉心炼制丹药。学会任意丹方后，即可在此开炉。</p>
+                  <div class="info-tray">
+                    <div class="meta-row">
+                      <span class="meta-chip">已学丹方 4</span>
+                      <span class="meta-chip">生产型区域</span>
+                      <span class="meta-chip">当前空闲</span>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <button class="enter-button">进入炼丹坊</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="card region-card">
+                <div class="card-image herb">
+                  <div class="art-placeholder">
+                    <div class="image-tag">图片占位</div>
+                    <div class="art-symbol">草</div>
+                    <div class="mist"></div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="title-row">
+                    <h3 class="title">百草山</h3>
+                  </div>
+                  <p class="subtitle">山雾常年不散，草药点散布在缓坡与旧道之间。学会草药采集术后方可进入。</p>
+                  <div class="info-tray">
+                    <div class="meta-row">
+                      <span class="meta-chip">生产型区域</span>
+                      <span class="meta-chip">当前空闲</span>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <button class="enter-button locked">尚未解锁</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="card region-card">
+                <div class="card-image task">
+                  <div class="art-placeholder">
+                    <div class="image-tag">图片占位</div>
+                    <div class="art-symbol">务</div>
+                    <div class="mist"></div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="title-row">
+                    <h3 class="title">仙务司</h3>
+                  </div>
+                  <p class="subtitle">负责发布宗门杂务与每日差事。这里适合把“可领取”状态提到卡面，不只靠红点表达。</p>
+                  <div class="info-tray">
+                    <div class="meta-row">
+                      <span class="meta-chip">每日 2 项可领取</span>
+                      <span class="meta-chip">新手 1 项可领取</span>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <button class="enter-button alt">前往仙务司</button>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <h2 class="section-title">历练区域卡</h2>
+                <p class="section-desc">适合替换现在历练选择页里一排按钮。这里更强调敌情、风险、掉落和次数限制，玩家在点进去前就能读到“为什么值得打”。</p>
+              </div>
+              <div class="section-note">更像“去打什么”</div>
+            </div>
+
+            <div class="grid lianli">
+              <article class="card lianli-card">
+                <div class="card-image woodland">
+                  <div class="art-placeholder">
+                    <div class="image-tag">图片占位</div>
+                    <div class="art-symbol">林</div>
+                    <div class="mist"></div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="title-row">
+                    <h3 class="title">青梧林地外围</h3>
+                  </div>
+                  <p class="subtitle">稷安里西行三十里的青梧林地外缘，林雾稀薄，适合初入历练者。</p>
+                  <div class="info-tray">
+                    <div class="chip-row">
+                      <span class="reward-chip">敌人 Lv.1-3</span>
+                      <span class="reward-chip">建议 Lv.1-4</span>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <button class="enter-button">开始历练</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="card lianli-card">
+                <div class="card-image ruins">
+                  <div class="art-placeholder">
+                    <div class="image-tag">图片占位</div>
+                    <div class="art-symbol">丘</div>
+                    <div class="mist"></div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="title-row">
+                    <h3 class="title">白石丘原中心</h3>
+                  </div>
+                  <p class="subtitle">丘原腹心地带，夜风急厉，古驿残念与凶兽同栖，风险显著提升。</p>
+                  <div class="info-tray">
+                    <div class="chip-row">
+                      <span class="reward-chip">敌人 Lv.9-12</span>
+                      <span class="reward-chip">建议 Lv.10-13</span>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <button class="enter-button danger">开始历练</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="card lianli-card">
+                <div class="card-image cave">
+                  <div class="art-placeholder">
+                    <div class="image-tag">图片占位</div>
+                    <div class="art-symbol">洞</div>
+                    <div class="mist"></div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="title-row">
+                    <h3 class="title">破境草洞穴</h3>
+                    <span class="title-side">3 / 3</span>
+                  </div>
+                  <p class="subtitle">洞穴深处有看守者盘踞，通关后可带回破境草，是突破前最值得关注的每日目标。</p>
+                  <div class="info-tray">
+                    <div class="chip-row">
+                      <span class="reward-chip">敌人 Lv.12-14</span>
+                      <span class="reward-chip">建议 Lv.13-15</span>
+                      <span class="reward-chip">每日次数限制</span>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <button class="enter-button">开始历练</button>
+                  </div>
+                </div>
+              </article>
+
+              <article class="card lianli-card">
+                <div class="card-image tower">
+                  <div class="art-placeholder">
+                    <div class="image-tag">图片占位</div>
+                    <div class="art-symbol">塔</div>
+                    <div class="mist"></div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="title-row">
+                    <h3 class="title">南麓试练塔</h3>
+                    <span class="title-side">17层</span>
+                  </div>
+                  <p class="subtitle">逐层加压的古制试练塔，每 5 层结算奖励，更适合作为长期战力标尺，而不是普通刷图点。</p>
+                  <div class="info-tray">
+                    <div class="chip-row">
+                      <span class="reward-chip">5 层奖励</span>
+                      <span class="reward-chip">稳定战力检验</span>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <button class="enter-button alt">开始试炼</button>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <h2 class="section-title">模板要点</h2>
+                <p class="section-desc">这页预览背后的意图，不是给卡片加很多装饰，而是让玩家在点之前就读懂“这是哪里、值不值得去、现在能不能去”。</p>
+              </div>
+            </div>
+
+            <div class="spec-grid">
+              <div class="spec">
+                <strong>图片区占上半屏</strong>
+                <span>地区和历练都保留同一张大图位，先用占位图也没关系，后续只要替换 `TextureRect` 即可。</span>
+              </div>
+              <div class="spec">
+                <strong>点击重心只有一个</strong>
+                <span>卡片本体就是主入口，不再要求玩家先读一行按钮文字再决定是否进入。</span>
+              </div>
+              <div class="spec">
+                <strong>状态信息前置</strong>
+                <span>解锁条件、今日次数、当前层数、推荐度这些都提到卡片上半部，不只依赖日志或点击后反馈。</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const frame = document.getElementById("previewFrame");
+    const buttons = document.querySelectorAll("[data-mode]");
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        buttons.forEach((btn) => btn.classList.remove("active"));
+        button.classList.add("active");
+        frame.classList.toggle("mobile", button.dataset.mode === "mobile");
+      });
+    });
+  </script>
+</body>
+</html>

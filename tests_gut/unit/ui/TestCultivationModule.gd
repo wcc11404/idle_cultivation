@@ -59,6 +59,26 @@ func test_breakthrough_failure_uses_missing_resource_copy():
 	assert_false(result.get("success", true), "清空突破资源后服务端应返回突破失败")
 	assert_true(module._resolve_cultivation_result_message(result, "").begins_with("突破失败，缺少"), "突破失败时应提示缺少的资源")
 
+func test_breakthrough_material_panel_uses_fixed_three_slots():
+	var module = harness.game_ui.cultivation_module
+	var entries = module._build_breakthrough_panel_material_entries({
+		"energy_cost": 120,
+		"spirit_energy_current": 50.0,
+		"stone_cost": 30,
+		"spirit_stone_current": 30,
+		"materials": {}
+	})
+
+	assert_eq(entries.size(), 3, "突破条件面板应固定三组占位")
+	assert_eq(entries[0].get("name", ""), "消耗灵气", "第一组固定为灵气")
+	assert_eq(entries[0].get("value", ""), "120", "灵气组只显示需求数量")
+	assert_false(entries[0].get("sufficient", true), "灵气不足时数值应可标红")
+	assert_eq(entries[1].get("name", ""), "消耗灵石", "第二组固定为灵石")
+	assert_eq(entries[1].get("value", ""), "30", "灵石组只显示需求数量")
+	assert_true(entries[1].get("sufficient", false), "灵石足够时数值应保持正常色")
+	assert_eq(entries[2].get("name", ""), "", "无丹药材料时第三组名称留空占位")
+	assert_eq(entries[2].get("value", ""), "", "无丹药材料时第三组数值留空占位")
+
 func test_cultivation_repeat_start_and_unsynced_stop_have_client_copy():
 	var module = harness.game_ui.cultivation_module
 	var first_start = await harness.client.cultivation_start()

@@ -3,6 +3,7 @@ class_name SpellDetailPopup extends Panel
 const POPUP_STYLE_TEMPLATE = preload("res://scripts/ui/common/PopupStyleTemplate.gd")
 const ACTION_BUTTON_TEMPLATE = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
 const SAFE_AREA_HELPER = preload("res://scripts/ui/common/SafeAreaHelper.gd")
+const UI_FEEDBACK_MANAGER = preload("res://scripts/ui/common/UIFeedbackManager.gd")
 
 ## 术法详情弹窗 - 独立管理弹窗UI
 ## 负责显示术法详细信息、升级条件、充灵操作等
@@ -33,7 +34,6 @@ func _init():
 	name = "SpellDetailPopup"
 	visible = false
 	z_index = 100
-	set_process_input(true)
 
 func setup(parent_node: Node):
 	"""初始化弹窗，创建所有UI元素"""
@@ -51,23 +51,14 @@ func _create_background():
 	"""创建背景遮罩层"""
 	if not overlay_host:
 		return
-	background = POPUP_STYLE_TEMPLATE.create_overlay(self, Callable(), 0.62)
+	var outside_click_callback := func():
+		if get_global_rect().has_point(get_global_mouse_position()):
+			return
+		if visible:
+			close_requested.emit()
+	background = POPUP_STYLE_TEMPLATE.create_overlay(self, outside_click_callback, 0.62)
 	background.name = "SpellPopupBackground"
 	overlay_host.add_child(background)
-
-func _input(event: InputEvent) -> void:
-	# 当弹窗显示时：点击外部关闭，点击内部不关闭
-	if not visible:
-		return
-	if not (event is InputEventMouseButton):
-		return
-	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
-		return
-	var mouse_event := event as InputEventMouseButton
-	if get_global_rect().has_point(mouse_event.position):
-		return
-	close_requested.emit()
-	get_viewport().set_input_as_handled()
 
 func _create_popup_content():
 	"""创建弹窗内容"""
@@ -80,30 +71,29 @@ func _create_popup_content():
 	position = Vector2(180.0, 180.0)
 	size = Vector2(360.0, 440.0)
 	mouse_filter = Control.MOUSE_FILTER_STOP  # 阻止事件传递到背景
-	
+
+	var content_margin := POPUP_STYLE_TEMPLATE.build_decorated_popup(self, {
+		"content_name": "SpellPopupContent"
+	})
+
+	var scroll := ScrollContainer.new()
+	scroll.name = "SpellPopupScroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content_margin.add_child(scroll)
+
 	vbox = VBoxContainer.new()
 	vbox.name = "VBoxContainer"
-	vbox.layout_mode = 1
-	vbox.anchors_preset = 15
-	vbox.anchor_right = 1.0
-	vbox.anchor_bottom = 1.0
-	vbox.offset_left = 20.0
-	vbox.offset_top = 20.0
-	vbox.offset_right = -20.0
-	vbox.offset_bottom = -20.0
-	vbox.grow_horizontal = 2
-	vbox.grow_vertical = 2
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_theme_constant_override("separation", 10)
-	add_child(vbox)
+	scroll.add_child(vbox)
 	
 	# 标题
-	var title = Label.new()
-	title.name = "TitleLabel"
-	title.text = "术法详情"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 30)
-	title.add_theme_color_override("font_color", Color(0.22, 0.2, 0.18, 1))
+	var title = POPUP_STYLE_TEMPLATE.create_title_label("术法详情")
 	vbox.add_child(title)
+	vbox.add_child(POPUP_STYLE_TEMPLATE.create_title_separator())
 	
 	# 类型
 	var type_label = Label.new()
@@ -299,6 +289,15 @@ func _create_popup_content():
 	star_condition_label.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
 	vbox.add_child(star_condition_label)
 
+	var star_conditions_box = VBoxContainer.new()
+	star_conditions_box.name = "StarConditionsBox"
+	star_conditions_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	star_conditions_box.add_theme_constant_override("separation", 8)
+	vbox.add_child(star_conditions_box)
+
+	star_conditions_box.add_child(_create_star_condition_row("SameUnlock", "同名解锁道具："))
+	star_conditions_box.add_child(_create_star_condition_row("BlankJade", "空白玉简："))
+
 	vbox.add_child(_create_section_gap(8))
 	
 	# 按钮容器
@@ -333,12 +332,6 @@ func _create_popup_content():
 	button_container.add_child(close_button)
 
 func _apply_popup_theme():
-	add_theme_stylebox_override("panel", POPUP_STYLE_TEMPLATE.build_panel_style({
-		"bg_color": POPUP_STYLE_TEMPLATE.POPUP_BG_COLOR,
-		"border_color": POPUP_STYLE_TEMPLATE.POPUP_BORDER_COLOR,
-		"corner_radius": 12,
-		"border_width": 2
-	}))
 	_apply_action_button_styles()
 
 func _apply_action_button_styles():
@@ -353,13 +346,46 @@ func _apply_action_button_styles():
 	if close_button:
 		ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(close_button, close_button.custom_minimum_size, 22)
 
+func _create_star_condition_row(row_prefix: String, label_text: String) -> HBoxContainer:
+	var row = HBoxContainer.new()
+	row.name = row_prefix + "Row"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+
+	var name_label = Label.new()
+	name_label.name = row_prefix + "Label"
+	name_label.text = label_text
+	name_label.custom_minimum_size = Vector2(132, 0)
+	name_label.add_theme_font_size_override("font_size", 19)
+	name_label.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(name_label)
+
+	var value_label = Label.new()
+	value_label.name = row_prefix + "ValueLabel"
+	value_label.text = "0 / 0"
+	value_label.custom_minimum_size = Vector2(76, 0)
+	value_label.add_theme_font_size_override("font_size", 19)
+	value_label.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1))
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(value_label)
+
+	var empty_container = Control.new()
+	empty_container.name = row_prefix + "EmptyContainer"
+	empty_container.custom_minimum_size = Vector2(102, 0)
+	row.add_child(empty_container)
+	return row
+
 func show_popup():
 	"""显示弹窗"""
 	if background:
 		background.z_index = z_index - 1
-		background.visible = true
+	if get_parent():
+		get_parent().move_child(self, get_parent().get_child_count() - 1)
 	visible = true
 	_update_popup_layout()
+	if background:
+		POPUP_STYLE_TEMPLATE.play_open(background, self)
 	# 首次显示时等一帧再二次布局，避免初次高度异常
 	call_deferred("_update_popup_layout")
 
@@ -374,10 +400,18 @@ func _update_popup_layout():
 	var safe_rect := SAFE_AREA_HELPER.get_safe_inner_rect(self)
 	var viewport_size = safe_rect.size
 	var content_min_size = vbox.get_combined_minimum_size()
-	var popup_width = clamp(content_min_size.x + 40.0, 360.0, max(360.0, viewport_size.x - 40.0))
+	var popup_width = clamp(
+		content_min_size.x + 64.0,
+		POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE.x,
+		max(POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE.x, viewport_size.x - 40.0)
+	)
 	# 高度上限按屏幕 82%，并且不让无意义留白撑高
-	var max_height = max(420.0, floor(viewport_size.y * 0.82))
-	var popup_height = clamp(content_min_size.y + 34.0, 420.0, max_height)
+	var max_height = max(POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE.y, floor(viewport_size.y * 0.82))
+	var popup_height = clamp(
+		content_min_size.y + 72.0,
+		POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE.y,
+		max_height
+	)
 	var popup_pos := safe_rect.position + (safe_rect.size - Vector2(popup_width, popup_height)) * 0.5
 	position = popup_pos
 	size = Vector2(popup_width, popup_height)
@@ -385,12 +419,26 @@ func _update_popup_layout():
 func hide_popup():
 	"""隐藏弹窗"""
 	if background:
-		background.visible = false
-	visible = false
+		POPUP_STYLE_TEMPLATE.play_close(background, self, func() -> void:
+			background.visible = false
+			visible = false
+		)
+	else:
+		visible = false
 
 func is_popup_visible() -> bool:
 	"""检查弹窗是否可见"""
 	return visible
+
+func play_success_feedback() -> void:
+	if visible:
+		modulate.a = 1.0
+		scale = Vector2.ONE
+		var feedback_target: Control = vbox if vbox else self
+		UI_FEEDBACK_MANAGER.play_soft_flash(feedback_target, {
+			"flash_color": Color(1.0, 0.90, 0.54, 1.0),
+			"duration": 0.34
+		})
 
 func update_content(spell_info: Dictionary, spell_config: Dictionary, 
 					spell_system: Node, spell_data: Node, 
@@ -405,7 +453,7 @@ func update_content(spell_info: Dictionary, spell_config: Dictionary,
 	var title_label = vbox.get_node_or_null("TitleLabel")
 	if title_label:
 		title_label.text = spell_config.get("name", "")
-		title_label.modulate = _get_spell_quality_color(int(spell_info.get("quality", 0)))
+		title_label.modulate = _get_spell_rarity_color(str(spell_info.get("rarity", "fan")))
 	
 	# 更新类型
 	var type_label = vbox.get_node_or_null("TypeLabel")
@@ -632,16 +680,41 @@ func update_use_count_only(spell_info: Dictionary, spell_config: Dictionary, spe
 
 func _update_star_conditions(spell_info: Dictionary, spell_config: Dictionary, spell_data: Node):
 	var star_condition_label = vbox.get_node_or_null("StarConditionLabel")
+	var star_conditions_box = vbox.get_node_or_null("StarConditionsBox")
+	var same_unlock_row = vbox.get_node_or_null("StarConditionsBox/SameUnlockRow")
+	var same_unlock_value_label = vbox.get_node_or_null("StarConditionsBox/SameUnlockRow/SameUnlockValueLabel")
+	var blank_jade_row = vbox.get_node_or_null("StarConditionsBox/BlankJadeRow")
+	var blank_jade_label = vbox.get_node_or_null("StarConditionsBox/BlankJadeRow/BlankJadeLabel")
+	var blank_jade_value_label = vbox.get_node_or_null("StarConditionsBox/BlankJadeRow/BlankJadeValueLabel")
 	if not star_condition_label:
 		return
 	if not _is_spell_obtained(spell_info):
-		star_condition_label.text = "同名术法解锁道具 - / -"
+		star_condition_label.visible = false
+		if star_conditions_box:
+			star_conditions_box.visible = true
+		if same_unlock_value_label:
+			same_unlock_value_label.text = "- / -"
+		if same_unlock_row:
+			same_unlock_row.visible = true
+		if blank_jade_row:
+			blank_jade_row.visible = true
+		if blank_jade_label:
+			blank_jade_label.text = ""
+		if blank_jade_value_label:
+			blank_jade_value_label.text = ""
 		if star_up_button:
 			star_up_button.disabled = true
 		return
 	var current_star = int(spell_info.get("star", 0))
 	var max_star = int(spell_info.get("max_star", 5))
 	if current_star >= max_star:
+		if star_conditions_box:
+			star_conditions_box.visible = false
+		if same_unlock_row:
+			same_unlock_row.visible = false
+		if blank_jade_row:
+			blank_jade_row.visible = false
+		star_condition_label.visible = true
 		star_condition_label.text = "已达到最高星级"
 		if star_up_button:
 			star_up_button.disabled = true
@@ -654,13 +727,28 @@ func _update_star_conditions(spell_info: Dictionary, spell_config: Dictionary, s
 	var inventory_counts = _get_inventory_counts()
 	var unlock_item_id = str(spell_config.get("unlock_item_id", ""))
 	var current_unlock_count = int(inventory_counts.get(unlock_item_id, 0))
-	var lines = [
-		"同名术法解锁道具 %d / %d" % [current_unlock_count, unlock_count]
-	]
+	star_condition_label.visible = false
+	if star_conditions_box:
+		star_conditions_box.visible = true
+	if same_unlock_row:
+		same_unlock_row.visible = true
+	if same_unlock_value_label:
+		same_unlock_value_label.text = "%d / %d" % [current_unlock_count, unlock_count]
 	if star_material_count > 0:
 		var current_blank = int(inventory_counts.get("blank_jade_slip", 0))
-		lines.append("空白玉简 %d / %d" % [current_blank, star_material_count])
-	star_condition_label.text = "\n".join(lines)
+		if blank_jade_row:
+			blank_jade_row.visible = true
+		if blank_jade_label:
+			blank_jade_label.text = "空白玉简："
+		if blank_jade_value_label:
+			blank_jade_value_label.text = "%d / %d" % [current_blank, star_material_count]
+	else:
+		if blank_jade_row:
+			blank_jade_row.visible = true
+		if blank_jade_label:
+			blank_jade_label.text = ""
+		if blank_jade_value_label:
+			blank_jade_value_label.text = ""
 	if star_up_button:
 		star_up_button.disabled = not _is_spell_obtained(spell_info)
 
@@ -933,11 +1021,11 @@ func _get_element_name(element: String) -> String:
 		_:
 			return "无"
 
-func _get_spell_quality_color(quality: int) -> Color:
+func _get_spell_rarity_color(rarity: String) -> Color:
 	var game_manager = get_node_or_null("/root/GameManager")
 	var item_data = game_manager.get_item_data() if game_manager and game_manager.has_method("get_item_data") else null
-	if item_data and item_data.has_method("get_item_quality_color"):
-		return item_data.get_item_quality_color(quality)
+	if item_data and item_data.has_method("get_item_rarity_color"):
+		return item_data.get_item_rarity_color(rarity)
 	return Color(0.2, 0.2, 0.2, 1.0)
 
 func _format_spell_multiplier(value: float) -> String:
@@ -979,7 +1067,7 @@ func _create_thick_separator() -> HSeparator:
 	"""创建粗分割线，使其在不同分辨率下都能清晰显示"""
 	var separator = HSeparator.new()
 	var separator_style = StyleBoxLine.new()
-	separator_style.color = Color(0.66, 0.6, 0.5, 0.55)
+	separator_style.color = Color(0.75, 0.61, 0.34, 0.38)
 	separator_style.thickness = 2
 	separator.add_theme_stylebox_override("separator", separator_style)
 	separator.custom_minimum_size = Vector2(0, 6)

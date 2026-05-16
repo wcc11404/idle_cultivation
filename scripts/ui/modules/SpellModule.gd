@@ -3,6 +3,8 @@ class_name SpellModule extends Node
 const ACTION_LOCK_MANAGER = preload("res://scripts/utils/flow/ActionLockManager.gd")
 const SPELL_THUMBNAIL_TEMPLATE = preload("res://scripts/ui/common/SpellThumbnailTemplate.gd")
 const ACTION_BUTTON_TEMPLATE = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
+const UI_ICON_PROVIDER = preload("res://scripts/ui/common/UIIconProvider.gd")
+const UI_FEEDBACK_MANAGER = preload("res://scripts/ui/common/UIFeedbackManager.gd")
 
 signal spell_equipped(spell_id: String)
 signal spell_unequipped(spell_id: String)
@@ -33,14 +35,6 @@ var _signals_connected: bool = false
 var _scroll_vertical_step: float = 20.0
 var _touch_states := {}
 const TOUCH_SLOP := 16.0
-const ELEMENT_ICONS := {
-	"metal": "⚙",
-	"wood": "🌿",
-	"water": "💧",
-	"fire": "🔥",
-	"earth": "⛰",
-	"none": "○"
-}
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ACTION_LOCK_MANAGER.new()
@@ -168,15 +162,11 @@ func _sync_scroll_step_with_log():
 func _setup_signals():
 	if _signals_connected:
 		return
-	if spell_tab and not spell_tab.pressed.is_connected(_on_spell_tab_pressed):
-		spell_tab.pressed.connect(_on_spell_tab_pressed)
 	if spell_system and not spell_system.spell_used.is_connected(on_spell_used):
 		spell_system.spell_used.connect(on_spell_used)
 	_signals_connected = true
 
 func cleanup():
-	if spell_tab and spell_tab.pressed.is_connected(_on_spell_tab_pressed):
-		spell_tab.pressed.disconnect(_on_spell_tab_pressed)
 	if spell_detail_popup:
 		spell_detail_popup.cleanup()
 		spell_detail_popup = null
@@ -198,15 +188,10 @@ func hide_tab():
 		spell_panel.visible = false
 	_on_spell_detail_close_pressed()
 
-func _on_spell_tab_pressed():
-	if game_ui and game_ui.neishi_module:
-		game_ui.neishi_module.show_spell_panel()
-	else:
-		show_tab()
-
 func update_spell_ui():
 	if not spell_panel or not spell_system or not spell_data:
 		return
+	var started_at := Time.get_ticks_msec()
 	
 	var was_viewing_spell = current_viewing_spell
 	var was_popup_visible = false
@@ -305,7 +290,7 @@ func update_spell_ui():
 		
 		var grid = GridContainer.new()
 		grid.name = type_key + "_grid"
-		grid.columns = 5
+		grid.columns = 4
 		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_theme_constant_override("h_separation", 10)
 		grid.add_theme_constant_override("v_separation", 10)
@@ -324,6 +309,8 @@ func update_spell_ui():
 	
 	if was_popup_visible and not was_viewing_spell.is_empty() and spell_cards.has(was_viewing_spell):
 		_show_spell_detail(was_viewing_spell)
+	if game_ui and game_ui.has_method("perf_debug_log_timing"):
+		game_ui.perf_debug_log_timing("spell_ui rebuild", Time.get_ticks_msec() - started_at, "cards=%d" % spell_cards.size())
 
 func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) -> Control:
 	var card: Control
@@ -334,19 +321,22 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 		card = _create_card_template()
 	
 	var vbox = card.get_child(0) as VBoxContainer
-	var star_label = vbox.get_node_or_null("StarLabel") as Label
+	var rarity_strip = vbox.get_node_or_null("TopArea/RarityStrip") as ColorRect
+	var equipped_badge = vbox.get_node_or_null("TopArea/EquippedBadge") as PanelContainer
+	var star_badge = vbox.get_node_or_null("TopArea/StarBadge") as PanelContainer
+	var star_label = vbox.get_node_or_null("TopArea/StarBadge/StarLabel") as Label
 	var name_label = vbox.get_node_or_null("NameLabel") as Label
-	var meta_label = vbox.get_node_or_null("MetaLabel") as Label
+	var element_icon = vbox.get_node_or_null("MetaRow/MetaContent/ElementIcon") as TextureRect
+	var meta_label = vbox.get_node_or_null("MetaRow/MetaContent/MetaLabel") as Label
 	var status_label = vbox.get_node_or_null("StatusLabel") as Label
 	var button_container = vbox.get_node_or_null("ButtonContainer") as HBoxContainer
 	if not button_container:
 		return card
-	var view_btn = button_container.get_node_or_null("ViewButton") as Button
 	var equip_btn = button_container.get_node_or_null("EquipButton") as Button
 	
 	var spell_name = info.get("name", "未知术法")
-	var quality = int(info.get("quality", spell_data.get_spell_quality(spell_id) if spell_data else 0))
-	var rarity_color = _get_spell_quality_color(quality)
+	var rarity = str(info.get("rarity", spell_data.get_spell_rarity(spell_id) if spell_data else "fan"))
+	var rarity_color = _get_spell_rarity_color(rarity)
 	var star = int(data.get("star", 0))
 	var element = str(info.get("element", spell_data.get_spell_element(spell_id) if spell_data else "none"))
 	if name_label:
@@ -355,14 +345,22 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 	if star_label:
 		star_label.text = "" if star <= 0 else "★".repeat(min(star, 5))
 		star_label.visible = true
+	if element_icon:
+		element_icon.texture = UI_ICON_PROVIDER.get_spell_element_texture(element)
 	if meta_label:
-		meta_label.text = _get_element_icon(element) + "  " + _get_element_name(element)
+		meta_label.text = _get_element_name(element)
 	
 	var level = int(data.get("level", 0))
 	var obtained = bool(data.get("obtained", false)) or level > 0
 	var is_equipped = spell_system.is_spell_equipped(spell_id) if spell_system else false
 	var spell_type = info.get("type", "")
 	var is_production = (spell_type == "production")
+
+	SPELL_THUMBNAIL_TEMPLATE.apply_thumbnail_state(card as PanelContainer, rarity_color, is_equipped)
+	if rarity_strip:
+		rarity_strip.color = rarity_color
+	if equipped_badge:
+		equipped_badge.visible = is_equipped
 	
 	if status_label:
 		if not obtained or level <= 0:
@@ -375,33 +373,36 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 			else:
 				status_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))
 	
-	if view_btn:
-		ACTION_BUTTON_TEMPLATE.apply_spell_view_brown(view_btn)
-		for conn in view_btn.pressed.get_connections():
-			view_btn.pressed.disconnect(conn.callable)
-		view_btn.pressed.connect(_on_view_button_pressed.bind(spell_id))
+	if star_badge:
+		star_badge.visible = star > 0
+	if star_label:
+		star_label.text = "★%d" % min(star, 5) if star > 0 else ""
 	
 	if equip_btn:
+		for conn in equip_btn.pressed.get_connections():
+			equip_btn.pressed.disconnect(conn.callable)
+
 		if is_production:
+			button_container.visible = false
 			equip_btn.visible = false
+			equip_btn.disabled = true
 		else:
+			button_container.visible = true
 			equip_btn.visible = true
-			for conn in equip_btn.pressed.get_connections():
-				equip_btn.pressed.disconnect(conn.callable)
 			
 			if obtained and level > 0:
 				if is_equipped:
 					equip_btn.text = "卸下"
-					ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(equip_btn)
+					ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(equip_btn, Vector2.ZERO, -1, {"feedback": false})
 				else:
 					equip_btn.text = "装备"
-					ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(equip_btn)
+					ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(equip_btn, Vector2.ZERO, -1, {"feedback": false})
 				equip_btn.disabled = false
 				equip_btn.pressed.connect(_on_equip_button_pressed.bind(spell_id))
 			else:
 				equip_btn.text = "装备"
 				equip_btn.disabled = true
-				ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(equip_btn)
+				ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(equip_btn, Vector2.ZERO, -1, {"feedback": false})
 
 	_touch_states[spell_id] = {"active": false, "start_pos": Vector2.ZERO, "touch_id": -1, "moved": false}
 	for conn in card.gui_input.get_connections():
@@ -412,76 +413,167 @@ func _create_spell_card(spell_id: String, info: Dictionary, data: Dictionary) ->
 
 func _create_card_template() -> Control:
 	var card = PanelContainer.new()
-	card.custom_minimum_size = Vector2(130, 188)
+	card.custom_minimum_size = Vector2(120, 190)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	SPELL_THUMBNAIL_TEMPLATE.apply_to_card(card, {
-		"bg_color": SPELL_THUMBNAIL_TEMPLATE.DEFAULT_BG_COLOR
+		"bg_color": SPELL_THUMBNAIL_TEMPLATE.OPTIMIZED_BG_COLOR
 	})
 	
 	var vbox = VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 8)
+	vbox.add_theme_constant_override("separation", 6)
 	card.add_child(vbox)
 
-	var top_spacer = Control.new()
-	top_spacer.name = "TopSpacer"
-	top_spacer.custom_minimum_size = Vector2(0, 5)
-	vbox.add_child(top_spacer)
+	var top_area = Control.new()
+	top_area.name = "TopArea"
+	top_area.custom_minimum_size = Vector2(0, 40)
+	top_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(top_area)
 
-	var star_label = Label.new()
-	star_label.name = "StarLabel"
-	star_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	star_label.custom_minimum_size = Vector2(0, 24)
-	star_label.add_theme_font_size_override("font_size", 16)
-	star_label.add_theme_color_override("font_color", Color(0.89, 0.72, 0.21, 1.0))
-	vbox.add_child(star_label)
+	var rarity_strip = ColorRect.new()
+	rarity_strip.name = "RarityStrip"
+	rarity_strip.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	rarity_strip.offset_left = 10
+	rarity_strip.offset_top = 7
+	rarity_strip.offset_right = -10
+	rarity_strip.offset_bottom = 11
+	rarity_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_area.add_child(rarity_strip)
+
+	var equipped_badge = _create_spell_card_badge("EquippedBadge", "已装备", Color(0.90, 0.68, 0.19, 1.0))
+	equipped_badge.anchor_left = 0.0
+	equipped_badge.anchor_right = 0.0
+	equipped_badge.offset_left = 9
+	equipped_badge.offset_right = 66
+	equipped_badge.offset_top = 17
+	equipped_badge.offset_bottom = 39
+	top_area.add_child(equipped_badge)
+
+	var star_badge = _create_spell_card_badge("StarBadge", "", Color(0.96, 0.76, 0.20, 1.0))
+	star_badge.anchor_left = 1.0
+	star_badge.anchor_right = 1.0
+	star_badge.offset_left = -52
+	star_badge.offset_right = -9
+	star_badge.offset_top = 17
+	star_badge.offset_bottom = 39
+	var star_label = star_badge.get_node_or_null("StarLabel") as Label
+	if star_label:
+		star_label.add_theme_font_size_override("font_size", 12)
+	top_area.add_child(star_badge)
 	
 	var name_label = Label.new()
 	name_label.name = "NameLabel"
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_label.add_theme_font_size_override("font_size", 17)
+	name_label.custom_minimum_size = Vector2(0, 44)
+	name_label.add_theme_font_size_override("font_size", 18)
 	name_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2))
 	vbox.add_child(name_label)
+
+	var meta_row = PanelContainer.new()
+	meta_row.name = "MetaRow"
+	meta_row.custom_minimum_size = Vector2(0, 28)
+	meta_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var meta_style = _create_spell_card_style(
+		Color(1.0, 0.97, 0.88, 0.55),
+		Color(0.81, 0.73, 0.58, 0.30),
+		10,
+		1
+	)
+	meta_style.content_margin_left = 6
+	meta_style.content_margin_right = 6
+	meta_style.content_margin_top = 2
+	meta_style.content_margin_bottom = 2
+	meta_row.add_theme_stylebox_override("panel", meta_style)
+	vbox.add_child(meta_row)
+
+	var meta_content = HBoxContainer.new()
+	meta_content.name = "MetaContent"
+	meta_content.alignment = BoxContainer.ALIGNMENT_CENTER
+	meta_content.add_theme_constant_override("separation", 5)
+	meta_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	meta_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meta_row.add_child(meta_content)
+
+	var element_icon = TextureRect.new()
+	element_icon.name = "ElementIcon"
+	element_icon.custom_minimum_size = Vector2(22, 22)
+	element_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	element_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	element_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meta_content.add_child(element_icon)
 
 	var meta_label = Label.new()
 	meta_label.name = "MetaLabel"
 	meta_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	meta_label.add_theme_font_size_override("font_size", 14)
+	meta_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	meta_label.add_theme_font_size_override("font_size", 15)
 	meta_label.add_theme_color_override("font_color", Color(0.36, 0.33, 0.29, 1.0))
-	vbox.add_child(meta_label)
+	meta_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meta_content.add_child(meta_label)
 	
 	var status_label = Label.new()
 	status_label.name = "StatusLabel"
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	status_label.custom_minimum_size = Vector2(0, 24)
 	status_label.add_theme_font_size_override("font_size", 16)
 	vbox.add_child(status_label)
 	
 	var button_container = HBoxContainer.new()
 	button_container.name = "ButtonContainer"
 	button_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	button_container.add_theme_constant_override("separation", 5)
+	button_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(button_container)
-	
-	var view_button = Button.new()
-	view_button.name = "ViewButton"
-	view_button.text = "查看"
-	view_button.custom_minimum_size = Vector2(48, 30)
-	view_button.add_theme_font_size_override("font_size", 14)
-	button_container.add_child(view_button)
 	
 	var equip_button = Button.new()
 	equip_button.name = "EquipButton"
-	equip_button.custom_minimum_size = Vector2(48, 30)
+	equip_button.custom_minimum_size = Vector2(92, 31)
 	equip_button.add_theme_font_size_override("font_size", 14)
 	button_container.add_child(equip_button)
 
 	var bottom_spacer = Control.new()
 	bottom_spacer.name = "BottomSpacer"
-	bottom_spacer.custom_minimum_size = Vector2(0, 7)
+	bottom_spacer.custom_minimum_size = Vector2(0, 5)
 	vbox.add_child(bottom_spacer)
 	
 	return card
+
+func _create_spell_card_badge(node_name: String, text: String, color: Color) -> PanelContainer:
+	var badge = PanelContainer.new()
+	badge.name = node_name
+	badge.custom_minimum_size = Vector2(48, 22)
+	badge.layout_mode = 1
+	badge.anchor_top = 0.0
+	badge.anchor_bottom = 0.0
+	badge.offset_top = 17
+	badge.offset_bottom = 39
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_theme_stylebox_override("panel", _create_spell_card_style(color, color.darkened(0.18), 11, 1))
+
+	var label = Label.new()
+	label.name = "StarLabel" if node_name == "StarBadge" else "BadgeLabel"
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(1.0, 0.98, 0.90, 1.0))
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_child(label)
+	return badge
+
+func _create_spell_card_style(bg: Color, border: Color, radius: int, border_width: int) -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.set_corner_radius_all(radius)
+	style.set_border_width_all(border_width)
+	return style
 
 func _return_card_to_pool(card: Control):
 	if card.get_parent():
@@ -491,9 +583,6 @@ func _return_card_to_pool(card: Control):
 		card.visible = false
 	else:
 		card.queue_free()
-
-func _on_view_button_pressed(spell_id: String):
-	_show_spell_detail(spell_id)
 
 func _on_card_input(event: InputEvent, spell_id: String):
 	var state = _touch_states.get(spell_id, {"active": false, "start_pos": Vector2.ZERO, "touch_id": -1, "moved": false})
@@ -507,6 +596,11 @@ func _on_card_input(event: InputEvent, spell_id: String):
 			if bool(state.get("active", false)) and not bool(state.get("moved", false)):
 				_show_spell_detail(spell_id)
 			state["active"] = false
+	elif event is InputEventMouseMotion:
+		var mm := event as InputEventMouseMotion
+		if bool(state.get("active", false)):
+			if mm.position.distance_to(state.get("start_pos", Vector2.ZERO)) > TOUCH_SLOP:
+				state["moved"] = true
 	elif event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
 		if st.pressed:
@@ -564,11 +658,20 @@ func _update_spell_detail_popup():
 		display_data = data.duplicate(true)
 		if not display_data.has("id"):
 			display_data["id"] = current_viewing_spell
-	display_data["quality"] = int(info.get("quality", spell_data.get_spell_quality(current_viewing_spell) if spell_data else 0))
 	display_data["rarity"] = str(info.get("rarity", spell_data.get_spell_rarity(current_viewing_spell) if spell_data else "fan"))
 	display_data["element"] = str(info.get("element", spell_data.get_spell_element(current_viewing_spell) if spell_data else "none"))
 	display_data["max_star"] = int(info.get("max_star", spell_data.get_spell_max_star(current_viewing_spell) if spell_data else 5))
 	spell_detail_popup.update_content(display_data, info, spell_system, spell_data, current_multiplier_index, MULTIPLIERS)
+
+
+func refresh_visible_detail_popup() -> bool:
+	if not spell_detail_popup or not spell_detail_popup.is_popup_visible():
+		return false
+	if current_viewing_spell.is_empty() or not spell_system or not spell_data:
+		return false
+	_update_spell_detail_popup()
+	return true
+
 
 func _update_use_count_label_only():
 	if spell_detail_popup and not current_viewing_spell.is_empty():
@@ -618,8 +721,10 @@ func _on_spell_equip_toggle():
 		_add_log(_get_spell_result_text(result, "装备成功"))
 		spell_equipped.emit(current_viewing_spell)
 
+	var feedback_spell_id := current_viewing_spell
 	update_spell_ui()
 	_update_spell_detail_popup()
+	_play_spell_card_success_feedback(feedback_spell_id)
 	_end_action_lock("spell_equip_toggle")
 
 func _on_spell_upgrade_pressed():
@@ -629,6 +734,7 @@ func _on_spell_upgrade_pressed():
 		_add_log(_get_spell_result_text(result, "术法升级成功"))
 		await _refresh_after_spell_action()
 		_update_spell_detail_popup()
+		_play_spell_detail_success_feedback()
 		spell_upgraded.emit(current_viewing_spell)
 	else:
 		var err_msg = _get_spell_result_text(result, "升级失败")
@@ -704,6 +810,18 @@ func _refresh_after_spell_action():
 	await _refresh_spell_from_server()
 	update_spell_ui()
 
+func _play_spell_card_success_feedback(spell_id: String) -> void:
+	var card = spell_cards.get(spell_id, null)
+	if card is Control and is_instance_valid(card):
+		UI_FEEDBACK_MANAGER.play_soft_flash(card, {
+			"flash_color": Color(1.0, 0.90, 0.52, 1.0),
+			"duration": 0.34
+		})
+
+func _play_spell_detail_success_feedback() -> void:
+	if spell_detail_popup and spell_detail_popup.has_method("play_success_feedback"):
+		spell_detail_popup.play_success_feedback()
+
 func _refresh_spell_from_server():
 	if not api or not spell_system:
 		return
@@ -726,7 +844,6 @@ func _refresh_spell_from_server():
 	spell_system.apply_save_data(payload)
 	if game_ui and game_ui.has_method("update_ui"):
 		game_ui.update_ui()
-	update_spell_ui()
 
 func _get_slot_type_by_spell(spell_id: String) -> String:
 	if not spell_data:
@@ -746,15 +863,12 @@ func _get_slot_type_by_spell(spell_id: String) -> String:
 		_:
 			return "active"
 
-func _get_spell_quality_color(quality: int) -> Color:
+func _get_spell_rarity_color(rarity: String) -> Color:
 	var game_manager = get_node_or_null("/root/GameManager")
 	var item_data = game_manager.get_item_data() if game_manager and game_manager.has_method("get_item_data") else null
-	if item_data and item_data.has_method("get_item_quality_color"):
-		return item_data.get_item_quality_color(quality)
+	if item_data and item_data.has_method("get_item_rarity_color"):
+		return item_data.get_item_rarity_color(rarity)
 	return Color(0.2, 0.2, 0.2, 1.0)
-
-func _get_element_icon(element: String) -> String:
-	return ELEMENT_ICONS.get(element, ELEMENT_ICONS["none"])
 
 func _get_element_name(element: String) -> String:
 	match element:
@@ -775,7 +889,8 @@ func _add_log(message: String):
 	log_message.emit(message)
 
 func on_spell_used(spell_id: String):
-	update_spell_ui()
+	# Use count is only visible in the detail popup; rebuilding every spell card
+	# would make production loops like herb gathering pay a repeated UI cost.
 	if current_viewing_spell == spell_id:
 		_update_use_count_label_only()
 		_update_spell_detail_popup()

@@ -245,8 +245,6 @@ func _apply_local_spell_use_count(spell_id: String):
 	if not spell_system or not spell_system.has_method("add_spell_use_count"):
 		return
 	spell_system.add_spell_use_count(spell_id)
-	if game_ui and game_ui.has_method("_on_spell_used"):
-		game_ui._on_spell_used(spell_id)
 
 func _apply_report_result(report_result: Dictionary):
 	var returned_materials = report_result.get("returned_materials", {})
@@ -1231,7 +1229,10 @@ func _finish_alchemy_session(natural_finished: bool):
 		_on_alchemy_crafting_stopped(success_count, fail_count)
 	
 	if game_ui and game_ui.has_method("refresh_all_player_data"):
-		await game_ui.refresh_all_player_data()
+		await game_ui.refresh_all_player_data({
+			"priority_scope": "alchemy",
+			"defer_other_scopes": false
+		})
 
 	_end_action_lock("alchemy_stop")
 	_pending_async_task_count = maxi(0, _pending_async_task_count - 1)

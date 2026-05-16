@@ -117,15 +117,28 @@ func test_spell_detail_popup_upgrade_conditions_sync_after_unlock_and_charge():
 
 	var use_count_label = popup.vbox.get_node_or_null("UpgradeConditionsBox/UseCountRow/UseCountValueLabel") if popup and popup.vbox else null
 	var spirit_amount_label = popup.vbox.get_node_or_null("UpgradeConditionsBox/SpiritChargeRow/SpiritAmountLabel") if popup and popup.vbox else null
+	var blank_jade_row = popup.vbox.get_node_or_null("StarConditionsBox/BlankJadeRow") if popup and popup.vbox else null
+	var blank_jade_label = popup.vbox.get_node_or_null("StarConditionsBox/BlankJadeRow/BlankJadeLabel") if popup and popup.vbox else null
+	var blank_jade_value_label = popup.vbox.get_node_or_null("StarConditionsBox/BlankJadeRow/BlankJadeValueLabel") if popup and popup.vbox else null
 	assert_not_null(use_count_label, "弹窗应包含使用次数标签")
 	assert_not_null(spirit_amount_label, "弹窗应包含所需灵气标签")
+	assert_not_null(blank_jade_row, "弹窗应包含空白玉简升星条件占位行")
+	assert_true(blank_jade_row.visible, "无空白玉简需求时仍应保留占位行，避免弹窗高度跳动")
+	assert_eq(blank_jade_label.text, "", "无空白玉简需求时名称占位应为空")
+	assert_eq(blank_jade_value_label.text, "", "无空白玉简需求时数量占位应为空")
+	var level_data = module.spell_data.get_spell_level_data("basic_breathing", 1)
+	var required_spirit = int(level_data.get("spirit_cost", 0))
+	var expected_initial_charge_text = "0 / %d" % required_spirit
 	assert_eq(use_count_label.text, "0 / 100", "解锁后升级条件应同步新的术法真值配置")
-	assert_eq(spirit_amount_label.text, "0 / 1", "解锁后充灵条件不应继续显示 0 / 0")
+	assert_eq(spirit_amount_label.text, expected_initial_charge_text, "解锁后充灵条件应同步当前术法真值配置")
 
+	var player_spirit_before_charge = int(module.player.spirit_energy) if module.player else 0
 	await module._on_spell_charge_pressed()
 	await get_tree().process_frame
 
-	assert_eq(spirit_amount_label.text, "1 / 1", "充灵后弹窗应实时反映充灵进度")
+	var expected_charged_amount = mini(10, mini(required_spirit, player_spirit_before_charge))
+	var expected_charge_progress_text = "%d / %d" % [expected_charged_amount, required_spirit]
+	assert_eq(spirit_amount_label.text, expected_charge_progress_text, "充灵后弹窗应实时反映当前规则下的充灵进度")
 
 func test_spell_detail_popup_unobtained_spell_uses_level_one_preview():
 	await harness.reset_and_sync()
@@ -164,6 +177,102 @@ func test_spell_detail_popup_unobtained_spell_uses_level_one_preview():
 	assert_true(not effect_value.text.is_empty(), "未获得术法时术法效果应按1级数据展示")
 	assert_eq(use_count_label.text, "- / -", "未获得术法升级条件应保持未解锁占位文案")
 	assert_eq(spirit_amount_label.text, "- / -", "未获得术法充灵条件应保持未解锁占位文案")
+
+func test_spell_detail_popup_front_click_does_not_close_popup():
+	await harness.reset_and_sync()
+	var module = harness.game_ui.spell_module
+
+	module.current_viewing_spell = "basic_breathing"
+	module._show_spell_detail("basic_breathing")
+	await get_tree().process_frame
+
+	var popup = module.spell_detail_popup
+	assert_not_null(popup, "应创建术法详情弹窗")
+	assert_true(popup.is_popup_visible(), "术法详情弹窗应处于显示状态")
+
+	var global_point: Vector2 = popup.global_position + popup.size * 0.5
+	var click_event := InputEventMouseButton.new()
+	click_event.button_index = MOUSE_BUTTON_LEFT
+	click_event.pressed = true
+	click_event.position = global_point
+	click_event.global_position = global_point
+	popup.background.gui_input.emit(click_event)
+
+	assert_true(popup.is_popup_visible(), "点击弹窗前景区域时不应触发外部遮罩关闭")
+
+func test_spell_detail_success_feedback_keeps_popup_visible():
+	await harness.reset_and_sync()
+	var module = harness.game_ui.spell_module
+
+	module.current_viewing_spell = "basic_breathing"
+	module._show_spell_detail("basic_breathing")
+	await get_tree().process_frame
+
+	var popup = module.spell_detail_popup
+	assert_not_null(popup, "应创建术法详情弹窗")
+	assert_true(popup.is_popup_visible(), "术法详情弹窗应处于显示状态")
+
+	popup.modulate.a = 0.0
+	popup.play_success_feedback()
+	await get_tree().create_timer(0.42).timeout
+
+	assert_true(popup.is_popup_visible(), "成功反馈后弹窗仍应处于显示状态")
+	assert_true(popup.modulate.a > 0.95, "成功反馈不应把弹窗根节点留成透明")
+	assert_true(popup.vbox.modulate.a > 0.95, "成功反馈结束后内容容器应恢复可见")
+
+func test_spell_thumbnail_uses_full_card_detail_entry_and_single_action_button():
+	await harness.apply_preset_and_sync("spell_ready")
+	var module = harness.game_ui.spell_module
+	await module.show_tab()
+
+	var equipped_spell_id := ""
+	for spell_id in module.spell_system.get_player_spells().keys():
+		var spell_data = module.spell_system.get_player_spells()[spell_id]
+		var spell_info = module.spell_data.get_spell_data(str(spell_id))
+		if bool(spell_data.get("obtained", false)) and str(spell_info.get("type", "")) != "production":
+			equipped_spell_id = str(spell_id)
+			break
+	assert_false(equipped_spell_id.is_empty(), "测试前应存在一个已获得的非生产术法")
+	if equipped_spell_id.is_empty():
+		return
+	var equipped_type = str(module.spell_data.get_spell_data(equipped_spell_id).get("type", "active"))
+	module.spell_system.equipped_spells[equipped_type] = [equipped_spell_id]
+	module.update_spell_ui()
+
+	var equipped_card = module.spell_cards.get(equipped_spell_id)
+	assert_not_null(equipped_card, "术法页中应存在已装备术法卡片")
+	var equipped_vbox = equipped_card.get_child(0) if equipped_card and equipped_card.get_child_count() > 0 else null
+	assert_not_null(equipped_vbox, "术法卡片应保留根 VBox，供测试和模块定位")
+	if equipped_vbox == null:
+		return
+	assert_null(equipped_vbox.get_node_or_null("ButtonContainer/ViewButton"), "术法缩略卡不再包含查看按钮")
+
+	var equip_button = equipped_vbox.get_node_or_null("ButtonContainer/EquipButton")
+	assert_not_null(equip_button, "非生产术法应保留装备/卸下按钮")
+	assert_true(equip_button.custom_minimum_size.x >= 90.0, "单按钮布局下装备按钮应居中加宽")
+
+	var equipped_badge = equipped_vbox.get_node_or_null("TopArea/EquippedBadge")
+	assert_not_null(equipped_badge, "术法卡片应包含已装备徽章节点")
+	assert_true(equipped_badge.visible, "已装备术法应显示已装备徽章")
+
+func test_production_spell_thumbnail_hides_action_button_but_keeps_card_entry():
+	await harness.reset_and_sync()
+	var module = harness.game_ui.spell_module
+	await module.show_tab()
+
+	var production_card: Control = null
+	for spell_id in module.spell_cards.keys():
+		var spell_info = module.spell_data.get_spell_data(str(spell_id))
+		if str(spell_info.get("type", "")) == "production":
+			production_card = module.spell_cards[spell_id]
+			break
+
+	assert_not_null(production_card, "术法页中应存在生产术法卡片")
+	var vbox = production_card.get_child(0) if production_card and production_card.get_child_count() > 0 else null
+	assert_not_null(vbox, "生产术法卡片应保留根 VBox")
+	var button_container = vbox.get_node_or_null("ButtonContainer")
+	assert_not_null(button_container, "生产术法仍保留按钮容器节点，避免池化复用缺字段")
+	assert_false(button_container.visible, "生产术法卡片不显示底部按钮，详情入口统一为点击整卡")
 
 func test_spell_detail_popup_obtained_spell_uses_runtime_effect_copy():
 	await harness.reset_and_sync()

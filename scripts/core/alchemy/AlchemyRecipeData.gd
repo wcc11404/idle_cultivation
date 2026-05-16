@@ -1,11 +1,17 @@
 class_name AlchemyRecipeData extends Node
 
 var recipes: Dictionary = {}
+var _config_loaded: bool = false
+
+func _init():
+	_load_config()
 
 func _ready():
 	_load_config()
 
 func _load_config():
+	if _config_loaded:
+		return
 	var file = FileAccess.open("res://scripts/core/alchemy/recipes.json", FileAccess.READ)
 	if file:
 		var json_text = file.get_as_text()
@@ -13,6 +19,7 @@ func _load_config():
 		if data:
 			var raw_recipes = data.get("recipes", {})
 			recipes = _normalize_recipes(raw_recipes)
+			_config_loaded = true
 
 func _normalize_recipes(raw_recipes: Dictionary) -> Dictionary:
 	var normalized: Dictionary = {}

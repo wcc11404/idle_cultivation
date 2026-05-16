@@ -2,6 +2,8 @@ class_name SpellThumbnailTemplate
 extends RefCounted
 
 const DEFAULT_BG_COLOR := Color(242.0 / 255.0, 229.0 / 255.0, 204.0 / 255.0, 1.0) # #f2e5cc
+const OPTIMIZED_BG_COLOR := Color(0.96, 0.90, 0.78, 1.0)
+const EQUIPPED_BORDER_COLOR := Color(0.84, 0.63, 0.18, 1.0)
 
 static func apply_to_card(card: PanelContainer, config: Dictionary = {}) -> void:
 	if card == null:
@@ -19,3 +21,11 @@ static func apply_to_card(card: PanelContainer, config: Dictionary = {}) -> void
 	style.border_color = border_color
 	card.add_theme_stylebox_override("panel", style)
 
+static func apply_thumbnail_state(card: PanelContainer, rarity_color: Color, is_equipped: bool) -> void:
+	var border_color := EQUIPPED_BORDER_COLOR if is_equipped else rarity_color.lightened(0.22)
+	apply_to_card(card, {
+		"bg_color": OPTIMIZED_BG_COLOR,
+		"border_color": border_color,
+		"corner_radius": 10,
+		"border_width": 2
+	})

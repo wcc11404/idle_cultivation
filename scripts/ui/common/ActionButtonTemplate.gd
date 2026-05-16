@@ -1,6 +1,8 @@
 class_name ActionButtonTemplate
 extends RefCounted
 
+const UI_FEEDBACK_MANAGER = preload("res://scripts/ui/common/UIFeedbackManager.gd")
+
 const PRESET_CULTIVATION_YELLOW := "cultivation_yellow"
 const PRESET_BREAKTHROUGH_RED := "breakthrough_red"
 const PRESET_ALCHEMY_GREEN := "alchemy_green"
@@ -15,7 +17,8 @@ static func apply_to_button(
 	button: Button,
 	preset: String,
 	custom_size: Vector2 = Vector2.ZERO,
-	font_size: int = -1
+	font_size: int = -1,
+	config: Dictionary = {}
 ) -> void:
 	if not button:
 		return
@@ -47,26 +50,29 @@ static func apply_to_button(
 	button.add_theme_color_override("font_pressed_color", font_color)
 	button.add_theme_color_override("font_disabled_color", disabled_font_color)
 
-static func apply_cultivation_yellow(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1) -> void:
-	apply_to_button(button, PRESET_CULTIVATION_YELLOW, custom_size, font_size)
+	if bool(config.get("feedback", true)):
+		UI_FEEDBACK_MANAGER.bind_button_tap(button, Dictionary(config.get("feedback_config", {})))
 
-static func apply_breakthrough_red(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1) -> void:
-	apply_to_button(button, PRESET_BREAKTHROUGH_RED, custom_size, font_size)
+static func apply_cultivation_yellow(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1, config: Dictionary = {}) -> void:
+	apply_to_button(button, PRESET_CULTIVATION_YELLOW, custom_size, font_size, config)
 
-static func apply_alchemy_green(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1) -> void:
-	apply_to_button(button, PRESET_ALCHEMY_GREEN, custom_size, font_size)
+static func apply_breakthrough_red(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1, config: Dictionary = {}) -> void:
+	apply_to_button(button, PRESET_BREAKTHROUGH_RED, custom_size, font_size, config)
 
-static func apply_profile_blue(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1) -> void:
-	apply_to_button(button, PRESET_PROFILE_BLUE, custom_size, font_size)
+static func apply_alchemy_green(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1, config: Dictionary = {}) -> void:
+	apply_to_button(button, PRESET_ALCHEMY_GREEN, custom_size, font_size, config)
 
-static func apply_light_neutral(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1) -> void:
-	apply_to_button(button, PRESET_LIGHT_NEUTRAL, custom_size, font_size)
+static func apply_profile_blue(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1, config: Dictionary = {}) -> void:
+	apply_to_button(button, PRESET_PROFILE_BLUE, custom_size, font_size, config)
 
-static func apply_light_neutral_selected(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1) -> void:
-	apply_to_button(button, PRESET_LIGHT_NEUTRAL_SELECTED, custom_size, font_size)
+static func apply_light_neutral(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1, config: Dictionary = {}) -> void:
+	apply_to_button(button, PRESET_LIGHT_NEUTRAL, custom_size, font_size, config)
 
-static func apply_spell_view_brown(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1) -> void:
-	apply_to_button(button, PRESET_SPELL_VIEW_BROWN, custom_size, font_size)
+static func apply_light_neutral_selected(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1, config: Dictionary = {}) -> void:
+	apply_to_button(button, PRESET_LIGHT_NEUTRAL_SELECTED, custom_size, font_size, config)
+
+static func apply_spell_view_brown(button: Button, custom_size: Vector2 = Vector2.ZERO, font_size: int = -1, config: Dictionary = {}) -> void:
+	apply_to_button(button, PRESET_SPELL_VIEW_BROWN, custom_size, font_size, config)
 
 static func _build_style(bg_color: Color, border_color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()

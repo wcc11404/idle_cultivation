@@ -10,6 +10,7 @@ const TECHNICAL_ERROR_UI_THROTTLE_SECONDS := 2.0
 var current_token: String = ""
 var consecutive_network_failures: int = 0
 var _last_technical_error_ui_at: float = 0.0
+var perf_debug_sink: Node = null
 
 signal technical_error_for_ui(message: String)
 
@@ -44,10 +45,19 @@ func request(method: String, endpoint: String, body: Dictionary = {}, options: D
 	var attempts: int = retry_count + 1
 	var payload: Dictionary = _build_request_body(method, endpoint, body)
 	var last_result: Dictionary = {}
+	var request_started_at := Time.get_ticks_msec()
 
 	for attempt in range(attempts):
+		var attempt_started_at := Time.get_ticks_msec()
 		var result = await _request_once(method, endpoint, payload)
 		last_result = result
+		_emit_perf_debug(Time.get_ticks_msec() - attempt_started_at, {
+			"method": method,
+			"endpoint": endpoint,
+			"attempt": attempt + 1,
+			"success": bool(result.get("success", false)),
+			"response_code": int(result.get("response_code", 0))
+		})
 
 		if result.get("success", false):
 			if track_failure:
@@ -77,7 +87,6 @@ func request(method: String, endpoint: String, body: Dictionary = {}, options: D
 			_handle_invalid_token()
 
 		return result
-
 	return last_result
 
 func _build_request_body(method: String, endpoint: String, body: Dictionary) -> Dictionary:
@@ -272,3 +281,22 @@ func show_error(message: String):
 
 func _generate_operation_id() -> String:
 	return str(Time.get_unix_time_from_system()) + "-" + str(Time.get_ticks_usec()) + "-" + str(randi())
+
+func _emit_perf_debug(elapsed_ms: int, payload: Dictionary) -> void:
+	if not perf_debug_sink or not perf_debug_sink.has_method("perf_debug_log"):
+		return
+	var method := str(payload.get("method", ""))
+	var endpoint := str(payload.get("endpoint", ""))
+	var attempt := int(payload.get("attempt", 0))
+	var attempts := int(payload.get("attempts", 0))
+	var success := bool(payload.get("success", false))
+	var response_code := int(payload.get("response_code", 0))
+	var parts: Array[String] = []
+	if attempt > 0:
+		parts.append("attempt=%d" % attempt)
+	if attempts > 0:
+		parts.append("attempts=%d" % attempts)
+	if response_code > 0:
+		parts.append("code=%d" % response_code)
+	parts.append("success=%s" % ("true" if success else "false"))
+	perf_debug_sink.perf_debug_log("network %s %s %dms %s" % [method, endpoint, elapsed_ms, " ".join(parts)])

@@ -101,6 +101,10 @@ func _build_ui_if_needed():
 	ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(clear_button, clear_button.custom_minimum_size, 16)
 	top_row.add_child(clear_button)
 
+	var list_top_gap := Control.new()
+	list_top_gap.custom_minimum_size = Vector2(0, 8)
+	root_v.add_child(list_top_gap)
+
 	list_area = Control.new()
 	list_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_v.add_child(list_area)
@@ -288,6 +292,12 @@ func _on_card_input(event: InputEvent, mail_id: String):
 			if bool(state.get("active", false)) and not bool(state.get("moved", false)):
 				_open_mail_detail(mail_id)
 			state["active"] = false
+	elif event is InputEventMouseMotion:
+		var mm := event as InputEventMouseMotion
+		if bool(state.get("active", false)):
+			var distance = mm.position.distance_to(state.get("start_pos", Vector2.ZERO))
+			if distance > TOUCH_SLOP:
+				state["moved"] = true
 	elif event is InputEventScreenTouch:
 		var st := event as InputEventScreenTouch
 		if st.pressed:
@@ -339,52 +349,34 @@ func _open_mail_detail(mail_id: String):
 
 func _show_mail_popup(mail: Dictionary):
 	_close_popup_overlay()
-	var overlay := ColorRect.new()
-	overlay.name = "MailPopupOverlay"
-	overlay.color = Color(0, 0, 0, 0.25)
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	panel.add_child(overlay)
+	var overlay := _create_popup_overlay("MailPopupOverlay", 0.58, _close_popup_overlay)
 	_active_popup_overlay = overlay
 	_mail_detail_overlay = overlay
 
-	var popup = PanelContainer.new()
+	var popup = Control.new()
+	popup.name = "MailDetailPanel"
 	var viewport_size := panel.get_viewport_rect().size
-	var popup_width := minf(560.0, maxf(420.0, viewport_size.x - 40.0))
-	var popup_height := minf(760.0, maxf(520.0, viewport_size.y - 80.0))
+	var popup_width := minf(560.0, maxf(POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE.x, viewport_size.x - 40.0))
+	var popup_height := minf(760.0, maxf(POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE.y, viewport_size.y - 80.0))
 	popup.custom_minimum_size = Vector2(popup_width, popup_height)
-	popup.anchor_left = 0.5
-	popup.anchor_right = 0.5
-	popup.anchor_top = 0.5
-	popup.anchor_bottom = 0.5
-	popup.offset_left = -popup_width * 0.5
-	popup.offset_right = popup_width * 0.5
-	popup.offset_top = -popup_height * 0.5
-	popup.offset_bottom = popup_height * 0.5
+	_center_popup_panel(popup, popup.custom_minimum_size)
 	overlay.add_child(popup)
-	_apply_default_panel_style(popup)
 	popup.gui_input.connect(func(_event: InputEvent): pass)
 
-	var popup_margin := MarginContainer.new()
-	popup_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	popup_margin.add_theme_constant_override("margin_left", 14)
-	popup_margin.add_theme_constant_override("margin_top", 14)
-	popup_margin.add_theme_constant_override("margin_right", 14)
-	popup_margin.add_theme_constant_override("margin_bottom", 14)
-	popup.add_child(popup_margin)
+	var popup_margin := POPUP_STYLE_TEMPLATE.build_decorated_popup(popup, {
+		"content_name": "MailDetailContent",
+		"min_size": popup.custom_minimum_size
+	})
 
 	var root = VBoxContainer.new()
 	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_theme_constant_override("separation", 10)
 	popup_margin.add_child(root)
 
-	var title = Label.new()
+	var title = POPUP_STYLE_TEMPLATE.create_title_label()
 	title.text = str(mail.get("title", "邮件"))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 34)
-	title.add_theme_color_override("font_color", Color(0.18, 0.18, 0.18, 1.0))
 	root.add_child(title)
-	root.add_child(HSeparator.new())
+	root.add_child(POPUP_STYLE_TEMPLATE.create_title_separator())
 
 	var time_label = Label.new()
 	time_label.text = _format_time(int(mail.get("created_at", 0)))
@@ -456,7 +448,7 @@ func _show_mail_popup(mail: Dictionary):
 
 	var claim_btn = Button.new()
 	claim_btn.text = "领取"
-	claim_btn.custom_minimum_size = Vector2(170, 58)
+	claim_btn.custom_minimum_size = Vector2(150, 48)
 	var is_claimed = bool(mail.get("is_claimed", false))
 	claim_btn.visible = has_attachment
 	claim_btn.disabled = is_claimed
@@ -467,15 +459,9 @@ func _show_mail_popup(mail: Dictionary):
 
 	var del_btn = Button.new()
 	del_btn.text = "删除"
-	del_btn.custom_minimum_size = Vector2(170, 58)
+	del_btn.custom_minimum_size = Vector2(150, 48)
 	ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(del_btn, del_btn.custom_minimum_size, 24)
 	btn_row.add_child(del_btn)
-
-	var close_btn = Button.new()
-	close_btn.text = "关闭"
-	close_btn.custom_minimum_size = Vector2(170, 58)
-	ACTION_BUTTON_TEMPLATE.apply_spell_view_brown(close_btn, close_btn.custom_minimum_size, 24)
-	btn_row.add_child(close_btn)
 
 	claim_btn.pressed.connect(func():
 		_close_popup_overlay()
@@ -486,24 +472,16 @@ func _show_mail_popup(mail: Dictionary):
 		if delete_ok:
 			_close_mail_detail_overlay()
 	)
-	close_btn.pressed.connect(func():
-		_close_popup_overlay()
-	)
-	overlay.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton:
-			var mb := event as InputEventMouseButton
-			if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-				var rect := Rect2(popup.global_position, popup.size)
-				if not rect.has_point(mb.global_position):
-					_close_popup_overlay()
-	)
+	POPUP_STYLE_TEMPLATE.play_open(overlay, popup)
 
 func _claim_mail(mail_id: String):
 	var result = await api.mail_claim(mail_id)
 	if result.get("success", false):
 		log_message.emit("邮件附件领取成功")
 		if game_ui and game_ui.has_method("refresh_all_player_data"):
-			await game_ui.refresh_all_player_data()
+			await game_ui.refresh_all_player_data({
+				"priority_scope": "mail"
+			})
 	else:
 		log_message.emit("邮件附件领取失败")
 	await refresh_mail_list()
@@ -545,63 +523,40 @@ func _emit_mail_state_changed(result: Dictionary) -> void:
 
 func _close_popup_overlay():
 	if _active_popup_overlay and is_instance_valid(_active_popup_overlay):
-		_active_popup_overlay.queue_free()
+		_close_overlay_with_feedback(_active_popup_overlay)
 	_active_popup_overlay = null
 
 func _close_mail_detail_overlay():
 	if _mail_detail_overlay and is_instance_valid(_mail_detail_overlay):
-		_mail_detail_overlay.queue_free()
+		_close_overlay_with_feedback(_mail_detail_overlay)
 	_mail_detail_overlay = null
 
 func _show_confirm_popup(title: String, content: String, action: Callable, keep_current_overlay: bool = false):
 	if not keep_current_overlay:
 		_close_popup_overlay()
-	var overlay := ColorRect.new()
-	overlay.name = "MailConfirmOverlay"
-	overlay.color = Color(0, 0, 0, 0.45)
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	panel.add_child(overlay)
+	var overlay := _create_popup_overlay("MailConfirmOverlay", 0.58, _close_popup_overlay)
 	_active_popup_overlay = overlay
 
-	var popup_panel := Panel.new()
+	var popup_panel := Control.new()
 	popup_panel.name = "MailConfirmPanel"
-	popup_panel.anchor_left = 0.5
-	popup_panel.anchor_top = 0.5
-	popup_panel.anchor_right = 0.5
-	popup_panel.anchor_bottom = 0.5
-	popup_panel.offset_left = -240
-	popup_panel.offset_top = -110
-	popup_panel.offset_right = 240
-	popup_panel.offset_bottom = 110
+	popup_panel.custom_minimum_size = POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE
+	_center_popup_panel(popup_panel, popup_panel.custom_minimum_size)
 	popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	popup_panel.add_theme_stylebox_override("panel", POPUP_STYLE_TEMPLATE.build_panel_style({
-		"bg_color": POPUP_STYLE_TEMPLATE.POPUP_BG_COLOR,
-		"border_color": POPUP_STYLE_TEMPLATE.POPUP_BORDER_COLOR,
-		"corner_radius": 12,
-		"border_width": 2
-	}))
 	overlay.add_child(popup_panel)
 
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_top", 16)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_bottom", 16)
-	popup_panel.add_child(margin)
+	var margin := POPUP_STYLE_TEMPLATE.build_decorated_popup(popup_panel, {
+		"content_name": "MailConfirmContent"
+	})
 
 	var root := VBoxContainer.new()
 	root.alignment = BoxContainer.ALIGNMENT_CENTER
 	root.add_theme_constant_override("separation", 10)
 	margin.add_child(root)
 
-	var title_label_local := Label.new()
+	var title_label_local := POPUP_STYLE_TEMPLATE.create_title_label()
 	title_label_local.text = title
-	title_label_local.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label_local.add_theme_font_size_override("font_size", 26)
-	title_label_local.add_theme_color_override("font_color", Color(0.18, 0.18, 0.18, 1.0))
 	root.add_child(title_label_local)
+	root.add_child(POPUP_STYLE_TEMPLATE.create_title_separator())
 
 	var content_label_local := Label.new()
 	content_label_local.text = content
@@ -635,17 +590,42 @@ func _show_confirm_popup(title: String, content: String, action: Callable, keep_
 	cancel_btn.pressed.connect(func():
 		_close_popup_overlay()
 	)
-	overlay.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton:
-			var mb := event as InputEventMouseButton
-			if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-				var rect := Rect2(popup_panel.global_position, popup_panel.size)
-				if not rect.has_point(mb.global_position):
-					_close_popup_overlay()
-	)
+	POPUP_STYLE_TEMPLATE.play_open(overlay, popup_panel)
+
+func _create_popup_overlay(overlay_name: String, alpha: float, on_outside_click: Callable) -> ColorRect:
+	var overlay := POPUP_STYLE_TEMPLATE.create_overlay(panel, on_outside_click, alpha)
+	overlay.name = overlay_name
+	panel.add_child(overlay)
+	return overlay
+
+func _close_overlay_with_feedback(overlay: ColorRect) -> void:
+	if not overlay or not is_instance_valid(overlay):
+		return
+	var popup_panel: Control = null
+	for child in overlay.get_children():
+		if child is Control:
+			popup_panel = child as Control
+			break
+	if popup_panel:
+		POPUP_STYLE_TEMPLATE.play_close(overlay, popup_panel, func() -> void:
+			if is_instance_valid(overlay):
+				overlay.queue_free()
+		)
+	else:
+		overlay.queue_free()
 
 func _format_item_count(count: int) -> String:
 	return UIUtils.format_display_number_integer(float(count))
+
+func _center_popup_panel(popup: Control, popup_size: Vector2) -> void:
+	popup.anchor_left = 0.5
+	popup.anchor_top = 0.5
+	popup.anchor_right = 0.5
+	popup.anchor_bottom = 0.5
+	popup.offset_left = -popup_size.x * 0.5
+	popup.offset_right = popup_size.x * 0.5
+	popup.offset_top = -popup_size.y * 0.5
+	popup.offset_bottom = popup_size.y * 0.5
 
 func _apply_default_panel_style(panel_node: PanelContainer):
 	if not panel_node:

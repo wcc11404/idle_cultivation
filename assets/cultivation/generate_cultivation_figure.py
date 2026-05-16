@@ -10,7 +10,7 @@ BASE_SIZE = 200
 
 def load_ui_font(size):
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    font_path = os.path.join(project_root, "assets", "fonts", "SourceHanSansSC-VF.ttf")
+    font_path = os.path.join(project_root, "assets", "fonts", "SourceHanSansSC-Medium.otf")
     font = ImageFont.truetype(font_path, size=size)
     if hasattr(font, "set_variation_by_axes"):
         try:

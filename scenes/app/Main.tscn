@@ -464,7 +464,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 expand_mode = 1
-stretch_mode = 6
+stretch_mode = 0
 
 [node name="TopBarContent" type="HBoxContainer" parent="ContentFrame/VBoxContainer/TopBar" unique_id=1314718613]
 layout_mode = 1
@@ -476,8 +476,8 @@ grow_horizontal = 2
 alignment = 1
 
 [node name="PlayerInfo" type="HBoxContainer" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent" unique_id=790674460]
+custom_minimum_size = Vector2(170, 70)
 layout_mode = 2
-size_flags_horizontal = 3
 
 [node name="LeftSpacer" type="Control" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/PlayerInfo" unique_id=1652762232]
 custom_minimum_size = Vector2(20, 0)
@@ -520,47 +520,72 @@ offset_bottom = 12.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 24
 text = "炼气期 第1层"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="CurrencyContainer" type="HBoxContainer" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent" unique_id=872638970]
+[node name="CurrencyContainer" type="VBoxContainer" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent" unique_id=872638970]
+custom_minimum_size = Vector2(170, 70)
 layout_mode = 2
-size_flags_horizontal = 3
 size_flags_vertical = 4
-theme_override_constants/separation = 10
+theme_override_constants/separation = 4
 alignment = 1
 
-[node name="SpiritStoneIcon" type="TextureRect" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer" unique_id=175024947]
-custom_minimum_size = Vector2(45, 45)
+[node name="SpiritStoneRow" type="HBoxContainer" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer"]
+custom_minimum_size = Vector2(160, 28)
 layout_mode = 2
-size_flags_vertical = 4
+theme_override_constants/separation = 6
+alignment = 0
+
+[node name="SpiritStoneIcon" type="TextureRect" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer/SpiritStoneRow" unique_id=175024947]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="CurrencyValuesCenter" type="CenterContainer" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer" unique_id=1381048872]
-custom_minimum_size = Vector2(0, 58)
-layout_mode = 2
-size_flags_vertical = 4
-
-[node name="CurrencyValues" type="VBoxContainer" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer/CurrencyValuesCenter" unique_id=1460726171]
-layout_mode = 2
-theme_override_constants/separation = 2
-alignment = 1
-
-[node name="SpiritStoneLabel" type="Label" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer/CurrencyValuesCenter/CurrencyValues" unique_id=172021799]
+[node name="SpiritStoneNameLabel" type="Label" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer/SpiritStoneRow"]
+custom_minimum_size = Vector2(44, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
-theme_override_font_sizes/font_size = 20
-text = "灵石: 0"
+theme_override_font_sizes/font_size = 19
+text = "灵石"
 horizontal_alignment = 0
 
-[node name="ImmortalCrystalLabel" type="Label" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer/CurrencyValuesCenter/CurrencyValues" unique_id=1205177777]
+[node name="SpiritStoneLabel" type="Label" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer/SpiritStoneRow" unique_id=172021799]
+custom_minimum_size = Vector2(70, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
-theme_override_font_sizes/font_size = 20
-text = "仙晶: 0"
+theme_override_font_sizes/font_size = 19
+text = "0"
+horizontal_alignment = 0
+
+[node name="ImmortalCrystalRow" type="HBoxContainer" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer"]
+custom_minimum_size = Vector2(160, 28)
+layout_mode = 2
+theme_override_constants/separation = 6
+alignment = 0
+
+[node name="ImmortalCrystalIcon" type="TextureRect" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer/ImmortalCrystalRow"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ImmortalCrystalNameLabel" type="Label" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer/ImmortalCrystalRow"]
+custom_minimum_size = Vector2(44, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 19
+text = "仙晶"
+horizontal_alignment = 0
+
+[node name="ImmortalCrystalLabel" type="Label" parent="ContentFrame/VBoxContainer/TopBar/TopBarContent/CurrencyContainer/ImmortalCrystalRow" unique_id=1205177777]
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 19
+text = "0"
 horizontal_alignment = 0
 
 [node name="ContentPanel" type="Control" parent="ContentFrame/VBoxContainer" unique_id=1027355514]
@@ -648,9 +673,9 @@ layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -250.0
+offset_left = -262.5
 offset_top = 16.0
-offset_right = 250.0
+offset_right = 262.5
 offset_bottom = 218.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_status_panel")
@@ -1241,9 +1266,9 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -250.0
+offset_left = -262.5
 offset_top = -160.0
-offset_right = 250.0
+offset_right = 262.5
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_breakthrough_panel")
@@ -1289,25 +1314,70 @@ theme_override_constants/margin_left = 12
 
 [node name="BreakthroughMaterialsRow" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin" unique_id=178334010]
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 10
 
-[node name="BreakthroughMaterialLabel1" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow" unique_id=178334007]
+[node name="BreakthroughMaterialSlot1" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow"]
+custom_minimum_size = Vector2(170, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="BreakthroughMaterialNameLabel1" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow/BreakthroughMaterialSlot1"]
+custom_minimum_size = Vector2(88, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.27, 0.24, 0.2, 1)
 theme_override_font_sizes/font_size = 20
-text = "灵气：0 / 0"
+text = "消耗灵气"
 
-[node name="BreakthroughMaterialLabel2" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow" unique_id=178334011]
+[node name="BreakthroughMaterialLabel1" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow/BreakthroughMaterialSlot1" unique_id=178334007]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.27, 0.24, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "0"
+horizontal_alignment = 1
+
+[node name="BreakthroughMaterialSlot2" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="BreakthroughMaterialNameLabel2" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow/BreakthroughMaterialSlot2"]
+custom_minimum_size = Vector2(88, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.27, 0.24, 0.2, 1)
 theme_override_font_sizes/font_size = 20
-text = "灵石：0 / 0"
+text = "消耗灵石"
 
-[node name="BreakthroughMaterialLabel3" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow" unique_id=178334012]
+[node name="BreakthroughMaterialLabel2" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow/BreakthroughMaterialSlot2" unique_id=178334011]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.27, 0.24, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "0"
+horizontal_alignment = 1
+
+[node name="BreakthroughMaterialSlot3" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow"]
+custom_minimum_size = Vector2(170, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="BreakthroughMaterialNameLabel3" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow/BreakthroughMaterialSlot3"]
+custom_minimum_size = Vector2(88, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.27, 0.24, 0.2, 1)
 theme_override_font_sizes/font_size = 20
-text = "筑基丹：0 / 0"
+text = "筑基丹"
+
+[node name="BreakthroughMaterialLabel3" type="Label" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox/BreakthroughMaterialsMargin/BreakthroughMaterialsRow/BreakthroughMaterialSlot3" unique_id=178334012]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.27, 0.24, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "0"
+horizontal_alignment = 1
 
 [node name="BreakthroughButtonBar" type="HBoxContainer" parent="ContentFrame/VBoxContainer/ContentPanel/NeishiPanel/CultivationContainer/BreakthroughPanel/BreakthroughPanelMargin/BreakthroughPanelVBox" unique_id=178334008]
 custom_minimum_size = Vector2(0, 44)
@@ -1587,6 +1657,7 @@ theme_override_styles/hover = SubResource("StyleBoxFlat_breakthrough_button_hove
 text = "丢弃"
 
 [node name="RegionPanel" type="Control" parent="ContentFrame/VBoxContainer/ContentPanel" unique_id=143177763]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0

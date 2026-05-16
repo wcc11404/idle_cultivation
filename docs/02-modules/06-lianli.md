@@ -12,6 +12,9 @@
   - `is_in_battle`
   - `is_waiting`
   - `current_area_id`
+- 入口卡显示缓存：
+  - `game_ui.dungeon_info_cache`：每日副本剩余次数等轻量展示缓存。
+  - `lianli_system.daily_dungeon_data`：全量同步回来的每日副本真值；`refresh_all_player_data` 后会先把它回填到 `dungeon_info_cache`，再刷新卡片，避免“退出历练后卡面仍显示旧次数”。
 - 回放状态：
   - `_battle_timeline`、`_timeline_cursor`、`_timeline_elapsed`
   - `_is_timeline_running`、`_finish_in_flight`
@@ -32,7 +35,16 @@
 - 普通区：`area_1`、`area_2`、`area_3`、`area_4`
 - 每日区：`foundation_herb_cave`
 - 无尽塔：`sourth_endless_tower`
-- 按钮默认文案必须与 `areas.json` 同步（包括普通区与无尽塔），避免进入历练页时出现旧名称瞬时闪烁。
+- 历练选择页当前不再使用静态按钮，而是基于 `AreaEntryCard.gd` 动态生成 3 个分组：
+  - `普通区域`：4 张普通区域卡
+  - `每日区域`：`破境草洞穴`
+  - `特殊区域`：`南麓试练塔`
+- 卡片文案约定：
+  - 卡片图片区左上名称签统一显示玩家可见 `name`，不要显示 `图片占位`。
+  - 普通区域按钮统一为 `开始历练`
+  - `破境草洞穴` 副标题为 `今日剩余次数 x/y`
+  - `南麓试练塔` 副标题为 `当前挑战 第N层`
+  - 每日副本和试练塔虽然数据来源不同，组装 UI 时仍统一使用局部变量 `name / description`；不要引入 `tower_name` 这类特殊命名，避免同一模板出现两套字段口径。
 
 ## 功能触发流转
 
@@ -41,8 +53,8 @@
 1. 展示历练主面板。
 2. 用当前会话内记录的倍速先更新按钮文案，默认是 `1x`。
 3. 异步拉取 `speed_options`，根据服务端返回的可用倍速集合修正当前选择。
-2. 拉取副本次数与塔层信息，更新按钮文案。
-3. 根据本地运行态判断：
+4. 拉取副本次数与塔层信息，更新区域卡副标题。
+5. 根据本地运行态判断：
    - 若已在历练中，直接回到战斗面板。
    - 否则显示区域选择面板。
 
@@ -82,10 +94,13 @@
    - `-1`：首个战斗事件前主动退出，仅退出不结算。
    - `>=0`：按已播放事件做部分结算。
 2. `speed` 由客户端当前选中的倍速传入，服务端会再次校验是否合法。
-2. 成功：
+3. 成功：
    - 根据返回判断是否已完整结算。
+   - 先走 `refresh_all_player_data({"priority_scope": "lianli", "defer_other_scopes": false})` 全量同步底层模型，并把 `daily_dungeon_data` 同步进 `dungeon_info_cache`。
+   - 结算获得的掉落、术法熟练度、玩家状态等都会写入本地模型；当前只立即重建历练 UI，储纳/术法列表等隐藏页面等切页时再渲染。
+   - 如果术法详情弹窗正打开，数据同步后会单独刷新弹窗内容，避免可见详情停留在旧熟练度/升级条件。
    - 进入等待下一场或允许继续/退出。
-3. 失败：
+4. 失败：
    - 输出归一化提示。
    - 强制收敛退出战斗态，回到可恢复页面。
 
@@ -121,6 +136,9 @@
 - 切页返回后定位正确。
 - finish 失败收敛。
 - 本地气血拦截 + 服务端阻断提示。
+- 每日副本卡片分组与文案。
+- `refresh_all_player_data` 后每日副本剩余次数即时刷新。
+- 历练结算后不应出现无关的 `spell_ui rebuild` / `inventory_grid rebuild`，但打开中的术法详情弹窗应实时显示同步后的数据。
 
 ## 典型触发链路（函数级）
 
@@ -130,5 +148,6 @@
 2. 调 `api.lianli_simulate` 成功后写入 `lianli_system.is_in_lianli/current_area_id/is_in_battle`。
 3. `LianliModule._start_timeline_playback` 启动时间轴，`_process` 按帧推进事件并更新血条/日志。
 4. 时间轴结束后触发 `api.lianli_finish`。
-5. finish 成功则更新结算态并决定“继续连战/退出”；失败则强制收敛并回区域选择页。
-6. 切到其他 tab 再返回时，`on_tab_open` 依据 `lianli_system` 直接定位战斗页或选择页。
+5. finish 成功后调用 `refresh_all_player_data` 同步底层模型，只立即刷新 `lianli` scope 与可见详情弹窗。
+6. 结算态决定“继续连战/退出”；失败则强制收敛并回区域选择页。
+7. 切到其他 tab 再返回时，`on_tab_open` 依据 `lianli_system` 直接定位战斗页或选择页。

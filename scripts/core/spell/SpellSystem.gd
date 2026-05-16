@@ -228,12 +228,11 @@ func get_spell_info(spell_id: String) -> Dictionary:
 	
 	return {
 		"id": spell_id,
-		"name": config.get("name", ""),
-		"type": config.get("type", "active"),
-		"type_name": spell_data.get_spell_type_name(config.get("type", "active")),
-		"rarity": spell_data.get_spell_rarity(spell_id),
-		"quality": spell_data.get_spell_quality(spell_id),
-		"element": spell_data.get_spell_element(spell_id),
+			"name": config.get("name", ""),
+			"type": config.get("type", "active"),
+			"type_name": spell_data.get_spell_type_name(config.get("type", "active")),
+			"rarity": spell_data.get_spell_rarity(spell_id),
+			"element": spell_data.get_spell_element(spell_id),
 		"description": config.get("description", ""),
 		"obtained": player_info.obtained,
 		"level": player_info.level,

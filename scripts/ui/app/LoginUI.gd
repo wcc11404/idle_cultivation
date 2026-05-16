@@ -3,6 +3,7 @@ extends Control
 const GAME_SERVER_API_SCRIPT = preload("res://scripts/network/GameServerAPI.gd")
 const SERVER_CONFIG_SCRIPT = preload("res://scripts/network/ServerConfig.gd")
 const UI_FONT_PROVIDER = preload("res://scripts/ui/common/UIFontProvider.gd")
+const ACTION_BUTTON_TEMPLATE = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
 const CLICK_DEBOUNCE_UTILS := preload("res://scripts/utils/ClickDebounceUtils.gd")
 const CLICK_DEBOUNCE_MS := 200
 
@@ -61,6 +62,7 @@ func _ready():
 	CLICK_DEBOUNCE_UTILS.reset_action("login_ui_server_confirm_button")
 	
 	# 连接信号
+	_apply_button_templates()
 	login_button.pressed.connect(_on_login_pressed)
 	register_button.pressed.connect(_on_register_pressed)
 	server_ip_confirm_button.pressed.connect(_on_server_ip_confirm_pressed)
@@ -103,6 +105,11 @@ func check_auto_login():
 	else:
 		# 无Token，显示登录界面
 		show_message("请登录账号")
+
+func _apply_button_templates() -> void:
+	ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(login_button, login_button.custom_minimum_size, 20)
+	ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(register_button, register_button.custom_minimum_size, 20)
+	ACTION_BUTTON_TEMPLATE.apply_cultivation_yellow(server_ip_confirm_button, server_ip_confirm_button.custom_minimum_size, 20)
 
 func _on_login_pressed():
 	if not CLICK_DEBOUNCE_UTILS.should_accept("login_ui_login_button", CLICK_DEBOUNCE_MS):

@@ -4,6 +4,7 @@ class_name ChunaModule extends Node
 const ACTION_LOCK_MANAGER = preload("res://scripts/utils/flow/ActionLockManager.gd")
 const ACTION_BUTTON_TEMPLATE = preload("res://scripts/ui/common/ActionButtonTemplate.gd")
 const POPUP_STYLE_TEMPLATE = preload("res://scripts/ui/common/PopupStyleTemplate.gd")
+const UI_FEEDBACK_MANAGER = preload("res://scripts/ui/common/UIFeedbackManager.gd")
 
 # 信号
 signal item_selected(item_id: String, index: int)
@@ -58,19 +59,23 @@ var _slot_press_moved: bool = false
 var _signals_connected: bool = false
 var _discard_overlay_host: Control = null
 var _discard_confirm_overlay: ColorRect = null
-var _discard_confirm_panel: Panel = null
+var _discard_confirm_panel: Control = null
 var _discard_confirm_line1: Label = null
 var _discard_confirm_line2: Label = null
 var _discard_confirm_button: Button = null
 var _batch_use_overlay_host: Control = null
 var _batch_use_overlay: ColorRect = null
-var _batch_use_panel: Panel = null
+var _batch_use_panel: Control = null
 var _batch_use_slider: HSlider = null
 var _batch_use_count_label: Label = null
 var _batch_use_title_label: Label = null
 var _batch_use_confirm_button: Button = null
 var _batch_use_close_button: Button = null
 var _batch_use_total_count: int = 1
+var _slot_quantity_snapshot: Dictionary = {}
+var _inventory_quantity_feedback_initialized: bool = false
+var _last_detail_item_id: String = ""
+var _last_detail_count: int = -1
 
 const ACTION_COOLDOWN_SECONDS := 0.1
 var _action_lock := ACTION_LOCK_MANAGER.new()
@@ -137,6 +142,11 @@ func _get_item_name(item_id: String) -> String:
 func _get_spell_name(spell_id: String) -> String:
 	if spell_data and spell_data.has_method("get_spell_name"):
 		return spell_data.get_spell_name(spell_id)
+	var game_manager = _get_game_manager()
+	if game_manager and game_manager.has_method("get_spell_data"):
+		var spell_data_node = game_manager.get_spell_data()
+		if spell_data_node and spell_data_node.has_method("get_spell_name"):
+			return spell_data_node.get_spell_name(spell_id)
 	return spell_id
 
 func _get_recipe_name(recipe_id: String) -> String:
@@ -320,78 +330,67 @@ func _setup_discard_confirm_popup():
 	if not _discard_overlay_host:
 		return
 
-	_discard_confirm_overlay = ColorRect.new()
+	var outside_click_callback := func():
+		_hide_discard_confirm_popup()
+		_on_discard_cancelled()
+	_discard_confirm_overlay = POPUP_STYLE_TEMPLATE.create_overlay(_discard_overlay_host, outside_click_callback, 0.58)
 	_discard_confirm_overlay.name = "DiscardConfirmOverlay"
 	_discard_confirm_overlay.visible = false
-	_discard_confirm_overlay.color = Color(0, 0, 0, 0.45)
 	_discard_confirm_overlay.z_index = 1200
-	_discard_confirm_overlay.layout_mode = 1
-	_discard_confirm_overlay.anchors_preset = 15
-	_discard_confirm_overlay.anchor_right = 1.0
-	_discard_confirm_overlay.anchor_bottom = 1.0
-	_discard_confirm_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_discard_confirm_overlay.gui_input.connect(_on_discard_overlay_input)
 	_discard_overlay_host.add_child(_discard_confirm_overlay)
 
-	_discard_confirm_panel = Panel.new()
+	_discard_confirm_panel = Control.new()
 	_discard_confirm_panel.name = "DiscardConfirmPanel"
 	_discard_confirm_panel.z_index = 1201
-	_discard_confirm_panel.layout_mode = 1
-	_discard_confirm_panel.anchors_preset = 8
-	_discard_confirm_panel.anchor_left = 0.5
-	_discard_confirm_panel.anchor_top = 0.5
-	_discard_confirm_panel.anchor_right = 0.5
-	_discard_confirm_panel.anchor_bottom = 0.5
-	_discard_confirm_panel.offset_left = -170
-	_discard_confirm_panel.offset_top = -90
-	_discard_confirm_panel.offset_right = 170
-	_discard_confirm_panel.offset_bottom = 90
+	_discard_confirm_panel.custom_minimum_size = POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE
+	_center_popup_panel(_discard_confirm_panel, _discard_confirm_panel.custom_minimum_size)
 	_discard_confirm_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_discard_confirm_panel.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed:
 			_discard_confirm_panel.accept_event()
 	)
-	_discard_confirm_panel.add_theme_stylebox_override("panel", POPUP_STYLE_TEMPLATE.build_panel_style({
-		"bg_color": POPUP_STYLE_TEMPLATE.POPUP_BG_COLOR,
-		"border_color": POPUP_STYLE_TEMPLATE.POPUP_BORDER_COLOR,
-		"corner_radius": 12,
-		"border_width": 2
-	}))
 	_discard_confirm_overlay.add_child(_discard_confirm_panel)
 
-	var margin := MarginContainer.new()
-	margin.layout_mode = 1
-	margin.anchors_preset = 15
-	margin.anchor_right = 1.0
-	margin.anchor_bottom = 1.0
-	margin.add_theme_constant_override("margin_left", 18)
-	margin.add_theme_constant_override("margin_top", 16)
-	margin.add_theme_constant_override("margin_right", 18)
-	margin.add_theme_constant_override("margin_bottom", 16)
-	_discard_confirm_panel.add_child(margin)
+	var margin := POPUP_STYLE_TEMPLATE.build_decorated_popup(_discard_confirm_panel, {
+		"content_name": "DiscardConfirmContent",
+		"margin_left": 42,
+		"margin_top": 42,
+		"margin_right": 42,
+		"margin_bottom": 56
+	})
 
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 10)
+	vbox.add_theme_constant_override("separation", 14)
 	margin.add_child(vbox)
+
+	var title := POPUP_STYLE_TEMPLATE.create_title_label("丢弃确认")
+	vbox.add_child(title)
+	vbox.add_child(POPUP_STYLE_TEMPLATE.create_title_separator())
 
 	_discard_confirm_line1 = Label.new()
 	_discard_confirm_line1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_discard_confirm_line1.add_theme_font_size_override("font_size", 19)
+	_discard_confirm_line1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_discard_confirm_line1.add_theme_font_size_override("font_size", 20)
 	_discard_confirm_line1.add_theme_color_override("font_color", Color(0.24, 0.22, 0.19, 1.0))
 	vbox.add_child(_discard_confirm_line1)
 
 	_discard_confirm_line2 = Label.new()
 	_discard_confirm_line2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_discard_confirm_line2.add_theme_font_size_override("font_size", 15)
+	_discard_confirm_line2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_discard_confirm_line2.add_theme_font_size_override("font_size", 16)
 	_discard_confirm_line2.add_theme_color_override("font_color", Color(0.30, 0.27, 0.22, 1.0))
 	_discard_confirm_line2.text = "（此物品为重要物品，丢弃后无法找回）"
 	vbox.add_child(_discard_confirm_line2)
 
+	var button_gap := Control.new()
+	button_gap.custom_minimum_size = Vector2(0, 6)
+	vbox.add_child(button_gap)
+
 	_discard_confirm_button = Button.new()
 	_discard_confirm_button.name = "DiscardConfirmButton"
 	_discard_confirm_button.text = "确定丢弃"
-	_discard_confirm_button.custom_minimum_size = Vector2(170, 46)
+	_discard_confirm_button.custom_minimum_size = Vector2(300, 48)
 	ACTION_BUTTON_TEMPLATE.apply_breakthrough_red(_discard_confirm_button, _discard_confirm_button.custom_minimum_size, 18)
 	_discard_confirm_button.pressed.connect(_on_discard_confirmed)
 	vbox.add_child(_discard_confirm_button)
@@ -405,55 +404,31 @@ func _setup_batch_use_popup():
 	if not _batch_use_overlay_host:
 		return
 
-	_batch_use_overlay = ColorRect.new()
+	_batch_use_overlay = POPUP_STYLE_TEMPLATE.create_overlay(
+		_batch_use_overlay_host,
+		_hide_batch_use_popup,
+		0.58
+	)
 	_batch_use_overlay.name = "BatchUseOverlay"
 	_batch_use_overlay.visible = false
-	_batch_use_overlay.color = Color(0, 0, 0, 0.45)
 	_batch_use_overlay.z_index = 1200
-	_batch_use_overlay.layout_mode = 1
-	_batch_use_overlay.anchors_preset = 15
-	_batch_use_overlay.anchor_right = 1.0
-	_batch_use_overlay.anchor_bottom = 1.0
-	_batch_use_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_batch_use_overlay.gui_input.connect(_on_batch_use_overlay_input)
 	_batch_use_overlay_host.add_child(_batch_use_overlay)
 
-	_batch_use_panel = Panel.new()
+	_batch_use_panel = Control.new()
 	_batch_use_panel.name = "BatchUsePanel"
 	_batch_use_panel.z_index = 1201
-	_batch_use_panel.layout_mode = 1
-	_batch_use_panel.anchors_preset = 8
-	_batch_use_panel.anchor_left = 0.5
-	_batch_use_panel.anchor_top = 0.5
-	_batch_use_panel.anchor_right = 0.5
-	_batch_use_panel.anchor_bottom = 0.5
-	_batch_use_panel.offset_left = -190
-	_batch_use_panel.offset_top = -95
-	_batch_use_panel.offset_right = 190
-	_batch_use_panel.offset_bottom = 95
+	_batch_use_panel.custom_minimum_size = POPUP_STYLE_TEMPLATE.DECORATED_POPUP_MIN_SIZE
+	_center_popup_panel(_batch_use_panel, _batch_use_panel.custom_minimum_size)
 	_batch_use_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_batch_use_panel.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed:
 			_batch_use_panel.accept_event()
 	)
-	_batch_use_panel.add_theme_stylebox_override("panel", POPUP_STYLE_TEMPLATE.build_panel_style({
-		"bg_color": POPUP_STYLE_TEMPLATE.POPUP_BG_COLOR,
-		"border_color": POPUP_STYLE_TEMPLATE.POPUP_BORDER_COLOR,
-		"corner_radius": 12,
-		"border_width": 2
-	}))
 	_batch_use_overlay.add_child(_batch_use_panel)
 
-	var margin := MarginContainer.new()
-	margin.layout_mode = 1
-	margin.anchors_preset = 15
-	margin.anchor_right = 1.0
-	margin.anchor_bottom = 1.0
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_top", 14)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_bottom", 8)
-	_batch_use_panel.add_child(margin)
+	var margin := POPUP_STYLE_TEMPLATE.build_decorated_popup(_batch_use_panel, {
+		"content_name": "BatchUseContent"
+	})
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 10)
@@ -461,10 +436,11 @@ func _setup_batch_use_popup():
 
 	_batch_use_title_label = Label.new()
 	_batch_use_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_batch_use_title_label.add_theme_font_size_override("font_size", 24)
-	_batch_use_title_label.add_theme_color_override("font_color", Color(0.2, 0.2, 0.2, 1.0))
+	_batch_use_title_label.add_theme_font_size_override("font_size", 28)
+	_batch_use_title_label.add_theme_color_override("font_color", POPUP_STYLE_TEMPLATE.POPUP_TEXT_COLOR)
 	_batch_use_title_label.text = "批量使用"
 	vbox.add_child(_batch_use_title_label)
+	vbox.add_child(POPUP_STYLE_TEMPLATE.create_title_separator())
 
 	_batch_use_count_label = Label.new()
 	_batch_use_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -500,17 +476,6 @@ func _setup_batch_use_popup():
 	_batch_use_close_button.pressed.connect(_hide_batch_use_popup)
 	button_row.add_child(_batch_use_close_button)
 
-func _on_discard_overlay_input(event: InputEvent):
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_hide_discard_confirm_popup()
-		_on_discard_cancelled()
-		_discard_confirm_overlay.accept_event()
-
-func _on_batch_use_overlay_input(event: InputEvent):
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_hide_batch_use_popup()
-		_batch_use_overlay.accept_event()
-
 func _show_discard_confirm_popup(item_name: String):
 	if not _discard_confirm_overlay:
 		_setup_discard_confirm_popup()
@@ -518,7 +483,7 @@ func _show_discard_confirm_popup(item_name: String):
 		return
 	if _discard_confirm_line1:
 		_discard_confirm_line1.text = "确定要丢弃 %s 吗？" % item_name
-	_discard_confirm_overlay.visible = true
+	POPUP_STYLE_TEMPLATE.play_open(_discard_confirm_overlay, _discard_confirm_panel)
 
 func _show_batch_use_popup(total_count: int, item_name: String):
 	if not _batch_use_overlay:
@@ -534,17 +499,33 @@ func _show_batch_use_popup(total_count: int, item_name: String):
 		_batch_use_slider.step = 1
 		_batch_use_slider.value = 1
 	_update_batch_use_count_label(1)
-	_batch_use_overlay.visible = true
+	POPUP_STYLE_TEMPLATE.play_open(_batch_use_overlay, _batch_use_panel)
 
 func _hide_discard_confirm_popup(clear_log: bool = false):
-	if _discard_confirm_overlay:
-		_discard_confirm_overlay.visible = false
-	if clear_log:
+	if _discard_confirm_overlay and _discard_confirm_panel:
+		POPUP_STYLE_TEMPLATE.play_close(_discard_confirm_overlay, _discard_confirm_panel, func() -> void:
+			_discard_confirm_overlay.visible = false
+			if clear_log:
+				_on_discard_cancelled()
+		)
+	elif clear_log:
 		_on_discard_cancelled()
 
 func _hide_batch_use_popup():
-	if _batch_use_overlay:
-		_batch_use_overlay.visible = false
+	if _batch_use_overlay and _batch_use_panel:
+		POPUP_STYLE_TEMPLATE.play_close(_batch_use_overlay, _batch_use_panel, func() -> void:
+			_batch_use_overlay.visible = false
+		)
+
+func _center_popup_panel(popup: Control, popup_size: Vector2) -> void:
+	popup.anchor_left = 0.5
+	popup.anchor_top = 0.5
+	popup.anchor_right = 0.5
+	popup.anchor_bottom = 0.5
+	popup.offset_left = -popup_size.x * 0.5
+	popup.offset_right = popup_size.x * 0.5
+	popup.offset_top = -popup_size.y * 0.5
+	popup.offset_bottom = popup_size.y * 0.5
 
 func _on_batch_use_slider_changed(value: float):
 	_update_batch_use_count_label(int(value))
@@ -574,7 +555,10 @@ func show_tab():
 	update_inventory_ui()
 	# 初始化时，确保数据是最新的
 	if game_ui and bool(game_ui.get("allow_background_server_refresh")):
-		game_ui.call_deferred("refresh_all_player_data")
+		game_ui.call_deferred("refresh_all_player_data", {
+			"priority_scope": "inventory",
+			"defer_other_scopes": false
+		})
 
 # 隐藏储纳Tab
 func hide_tab():
@@ -587,6 +571,7 @@ func hide_tab():
 func setup_inventory_grid():
 	if not inventory_grid:
 		return
+	var started_at := Time.get_ticks_msec()
 	
 	# 禁用并隐藏横向滚动条
 	var scroll_container = inventory_grid.get_parent() if inventory_grid.get_parent() is ScrollContainer else null
@@ -598,6 +583,8 @@ func setup_inventory_grid():
 		var child = inventory_grid.get_child(0)
 		inventory_grid.remove_child(child)
 		child.queue_free()
+	_slot_quantity_snapshot.clear()
+	_inventory_quantity_feedback_initialized = false
 	
 	# 获取当前容量，限制最大格子数
 	var current_capacity = 40
@@ -611,8 +598,10 @@ func setup_inventory_grid():
 		var slot = _create_slot(i)
 		inventory_grid.add_child(slot)
 	
-		# 延迟到当前帧结束后再调整大小，避免在测试释放节点时留下悬空协程
-		call_deferred("_update_slot_sizes")
+	# 延迟到当前帧结束后再调整大小，避免在测试释放节点时留下悬空协程
+	call_deferred("_update_slot_sizes")
+	if game_ui and game_ui.has_method("perf_debug_log_timing"):
+		game_ui.perf_debug_log_timing("inventory_grid rebuild", Time.get_ticks_msec() - started_at, "slots=%d" % current_capacity)
 
 # 创建单个格子
 func _create_slot(index: int) -> Control:
@@ -776,6 +765,7 @@ func update_inventory_ui():
 	
 	# 更新格子显示
 	var item_list = inventory.get_item_list() if inventory else []
+	var next_snapshot: Dictionary = {}
 	
 	for child in inventory_grid.get_children():
 		var index = child.get_meta("index", -1)
@@ -796,17 +786,24 @@ func update_inventory_ui():
 				var count = int(item.get("count", 0))
 				var item_info = item_data.get_item_data(item_id) if item_data else {}
 				var item_name = item_info.get("name", "未知")
-				var quality = int(item_info.get("quality", 0))
+				var rarity = str(item_info.get("rarity", "fan"))
+				next_snapshot[index] = {
+					"id": item_id,
+					"count": count
+				}
 				
 				if name_label:
 					name_label.text = item_name
-					name_label.add_theme_color_override("font_color", _get_display_quality_color(quality))
+					name_label.add_theme_color_override("font_color", _get_display_rarity_color(rarity))
 				if count_label:
 					if count > 1:
 						count_label.text = "x" + UIUtils.format_display_number_integer(float(count))
 					else:
 						count_label.text = ""
 				_apply_slot_visual(child, false, index == current_selected_index)
+				_play_slot_quantity_feedback_if_needed(child, index, item_id, count)
+	_slot_quantity_snapshot = next_snapshot
+	_inventory_quantity_feedback_initialized = true
 
 func _refresh_slot_visuals():
 	if not inventory or not inventory_grid:
@@ -820,6 +817,26 @@ func _refresh_slot_visuals():
 		var item = item_list[index]
 		var is_empty = item == null or item.get("empty", true)
 		_apply_slot_visual(child, is_empty, index == current_selected_index)
+
+func _play_slot_quantity_feedback_if_needed(slot: Control, index: int, item_id: String, count: int) -> void:
+	if not _inventory_quantity_feedback_initialized or not chuna_panel or not chuna_panel.visible:
+		return
+	var previous = _slot_quantity_snapshot.get(index, {})
+	if not (previous is Dictionary):
+		return
+	var previous_id := str(previous.get("id", ""))
+	var previous_count := int(previous.get("count", -1))
+	if previous_id != item_id or previous_count == count:
+		return
+	var direction := 1 if count > previous_count else -1
+	var count_label = slot.get_node_or_null("CountLabel") as Label
+	if count_label and not count_label.text.is_empty():
+		UI_FEEDBACK_MANAGER.play_value_bump(count_label, direction)
+	else:
+		UI_FEEDBACK_MANAGER.play_soft_flash(slot, {
+			"flash_color": Color(1.0, 0.90, 0.58, 1.0) if direction > 0 else Color(0.82, 0.70, 0.62, 1.0),
+			"duration": 0.24
+		})
 
 func _apply_slot_visual(slot: Control, is_empty: bool, is_selected: bool):
 	if not slot:
@@ -845,12 +862,22 @@ func _apply_slot_visual(slot: Control, is_empty: bool, is_selected: bool):
 		sb.border_color = SLOT_BORDER_SELECTED if is_selected else SLOT_BORDER_DEFAULT
 		border.add_theme_stylebox_override("panel", sb)
 
-# 获取显示用的品质颜色（确保足够亮度）
-func _get_display_quality_color(quality: int) -> Color:
-	if not item_data or not item_data.has_method("get_item_quality_color"):
+# 获取显示用的稀有度颜色（确保足够亮度）
+func _get_display_rarity_color(rarity: String) -> Color:
+	if not item_data or not item_data.has_method("get_item_rarity_color"):
 		return Color(0.12, 0.12, 0.12, 1)
 	
-	return item_data.get_item_quality_color(quality)
+	return item_data.get_item_rarity_color(rarity)
+
+func _play_detail_count_feedback_if_needed(detail_count: Label, item_id: String, count: int) -> void:
+	if not detail_count or not chuna_panel or not chuna_panel.visible:
+		_last_detail_item_id = item_id
+		_last_detail_count = count
+		return
+	if _last_detail_item_id == item_id and _last_detail_count >= 0 and _last_detail_count != count:
+		UI_FEEDBACK_MANAGER.play_value_bump(detail_count, 1 if count > _last_detail_count else -1)
+	_last_detail_item_id = item_id
+	_last_detail_count = count
 
 # 显示物品详情
 func _show_item_detail(index: int):
@@ -872,7 +899,7 @@ func _show_item_detail(index: int):
 	var item_info = item_data.get_item_data(item_id) if item_data else {}
 	var item_name = item_info.get("name", "未知")
 	var description = item_info.get("description", "")
-	var quality = item_info.get("quality", 0)
+	var rarity = str(item_info.get("rarity", "fan"))
 	var type = item_info.get("type", 0)
 	
 	var detail_name = item_detail_panel.get_node_or_null("VBoxContainer/MainHBox/InfoVBox/DetailName")
@@ -886,7 +913,7 @@ func _show_item_detail(index: int):
 	
 	if detail_name:
 		detail_name.text = item_name
-		detail_name.modulate = _get_display_quality_color(quality)
+		detail_name.modulate = _get_display_rarity_color(rarity)
 	if detail_desc:
 		detail_desc.text = description
 	if detail_type:
@@ -896,6 +923,7 @@ func _show_item_detail(index: int):
 		detail_type.text = "类型: " + type_str
 	if detail_count:
 		detail_count.text = "数量: " + UIUtils.format_display_number(float(count))
+		_play_detail_count_feedback_if_needed(detail_count, item_id, count)
 	
 	# 隐藏装备属性显示（暂无装备类物品）
 	if detail_stats:
@@ -985,6 +1013,8 @@ func _clear_item_detail_panel():
 	
 	current_selected_index = -1
 	current_selected_item_id = ""
+	_last_detail_item_id = ""
+	_last_detail_count = -1
 	_refresh_slot_visuals()
 
 func _begin_action_lock(action_key: String) -> bool:
@@ -1025,9 +1055,46 @@ func _apply_local_unlock_result(result: Dictionary):
 	if game_ui and game_ui.spell_module:
 		game_ui.spell_module.update_spell_ui()
 
+func _apply_local_inventory_use_result(result: Dictionary) -> void:
+	if not inventory:
+		return
+	if not result.get("success", false):
+		return
+	var reason_data = result.get("reason_data", {})
+	if not (reason_data is Dictionary):
+		return
+	var item_id := str(reason_data.get("item_id", ""))
+	var used_count := int(reason_data.get("used_count", reason_data.get("completed_count", 0)))
+	if not item_id.is_empty() and used_count > 0 and inventory.has_method("remove_item"):
+		inventory.remove_item(item_id, used_count)
+
+	var contents = reason_data.get("contents", {})
+	if contents is Dictionary and not contents.is_empty() and inventory.has_method("add_item"):
+		if game_ui and game_ui.has_method("begin_silent_item_added_logs"):
+			game_ui.begin_silent_item_added_logs()
+		for content_item_id in contents.keys():
+			var count := int(contents[content_item_id])
+			if count > 0:
+				inventory.add_item(str(content_item_id), count)
+		if game_ui and game_ui.has_method("end_silent_item_added_logs"):
+			game_ui.end_silent_item_added_logs()
+
+	update_inventory_ui()
+	if preserve_selected_item_after_local_change(item_id):
+		_restore_selected_item_detail_if_possible()
+	else:
+		_clear_item_detail_panel()
+	if game_ui and game_ui.has_method("update_ui"):
+		game_ui.update_ui()
+
+func preserve_selected_item_after_local_change(item_id: String) -> bool:
+	return not item_id.is_empty() and inventory and inventory.get_item_count(item_id) > 0
+
 func _refresh_after_inventory_action(preserve_selection: bool = true):
 	if game_ui and game_ui.has_method("refresh_all_player_data"):
-		await game_ui.refresh_all_player_data()
+		await game_ui.refresh_all_player_data({
+			"priority_scope": "inventory"
+		})
 	else:
 		await _refresh_inventory_from_server()
 	if preserve_selection:
@@ -1089,10 +1156,10 @@ func _on_use_button_pressed():
 		return
 
 	item_used.emit(item_id)
-	_apply_local_unlock_result(result)
+	_apply_local_inventory_use_result(result)
+	_add_log(_get_inventory_result_message(result, "使用成功"))
 	
 	await _refresh_after_inventory_action(true)
-	_add_log(_get_inventory_result_message(result, "使用成功"))
 
 	_end_action_lock("inventory_use")
 
@@ -1144,13 +1211,13 @@ func _perform_batch_use(use_count: int):
 	else:
 		for i in range(success_count):
 			item_used.emit(item_id)
-		_apply_local_unlock_result(result)
+		_apply_local_inventory_use_result(result)
+		if success_count > 0:
+			var item_name = _get_item_name(item_id)
+			_add_log("%s批量使用成功 x%s" % [item_name, UIUtils.format_display_number_integer(float(success_count))])
 
 	await _refresh_after_inventory_action(true)
 
-	if success_count > 0:
-		var item_name = _get_item_name(item_id)
-		_add_log("%s批量使用成功 x%s" % [item_name, UIUtils.format_display_number_integer(float(success_count))])
 	if not first_error.is_empty():
 		_add_log(first_error)
 

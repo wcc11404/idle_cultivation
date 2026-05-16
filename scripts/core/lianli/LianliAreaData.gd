@@ -3,11 +3,17 @@ class_name LianliAreaData extends Node
 var NORMAL_AREAS: Dictionary = {}
 var DAILY_AREAS: Dictionary = {}
 var TOWER_CONFIG: Dictionary = {}
+var _config_loaded: bool = false
+
+func _init():
+	_load_config()
 
 func _ready():
 	_load_config()
 
 func _load_config():
+	if _config_loaded:
+		return
 	var file = FileAccess.open("res://scripts/core/lianli/areas.json", FileAccess.READ)
 	if file:
 		var json_text = file.get_as_text()
@@ -20,6 +26,7 @@ func _load_config():
 			_convert_area_data_types(NORMAL_AREAS)
 			_convert_area_data_types(DAILY_AREAS)
 			_convert_tower_data_types()
+			_config_loaded = true
 
 func _convert_area_data_types(areas: Dictionary):
 	for area_id in areas.keys():

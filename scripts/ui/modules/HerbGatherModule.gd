@@ -426,9 +426,13 @@ func _do_report_once():
 			_report_timer = 0.0
 			_update_button_states()
 			_update_progress_visual()
-		return
+			return
 
 	_report_time_invalid_prompted = false
+	# The next gather timer should resume as soon as the server accepts this report.
+	# Local inventory/log/spell UI sync below is presentation work and should not
+	# extend the network in-flight window for the production loop.
+	_report_in_flight = false
 	var drops_gained = result.get("drops_gained", {})
 	if drops_gained is Dictionary and inventory and inventory.has_method("add_item"):
 		if game_ui and game_ui.has_method("begin_silent_item_added_logs"):
@@ -447,5 +451,3 @@ func _apply_local_spell_use_count(spell_id: String):
 	if not spell_system or not spell_system.has_method("add_spell_use_count"):
 		return
 	spell_system.add_spell_use_count(spell_id)
-	if game_ui and game_ui.has_method("_on_spell_used"):
-		game_ui._on_spell_used(spell_id)

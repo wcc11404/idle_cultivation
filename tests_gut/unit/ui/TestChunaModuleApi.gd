@@ -95,6 +95,7 @@ func test_use_spell_book_after_opening_pack_unlocks_spell_message():
 	await module._on_use_button_pressed()
 
 	assert_true(harness.last_log().contains("术法"), "术法书应输出客户端翻译后的术法提示，实际为: %s" % harness.last_log())
+	assert_false(harness.last_log().contains("未知术法"), "术法书提示不应退化为未知术法，实际为: %s" % harness.last_log())
 
 func test_use_spell_book_updates_local_spell_state_immediately():
 	var module = harness.game_ui.chuna_module
@@ -123,6 +124,11 @@ func test_use_spell_book_updates_local_spell_state_immediately():
 	var status_label = card_vbox.get_node_or_null("StatusLabel") if card_vbox else null
 	assert_not_null(status_label, "术法卡片应包含状态文案")
 	assert_eq(status_label.text, "Lv.1", "使用术法书后术法卡片不应继续显示未获取")
+
+func test_spell_static_config_is_ready_when_main_ui_enters():
+	assert_not_null(harness.game_ui.spell_data_ref, "主界面进入时应已持有术法静态配置引用")
+	assert_not_null(harness.game_ui.chuna_module.spell_data, "储纳模块初始化时应已拿到术法静态配置")
+	assert_true(harness.game_ui.spell_data_ref.SPELLS.size() > 0, "进入主界面时术法配置应已完成加载")
 
 func test_item_detail_panel_shows_mapped_item_type():
 	var module = harness.game_ui.chuna_module

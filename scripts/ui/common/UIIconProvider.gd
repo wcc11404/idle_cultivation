@@ -1,9 +1,25 @@
 class_name UIIconProvider
 extends RefCounted
 
-const ICON_SPIRIT_STONE := "res://assets/ui/icon_spirit_stone.svg"
-const ICON_AUDIO_ON := "res://assets/ui/icon_audio_on.svg"
-const ICON_AUDIO_OFF := "res://assets/ui/icon_audio_off.svg"
+const ICON_SPIRIT_STONE := "res://assets/icon/icon_item_spirit_stone.png"
+const ICON_IMMORTAL_CRYSTAL := "res://assets/icon/icon_item_immortal_crystal.png"
+const ICON_AUDIO_ON := "res://assets/icon/icon_audio_on.png"
+const ICON_AUDIO_OFF := "res://assets/icon/icon_audio_mute.png"
+const ICON_SPELL_ELEMENT_NONE := "res://assets/icon/icon_spell_element_none.png"
+const ICON_SPELL_ELEMENT_METAL := "res://assets/icon/icon_spell_element_metal.png"
+const ICON_SPELL_ELEMENT_WOOD := "res://assets/icon/icon_spell_element_wood.png"
+const ICON_SPELL_ELEMENT_WATER := "res://assets/icon/icon_spell_element_water.png"
+const ICON_SPELL_ELEMENT_FIRE := "res://assets/icon/icon_spell_element_fire.png"
+const ICON_SPELL_ELEMENT_EARTH := "res://assets/icon/icon_spell_element_earth.png"
+
+const SPELL_ELEMENT_ICON_PATHS := {
+	"none": ICON_SPELL_ELEMENT_NONE,
+	"metal": ICON_SPELL_ELEMENT_METAL,
+	"wood": ICON_SPELL_ELEMENT_WOOD,
+	"water": ICON_SPELL_ELEMENT_WATER,
+	"fire": ICON_SPELL_ELEMENT_FIRE,
+	"earth": ICON_SPELL_ELEMENT_EARTH
+}
 
 static var _cache: Dictionary = {}
 
@@ -11,11 +27,18 @@ static func load_svg_texture(path: String) -> Texture2D:
 	if _cache.has(path):
 		return _cache[path]
 
+	if path.to_lower().ends_with(".png"):
+		var png_texture := _load_png_texture(path)
+		if png_texture:
+			_cache[path] = png_texture
+		return png_texture
+
 	# 1) 优先走 Godot 资源导入链路（跨平台最稳定，Android 推荐）
-	var imported: Resource = load(path)
-	if imported is Texture2D:
-		_cache[path] = imported
-		return imported
+	if FileAccess.file_exists(path + ".import"):
+		var imported: Resource = load(path)
+		if imported is Texture2D:
+			_cache[path] = imported
+			return imported
 
 	# 2) 回退：运行时 SVG 解析（桌面可用，移动端可能失败）
 	var svg_source := FileAccess.get_file_as_string(path)
@@ -43,3 +66,20 @@ static func load_svg_texture(path: String) -> Texture2D:
 	var texture := ImageTexture.create_from_image(image)
 	_cache[path] = texture
 	return texture
+
+static func _load_png_texture(path: String) -> Texture2D:
+	if FileAccess.file_exists(path + ".import"):
+		var imported: Resource = load(path)
+		if imported is Texture2D:
+			return imported
+	var image := Image.new()
+	var err := image.load(path)
+	if err != OK:
+		push_warning("Failed to load PNG icon: %s" % path)
+		return null
+	return ImageTexture.create_from_image(image)
+
+static func get_spell_element_texture(element: String) -> Texture2D:
+	var normalized := String(element).to_lower()
+	var path := str(SPELL_ELEMENT_ICON_PATHS.get(normalized, ICON_SPELL_ELEMENT_NONE))
+	return load_svg_texture(path)

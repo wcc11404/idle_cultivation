@@ -10,26 +10,49 @@ enum ItemType {
 	UNLOCK_FURNACE = 6,
 }
 
-const QUALITY_COLORS: Array = [
-	Color("#111111"),
-	Color("#1F6A25"),
-	Color("#00BFFF"),
-	Color("#EE82EE"),
-	Color.ORANGE
-]
+const RARITY_ORDER := {
+	"fan": 0,
+	"huang": 1,
+	"xuan": 2,
+	"di": 3,
+	"tian": 4
+}
+
+const RARITY_COLORS := {
+	"fan": Color("#111111"),
+	"huang": Color("#1F6A25"),
+	"xuan": Color("#00BFFF"),
+	"di": Color("#EE82EE"),
+	"tian": Color.ORANGE
+}
+
+const RARITY_NAMES := {
+	"fan": "凡",
+	"huang": "黄",
+	"xuan": "玄",
+	"di": "地",
+	"tian": "天"
+}
 
 var item_data: Dictionary = {}
+var _config_loaded: bool = false
+
+func _init():
+	_load_config()
 
 func _ready():
 	_load_config()
 
 func _load_config():
+	if _config_loaded:
+		return
 	var file = FileAccess.open("res://scripts/core/inventory/items.json", FileAccess.READ)
 	if file:
 		var json_text = file.get_as_text()
 		var data = JSON.parse_string(json_text)
 		if data:
 			item_data = data.get("items", {})
+			_config_loaded = true
 
 func get_item_data(item_id: String) -> Dictionary:
 	return item_data.get(item_id, {})
@@ -38,10 +61,21 @@ func get_item_name(item_id: String) -> String:
 	var data = get_item_data(item_id)
 	return data.get("name", "未知物品")
 
-func get_item_quality_color(quality: int) -> Color:
-	if quality >= 0 and quality < QUALITY_COLORS.size():
-		return QUALITY_COLORS[quality]
-	return QUALITY_COLORS[0]
+func normalize_rarity(rarity: String) -> String:
+	var normalized := rarity.to_lower()
+	return normalized if RARITY_ORDER.has(normalized) else "fan"
+
+func get_rarity_rank(rarity: String) -> int:
+	return int(RARITY_ORDER.get(normalize_rarity(rarity), 0))
+
+func get_rarity_color(rarity: String) -> Color:
+	return Color(RARITY_COLORS.get(normalize_rarity(rarity), RARITY_COLORS["fan"]))
+
+func get_rarity_display_name(rarity: String) -> String:
+	return str(RARITY_NAMES.get(normalize_rarity(rarity), RARITY_NAMES["fan"]))
+
+func get_item_rarity_color(rarity: String) -> Color:
+	return get_rarity_color(rarity)
 
 func get_item_type(item_id: String) -> int:
 	var data = get_item_data(item_id)
@@ -86,9 +120,12 @@ func get_item_icon(item_id: String) -> String:
 	var data = get_item_data(item_id)
 	return data.get("icon", "")
 
-func get_item_quality(item_id: String) -> int:
+func get_item_rarity(item_id: String) -> String:
 	var data = get_item_data(item_id)
-	return int(data.get("quality", 0))
+	return normalize_rarity(str(data.get("rarity", "fan")))
+
+func get_item_rarity_rank(item_id: String) -> int:
+	return get_rarity_rank(get_item_rarity(item_id))
 
 func get_item_effect(item_id: String) -> Dictionary:
 	var data = get_item_data(item_id)
@@ -113,8 +150,8 @@ func get_use_text(item_id: String) -> String:
 
 func is_important(item_id: String) -> bool:
 	var data = get_item_data(item_id)
-	var quality = data.get("quality", 0)
-	return quality >= 4
+	var rarity = str(data.get("rarity", "fan"))
+	return get_rarity_rank(rarity) >= get_rarity_rank("tian")
 
 func is_currency(item_id: String) -> bool:
 	return get_item_type(item_id) == ItemType.CURRENCY

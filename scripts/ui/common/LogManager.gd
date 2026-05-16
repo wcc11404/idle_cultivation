@@ -5,12 +5,16 @@ signal log_added(message: String)
 enum LogType {
 	SYSTEM,    # 系统消息
 	BATTLE,    # 战斗消息
-	PRODUCTION # 生产消息（炼丹/采集）
+	PRODUCTION, # 生产消息（炼丹/采集）
+	DEBUG      # 调试/性能诊断消息
 }
 
 var log_messages: Array = []
 var max_log_count: int = 500
-var current_filter: String = "all" # all/system/battle/production
+var current_filter: String = "all" # all/system/battle/production/debug
+var perf_debug_enabled: bool = false
+var _perf_render_metric_inflight: bool = false
+const PERF_RENDER_LOG_THRESHOLD_MS := 120
 
 var rich_text_label: RichTextLabel = null
 
@@ -31,7 +35,7 @@ func set_max_log_count(value: int):
 
 func set_filter(filter_key: String):
 	var normalized = String(filter_key).to_lower()
-	if normalized != "all" and normalized != "system" and normalized != "battle" and normalized != "production":
+	if normalized != "all" and normalized != "system" and normalized != "battle" and normalized != "production" and normalized != "debug":
 		normalized = "all"
 	current_filter = normalized
 	_update_display()
@@ -50,6 +54,10 @@ func add_battle_log(message: String):
 # 添加生产消息（炼丹/采集）
 func add_production_log(message: String):
 	_add_log_internal(message, LogType.PRODUCTION)
+
+# 添加调试消息（性能诊断专用）
+func add_debug_log(message: String):
+	_add_log_internal(message, LogType.DEBUG)
 
 func _add_log_internal(message: String, log_type: LogType):
 	var timestamp = _get_timestamp()
@@ -85,6 +93,8 @@ func _get_type_tag(log_type: LogType) -> String:
 			return "[战斗]"
 		LogType.PRODUCTION:
 			return "[生产]"
+		LogType.DEBUG:
+			return "[调试]"
 		_:
 			return "[系统]"
 
@@ -101,7 +111,7 @@ func _format_message(message: String, log_type: LogType) -> String:
 		result = result.replace("失败", "[color=#CD5C5C]失败[/color]")  # 柔和红色
 		result = result.replace("离线总计时间", "[color=#B8860B]离线总计时间[/color]")  # 深金色
 	# 战斗消息高亮（使用柔和的颜色）
-	else:
+	elif log_type == LogType.BATTLE:
 		# 高亮玩家和敌人
 		result = result.replace("玩家使用", "[color=#4169E1]玩家[/color]使用")
 		result = result.replace("对玩家造成", "对[color=#4169E1]玩家[/color]造成")
@@ -110,6 +120,8 @@ func _format_message(message: String, log_type: LogType) -> String:
 		result = result.replace("点伤害", "[color=#CD5C5C]点伤害[/color]")
 		result = result.replace("成功", "[color=#6B8E23]成功[/color]")
 		result = result.replace("失败", "[color=#CD5C5C]失败[/color]")
+	elif log_type == LogType.DEBUG:
+		result = "[color=#7A5D20]" + result + "[/color]"
 	
 	return result
 
@@ -139,6 +151,7 @@ func _highlight_reward(message: String, keyword: String, color: String) -> Strin
 func _update_display():
 	if not rich_text_label:
 		return
+	var started_at := Time.get_ticks_msec()
 	
 	var full_text = ""
 	for log_msg in log_messages:
@@ -147,10 +160,15 @@ func _update_display():
 		full_text += log_msg.timestamp + log_msg.type_tag + " " + log_msg.formatted_message + "\n"
 	
 	rich_text_label.text = full_text
+	var elapsed_ms := Time.get_ticks_msec() - started_at
+	if perf_debug_enabled and elapsed_ms >= PERF_RENDER_LOG_THRESHOLD_MS and not _perf_render_metric_inflight:
+		_perf_render_metric_inflight = true
+		add_debug_log("log_render %dms visible_lines=%d filter=%s" % [elapsed_ms, full_text.count("\n"), current_filter])
+		_perf_render_metric_inflight = false
 
 func _passes_filter(log_msg: Dictionary) -> bool:
 	if current_filter == "all":
-		return true
+		return int(log_msg.get("type", LogType.SYSTEM)) != LogType.DEBUG
 	var log_type = int(log_msg.get("type", LogType.SYSTEM))
 	match current_filter:
 		"system":
@@ -159,6 +177,8 @@ func _passes_filter(log_msg: Dictionary) -> bool:
 			return log_type == LogType.BATTLE
 		"production":
 			return log_type == LogType.PRODUCTION
+		"debug":
+			return log_type == LogType.DEBUG
 		_:
 			return true
 
@@ -168,3 +188,36 @@ func clear_logs():
 
 func get_logs() -> Array:
 	return log_messages.duplicate()
+
+
+func get_plain_text_for_filter(filter_key: String, max_lines: int = 0) -> String:
+	var normalized = String(filter_key).to_lower()
+	var lines: Array[String] = []
+	for log_msg in log_messages:
+		if not _passes_filter_for_key(log_msg, normalized):
+			continue
+		lines.append("%s%s %s" % [
+			str(log_msg.get("timestamp", "")),
+			str(log_msg.get("type_tag", "")),
+			str(log_msg.get("raw_message", ""))
+		])
+	if max_lines > 0 and lines.size() > max_lines:
+		lines = lines.slice(lines.size() - max_lines, lines.size())
+	return "\n".join(lines)
+
+
+func _passes_filter_for_key(log_msg: Dictionary, filter_key: String) -> bool:
+	if filter_key == "all":
+		return int(log_msg.get("type", LogType.SYSTEM)) != LogType.DEBUG
+	var log_type = int(log_msg.get("type", LogType.SYSTEM))
+	match filter_key:
+		"system":
+			return log_type == LogType.SYSTEM
+		"battle":
+			return log_type == LogType.BATTLE
+		"production":
+			return log_type == LogType.PRODUCTION
+		"debug":
+			return log_type == LogType.DEBUG
+		_:
+			return true

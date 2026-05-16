@@ -5,6 +5,7 @@ const UI_ICON_PROVIDER = preload("res://scripts/ui/common/UIIconProvider.gd")
 const SETTINGS_SAVE_PATH := "user://settings.cfg"
 const DEFAULT_FPS_LIMIT := 60
 const DEFAULT_MUSIC_VOLUME := 0.8
+const MUSIC_MUTE_ICON_SIZE := Vector2(36, 36)
 
 signal save_requested
 signal load_requested
@@ -90,17 +91,17 @@ func _ensure_mute_button_icon():
 	icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon_rect.custom_minimum_size = Vector2(24, 24)
+	icon_rect.custom_minimum_size = MUSIC_MUTE_ICON_SIZE
 	icon_rect.layout_mode = 1
 	icon_rect.anchors_preset = 8
 	icon_rect.anchor_left = 0.5
 	icon_rect.anchor_top = 0.5
 	icon_rect.anchor_right = 0.5
 	icon_rect.anchor_bottom = 0.5
-	icon_rect.offset_left = -12.0
-	icon_rect.offset_top = -12.0
-	icon_rect.offset_right = 12.0
-	icon_rect.offset_bottom = 12.0
+	icon_rect.offset_left = -MUSIC_MUTE_ICON_SIZE.x * 0.5
+	icon_rect.offset_top = -MUSIC_MUTE_ICON_SIZE.y * 0.5
+	icon_rect.offset_right = MUSIC_MUTE_ICON_SIZE.x * 0.5
+	icon_rect.offset_bottom = MUSIC_MUTE_ICON_SIZE.y * 0.5
 	music_mute_button.add_child(icon_rect)
 	_music_mute_icon_rect = icon_rect
 

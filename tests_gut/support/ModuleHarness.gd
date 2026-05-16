@@ -169,6 +169,8 @@ func _spawn_game_ui() -> void:
 	add_child(game_ui)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	if game_ui.has_method("set_perf_debug_enabled"):
+		game_ui.set_perf_debug_enabled(false)
 	_bind_api_to_scene()
 
 func _bind_api_to_scene() -> void:
